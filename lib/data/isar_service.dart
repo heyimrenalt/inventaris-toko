@@ -1,6 +1,11 @@
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'models/app_settings.dart';
+import 'models/category.dart';
+import 'models/product.dart';
+import 'models/stock_mutation.dart';
+
 class IsarService {
   IsarService._();
 
@@ -13,8 +18,12 @@ class IsarService {
 
     final dir = await getApplicationDocumentsDirectory();
     _instance = await Isar.open(
-      // TODO: add schemas here in Task 1
-      [],
+      [
+        CategorySchema,
+        ProductSchema,
+        StockMutationSchema,
+        AppSettingsSchema,
+      ],
       directory: dir.path,
     );
 

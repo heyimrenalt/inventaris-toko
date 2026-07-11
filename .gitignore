@@ -44,3 +44,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Isar native binary downloaded by Isar.initializeIsarCore(download: true)
+# when running `flutter test` on desktop.
+/libisar.dylib
+/libisar.so
+/isar.dll
