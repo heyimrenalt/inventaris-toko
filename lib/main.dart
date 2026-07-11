@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:isar_community/isar.dart';
 
 import 'data/isar_service.dart';
+import 'ui/navigation/main_scaffold.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await IsarService.open();
   runApp(const MyApp());
 }
 
@@ -15,10 +16,23 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Inventaris Toko',
-      home: Scaffold(
-        body: Center(
-          child: Text('Setup OK'),
-        ),
+      home: FutureBuilder<Isar>(
+        future: IsarService.open(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Text('Gagal membuka database: ${snapshot.error}'),
+              ),
+            );
+          }
+          return MainScaffold(isar: snapshot.data!);
+        },
       ),
     );
   }
