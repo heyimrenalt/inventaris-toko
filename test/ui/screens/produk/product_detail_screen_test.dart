@@ -143,7 +143,91 @@ void main() {
     });
   });
 
-  testWidgets('delete on a product with mutation history shows blocking message', (tester) async {
+  testWidgets(
+    'delete on a product with mutation history shows the archive-offering dialog',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          initialStock: 5,
+        );
+
+        await pumpDetailWithBackStack(tester, product.id);
+
+        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Hapus produk'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(TextButton, 'Hapus'),
+          ),
+        );
+        await settleAfterAsyncWork(tester);
+
+        expect(
+          find.textContaining('memiliki 1 riwayat mutasi stok'),
+          findsOneWidget,
+        );
+        expect(
+          find.widgetWithText(ElevatedButton, 'Arsipkan produk ini'),
+          findsOneWidget,
+        );
+        final unchanged = await productRepository.getById(product.id);
+        expect(unchanged, isNotNull);
+        expect(unchanged!.isArchived, isFalse);
+      });
+    },
+  );
+
+  testWidgets(
+    'confirming archive from the blocking dialog archives the product and navigates back',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          initialStock: 5,
+        );
+
+        await pumpDetailWithBackStack(tester, product.id);
+
+        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Hapus produk'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(TextButton, 'Hapus'),
+          ),
+        );
+        await settleAfterAsyncWork(tester);
+
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Arsipkan produk ini'));
+        await settleAfterAsyncWork(tester);
+
+        expect(find.text('Produk List Marker'), findsOneWidget);
+        expect(find.text('Produk diarsipkan'), findsOneWidget);
+
+        final archived = await productRepository.getById(product.id);
+        expect(archived!.isArchived, isTrue);
+        expect(archived.archivedAt, isNotNull);
+      });
+    },
+  );
+
+  testWidgets('standalone Arsipkan action in the menu archives without a failed delete first', (tester) async {
     await tester.runAsync(() async {
       final category = await categoryRepository.create('Snacks');
       final product = await productRepository.create(
@@ -151,29 +235,26 @@ void main() {
         categoryId: category.id,
         sellPrice: 5000,
         unit: 'pcs',
-        initialStock: 5,
       );
 
       await pumpDetailWithBackStack(tester, product.id);
 
       await tester.tap(find.byType(PopupMenuButton<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Hapus produk'));
+      await tester.tap(find.text('Arsipkan produk'));
       await tester.pumpAndSettle();
 
       await tester.tap(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.widgetWithText(TextButton, 'Hapus'),
+          matching: find.widgetWithText(TextButton, 'Arsipkan'),
         ),
       );
       await settleAfterAsyncWork(tester);
 
-      expect(
-        find.textContaining('memiliki 1 riwayat mutasi stok'),
-        findsOneWidget,
-      );
-      expect(await productRepository.getById(product.id), isNotNull);
+      expect(find.text('Produk List Marker'), findsOneWidget);
+      final archived = await productRepository.getById(product.id);
+      expect(archived!.isArchived, isTrue);
     });
   });
 }

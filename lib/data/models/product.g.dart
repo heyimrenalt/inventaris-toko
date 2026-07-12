@@ -17,41 +17,51 @@ const ProductSchema = CollectionSchema(
   name: r'Product',
   id: -6222113721139403729,
   properties: {
-    r'categoryId': PropertySchema(
+    r'archivedAt': PropertySchema(
       id: 0,
+      name: r'archivedAt',
+      type: IsarType.dateTime,
+    ),
+    r'categoryId': PropertySchema(
+      id: 1,
       name: r'categoryId',
       type: IsarType.long,
     ),
-    r'code': PropertySchema(id: 1, name: r'code', type: IsarType.string),
+    r'code': PropertySchema(id: 2, name: r'code', type: IsarType.string),
     r'createdAt': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'currentStock': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'currentStock',
       type: IsarType.double,
     ),
+    r'isArchived': PropertySchema(
+      id: 5,
+      name: r'isArchived',
+      type: IsarType.bool,
+    ),
     r'minStockThreshold': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'minStockThreshold',
       type: IsarType.double,
     ),
-    r'name': PropertySchema(id: 5, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 7, name: r'name', type: IsarType.string),
     r'photoPath': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'photoPath',
       type: IsarType.string,
     ),
     r'sellPrice': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'sellPrice',
       type: IsarType.double,
     ),
-    r'unit': PropertySchema(id: 8, name: r'unit', type: IsarType.string),
+    r'unit': PropertySchema(id: 10, name: r'unit', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
@@ -128,16 +138,18 @@ void _productSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.categoryId);
-  writer.writeString(offsets[1], object.code);
-  writer.writeDateTime(offsets[2], object.createdAt);
-  writer.writeDouble(offsets[3], object.currentStock);
-  writer.writeDouble(offsets[4], object.minStockThreshold);
-  writer.writeString(offsets[5], object.name);
-  writer.writeString(offsets[6], object.photoPath);
-  writer.writeDouble(offsets[7], object.sellPrice);
-  writer.writeString(offsets[8], object.unit);
-  writer.writeDateTime(offsets[9], object.updatedAt);
+  writer.writeDateTime(offsets[0], object.archivedAt);
+  writer.writeLong(offsets[1], object.categoryId);
+  writer.writeString(offsets[2], object.code);
+  writer.writeDateTime(offsets[3], object.createdAt);
+  writer.writeDouble(offsets[4], object.currentStock);
+  writer.writeBool(offsets[5], object.isArchived);
+  writer.writeDouble(offsets[6], object.minStockThreshold);
+  writer.writeString(offsets[7], object.name);
+  writer.writeString(offsets[8], object.photoPath);
+  writer.writeDouble(offsets[9], object.sellPrice);
+  writer.writeString(offsets[10], object.unit);
+  writer.writeDateTime(offsets[11], object.updatedAt);
 }
 
 Product _productDeserialize(
@@ -147,17 +159,19 @@ Product _productDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Product();
-  object.categoryId = reader.readLong(offsets[0]);
-  object.code = reader.readStringOrNull(offsets[1]);
-  object.createdAt = reader.readDateTime(offsets[2]);
-  object.currentStock = reader.readDouble(offsets[3]);
+  object.archivedAt = reader.readDateTimeOrNull(offsets[0]);
+  object.categoryId = reader.readLong(offsets[1]);
+  object.code = reader.readStringOrNull(offsets[2]);
+  object.createdAt = reader.readDateTime(offsets[3]);
+  object.currentStock = reader.readDouble(offsets[4]);
   object.id = id;
-  object.minStockThreshold = reader.readDouble(offsets[4]);
-  object.name = reader.readString(offsets[5]);
-  object.photoPath = reader.readStringOrNull(offsets[6]);
-  object.sellPrice = reader.readDouble(offsets[7]);
-  object.unit = reader.readString(offsets[8]);
-  object.updatedAt = reader.readDateTime(offsets[9]);
+  object.isArchived = reader.readBool(offsets[5]);
+  object.minStockThreshold = reader.readDouble(offsets[6]);
+  object.name = reader.readString(offsets[7]);
+  object.photoPath = reader.readStringOrNull(offsets[8]);
+  object.sellPrice = reader.readDouble(offsets[9]);
+  object.unit = reader.readString(offsets[10]);
+  object.updatedAt = reader.readDateTime(offsets[11]);
   return object;
 }
 
@@ -169,24 +183,28 @@ P _productDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readStringOrNull(offset)) as P;
-    case 7:
       return (reader.readDouble(offset)) as P;
-    case 8:
+    case 7:
       return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
     case 9:
+      return (reader.readDouble(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
+    case 11:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -410,6 +428,81 @@ extension ProductQueryWhere on QueryBuilder<Product, Product, QWhereClause> {
 
 extension ProductQueryFilter
     on QueryBuilder<Product, Product, QFilterCondition> {
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'archivedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'archivedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtEqualTo(
+    DateTime? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'archivedAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'archivedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'archivedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'archivedAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdEqualTo(
     int value,
   ) {
@@ -817,6 +910,16 @@ extension ProductQueryFilter
           upper: upper,
           includeUpper: includeUpper,
         ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> isArchivedEqualTo(
+    bool value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'isArchived', value: value),
       );
     });
   }
@@ -1491,6 +1594,18 @@ extension ProductQueryLinks
     on QueryBuilder<Product, Product, QFilterCondition> {}
 
 extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
+  QueryBuilder<Product, Product, QAfterSortBy> sortByArchivedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'archivedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByArchivedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'archivedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByCategoryId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'categoryId', Sort.asc);
@@ -1536,6 +1651,18 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
   QueryBuilder<Product, Product, QAfterSortBy> sortByCurrentStockDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'currentStock', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByIsArchived() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isArchived', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByIsArchivedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isArchived', Sort.desc);
     });
   }
 
@@ -1614,6 +1741,18 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
 
 extension ProductQuerySortThenBy
     on QueryBuilder<Product, Product, QSortThenBy> {
+  QueryBuilder<Product, Product, QAfterSortBy> thenByArchivedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'archivedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByArchivedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'archivedAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> thenByCategoryId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'categoryId', Sort.asc);
@@ -1671,6 +1810,18 @@ extension ProductQuerySortThenBy
   QueryBuilder<Product, Product, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByIsArchived() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isArchived', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByIsArchivedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isArchived', Sort.desc);
     });
   }
 
@@ -1749,6 +1900,12 @@ extension ProductQuerySortThenBy
 
 extension ProductQueryWhereDistinct
     on QueryBuilder<Product, Product, QDistinct> {
+  QueryBuilder<Product, Product, QDistinct> distinctByArchivedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'archivedAt');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByCategoryId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'categoryId');
@@ -1772,6 +1929,12 @@ extension ProductQueryWhereDistinct
   QueryBuilder<Product, Product, QDistinct> distinctByCurrentStock() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'currentStock');
+    });
+  }
+
+  QueryBuilder<Product, Product, QDistinct> distinctByIsArchived() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isArchived');
     });
   }
 
@@ -1826,6 +1989,12 @@ extension ProductQueryProperty
     });
   }
 
+  QueryBuilder<Product, DateTime?, QQueryOperations> archivedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'archivedAt');
+    });
+  }
+
   QueryBuilder<Product, int, QQueryOperations> categoryIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'categoryId');
@@ -1847,6 +2016,12 @@ extension ProductQueryProperty
   QueryBuilder<Product, double, QQueryOperations> currentStockProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'currentStock');
+    });
+  }
+
+  QueryBuilder<Product, bool, QQueryOperations> isArchivedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isArchived');
     });
   }
 

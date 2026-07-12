@@ -8,6 +8,7 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../widgets/product_list_item.dart';
+import 'archived_products_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 
@@ -77,6 +78,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
     await _loadData();
   }
 
+  Future<void> _openArchivedProducts() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => ArchivedProductsScreen(isar: widget.isar)),
+    );
+    await _loadData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,6 +93,14 @@ class _ProdukScreenState extends State<ProdukScreen> {
         children: [
           _buildCategoryChips(),
           const Divider(height: 1),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _openArchivedProducts,
+              icon: const Icon(Icons.archive_outlined),
+              label: const Text('Lihat produk diarsipkan', style: TextStyle(fontSize: 14)),
+            ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())

@@ -169,19 +169,73 @@ class ProductRepository {
     });
   }
 
-  Future<List<Product>> getAll() => _isar.products.where().findAll();
+  /// Marks a product archived instead of deleting it. Unlike [delete],
+  /// this works regardless of stock mutation history — it's the intended
+  /// way out for a product that has history and so can never be
+  /// hard-deleted, but is also available for products without history in
+  /// case archiving is simply preferred. Never touches `currentStock` or
+  /// the mutation ledger.
+  Future<Product> archive(int id) async {
+    final product = await getById(id);
+    if (product == null) {
+      throw NotFoundException('Product $id not found');
+    }
+
+    product.isArchived = true;
+    product.archivedAt = DateTime.now();
+    product.updatedAt = DateTime.now();
+
+    await _isar.writeTxn(() async {
+      await _isar.products.put(product);
+    });
+
+    return product;
+  }
+
+  Future<Product> unarchive(int id) async {
+    final product = await getById(id);
+    if (product == null) {
+      throw NotFoundException('Product $id not found');
+    }
+
+    product.isArchived = false;
+    product.archivedAt = null;
+    product.updatedAt = DateTime.now();
+
+    await _isar.writeTxn(() async {
+      await _isar.products.put(product);
+    });
+
+    return product;
+  }
+
+  Future<List<Product>> getAll({bool includeArchived = false}) {
+    if (includeArchived) {
+      return _isar.products.where().findAll();
+    }
+    return _isar.products.filter().isArchivedEqualTo(false).findAll();
+  }
 
   Future<Product?> getById(int id) => _isar.products.get(id);
 
-  Future<List<Product>> getByCategory(int categoryId) {
-    return _isar.products.filter().categoryIdEqualTo(categoryId).findAll();
+  Future<List<Product>> getArchived() {
+    return _isar.products.filter().isArchivedEqualTo(true).findAll();
   }
 
-  Future<List<Product>> searchByName(String query) {
-    return _isar.products
-        .filter()
-        .nameContains(query, caseSensitive: false)
-        .findAll();
+  Future<List<Product>> getByCategory(int categoryId, {bool includeArchived = false}) {
+    final query = _isar.products.filter().categoryIdEqualTo(categoryId);
+    if (includeArchived) {
+      return query.findAll();
+    }
+    return query.isArchivedEqualTo(false).findAll();
+  }
+
+  Future<List<Product>> searchByName(String query, {bool includeArchived = false}) {
+    final filter = _isar.products.filter().nameContains(query, caseSensitive: false);
+    if (includeArchived) {
+      return filter.findAll();
+    }
+    return filter.isArchivedEqualTo(false).findAll();
   }
 
   String _validateName(String name) {

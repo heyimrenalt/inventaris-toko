@@ -36,4 +36,12 @@ class Product {
   late DateTime createdAt;
 
   late DateTime updatedAt;
+
+  /// Archived products are hidden from normal listings but not deleted —
+  /// an alternative to [ProductRepository.delete] for products that have
+  /// stock mutation history (and so can't be hard-deleted) but the user
+  /// still wants off their active list.
+  bool isArchived = false;
+
+  DateTime? archivedAt;
 }

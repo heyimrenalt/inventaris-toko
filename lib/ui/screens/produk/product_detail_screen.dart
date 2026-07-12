@@ -108,24 +108,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       Navigator.of(context).pop(true);
     } on ProductHasHistoryException catch (e) {
       if (!mounted) return;
-      await showDialog<void>(
+      // Blocked by mutation history: offer archiving right here instead
+      // of leaving the user at a dead end.
+      final shouldArchive = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Tidak Bisa Dihapus', style: TextStyle(fontSize: 18)),
           content: Text(
             'Produk ini memiliki ${e.mutationCount} riwayat mutasi stok dan tidak '
-            'dapat dihapus.',
+            'dapat dihapus. Anda bisa mengarsipkan produk ini agar tidak muncul '
+            'di daftar utama, tanpa menghapus riwayatnya.',
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK', style: TextStyle(fontSize: 16)),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Tutup', style: TextStyle(fontSize: 16)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Arsipkan produk ini', style: TextStyle(fontSize: 16)),
             ),
           ],
         ),
       );
+      if (shouldArchive == true) {
+        await _archiveProduct(product, requireConfirmation: false);
+      }
     }
+  }
+
+  Future<void> _archiveProduct(Product product, {bool requireConfirmation = true}) async {
+    if (requireConfirmation) {
+      final confirmed = await showConfirmDialog(
+        context: context,
+        title: 'Arsipkan Produk',
+        message:
+            "Arsipkan produk '${product.name}'? Produk tidak akan muncul di daftar "
+            'utama, tapi bisa dipulihkan kapan saja.',
+        confirmLabel: 'Arsipkan',
+      );
+      if (confirmed != true) return;
+      if (!mounted) return;
+    }
+
+    await _productRepository.archive(product.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Produk diarsipkan')),
+    );
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _unarchiveProduct(Product product) async {
+    await _productRepository.unarchive(product.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Produk dipulihkan')),
+    );
+    await _load();
   }
 
   @override
@@ -144,16 +185,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
                 PopupMenuButton<String>(
                   onSelected: (value) {
-                    if (value == 'delete') _confirmDelete();
+                    switch (value) {
+                      case 'delete':
+                        _confirmDelete();
+                      case 'archive':
+                        _archiveProduct(product);
+                      case 'unarchive':
+                        _unarchiveProduct(product);
+                    }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'Hapus produk',
-                        style: TextStyle(color: Colors.red, fontSize: 16),
+                    if (product.isArchived)
+                      const PopupMenuItem(
+                        value: 'unarchive',
+                        child: Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
+                      )
+                    else ...[
+                      const PopupMenuItem(
+                        value: 'archive',
+                        child: Text('Arsipkan produk', style: TextStyle(fontSize: 16)),
                       ),
-                    ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text(
+                          'Hapus produk',
+                          style: TextStyle(color: Colors.red, fontSize: 16),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -177,6 +236,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           Center(child: _buildPhoto(product.photoPath)),
           const SizedBox(height: 16),
+          if (product.isArchived) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Diarsipkan pada ${_formatDate(product.archivedAt)}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Text(product.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           if (product.code != null && product.code!.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -206,25 +279,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 8),
           _infoRow('Batas minimum', '${_formatQuantity(product.minStockThreshold)} ${product.unit}'),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showNotAvailable,
-                  icon: const Icon(Icons.add_box_outlined),
-                  label: const Text('Stok masuk', style: TextStyle(fontSize: 16)),
-                ),
+          if (product.isArchived)
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () => _unarchiveProduct(product),
+                icon: const Icon(Icons.unarchive_outlined),
+                label: const Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showNotAvailable,
-                  icon: const Icon(Icons.remove_circle_outline),
-                  label: const Text('Stok keluar', style: TextStyle(fontSize: 16)),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showNotAvailable,
+                    icon: const Icon(Icons.add_box_outlined),
+                    label: const Text('Stok masuk', style: TextStyle(fontSize: 16)),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showNotAvailable,
+                    icon: const Icon(Icons.remove_circle_outline),
+                    label: const Text('Stok keluar', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 24),
           const Text('Riwayat Mutasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -287,6 +371,13 @@ String _formatQuantity(double value) {
     return value.toInt().toString();
   }
   return value.toStringAsFixed(1);
+}
+
+String _formatDate(DateTime? date) {
+  if (date == null) return '-';
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return '$day/$month/${date.year}';
 }
 
 String _formatCurrency(double value) {

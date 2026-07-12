@@ -268,4 +268,106 @@ void main() {
       expect(snacks.first.name, 'Chips');
     });
   });
+
+  group('ProductRepository archive/unarchive', () {
+    test('archive() sets isArchived true and archivedAt to a non-null value', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+
+      final archived = await productRepository.archive(product.id);
+
+      expect(archived.isArchived, isTrue);
+      expect(archived.archivedAt, isNotNull);
+    });
+
+    test('unarchive() resets isArchived to false and archivedAt to null', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      await productRepository.archive(product.id);
+
+      final restored = await productRepository.unarchive(product.id);
+
+      expect(restored.isArchived, isFalse);
+      expect(restored.archivedAt, isNull);
+    });
+
+    test('getAll() excludes archived by default, includes with includeArchived: true', () async {
+      final active = await productRepository.create(
+        name: 'Active',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      final archived = await productRepository.create(
+        name: 'Archived',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      await productRepository.archive(archived.id);
+
+      final defaultList = await productRepository.getAll();
+      expect(defaultList.map((p) => p.id), [active.id]);
+
+      final fullList = await productRepository.getAll(includeArchived: true);
+      expect(fullList, hasLength(2));
+    });
+
+    test('getArchived() returns only archived products', () async {
+      final active = await productRepository.create(
+        name: 'Active',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      final archived = await productRepository.create(
+        name: 'Archived',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      await productRepository.archive(archived.id);
+
+      final archivedList = await productRepository.getArchived();
+      expect(archivedList.map((p) => p.id), [archived.id]);
+      expect(archivedList.any((p) => p.id == active.id), isFalse);
+    });
+
+    test('archiving a product with mutation history succeeds', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+        initialStock: 5,
+      );
+
+      final archived = await productRepository.archive(product.id);
+      expect(archived.isArchived, isTrue);
+    });
+
+    test('delete() is still blocked by ProductHasHistoryException whether archived or not', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+        initialStock: 5,
+      );
+      await productRepository.archive(product.id);
+
+      expect(
+        () => productRepository.delete(product.id),
+        throwsA(isA<ProductHasHistoryException>()),
+      );
+    });
+  });
 }
