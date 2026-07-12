@@ -22,7 +22,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   Widget build(BuildContext context) {
     final screens = [
       const BerandaScreen(),
-      const ProdukScreen(),
+      ProdukScreen(isar: widget.isar),
       const MutasiScreen(),
       PengaturanScreen(isar: widget.isar),
     ];

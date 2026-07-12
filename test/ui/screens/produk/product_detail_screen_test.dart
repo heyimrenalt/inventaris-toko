@@ -1,0 +1,179 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
+import 'package:inventaris_toko/data/repositories/category_repository.dart';
+import 'package:inventaris_toko/data/repositories/product_repository.dart';
+import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
+import 'package:inventaris_toko/ui/screens/produk/product_detail_screen.dart';
+import 'package:isar_community/isar.dart';
+
+import '../../../data/repositories/test_isar.dart';
+import '../../widget_test_helpers.dart';
+import 'fake_photo_storage_service.dart';
+
+void main() {
+  late Isar isar;
+  late CategoryRepository categoryRepository;
+  late ProductRepository productRepository;
+  late StockMutationRepository stockMutationRepository;
+
+  setUp(() async {
+    isar = await openTestIsar();
+    categoryRepository = CategoryRepository(isar);
+    stockMutationRepository = StockMutationRepository(isar);
+    productRepository = ProductRepository(
+      isar,
+      stockMutationRepository,
+      AppSettingsRepository(isar),
+    );
+  });
+
+  tearDown(() async {
+    await closeTestIsar(isar);
+  });
+
+  // Wraps ProductDetailScreen behind a base route with a distinguishable
+  // marker, so "navigates back" can be verified by checking we're back at
+  // that marker (rather than just guessing at pop() semantics).
+  Future<void> pumpDetailWithBackStack(WidgetTester tester, int productId) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreen(
+                    isar: isar,
+                    productId: productId,
+                    photoStorageService: FakePhotoStorageService(),
+                  ),
+                ),
+              ),
+              child: const Text('Produk List Marker'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Produk List Marker'));
+    await settleAfterAsyncWork(tester);
+  }
+
+  testWidgets('displays correct product info', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        code: '999',
+        minStockThreshold: 5,
+        initialStock: 12,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.text('Chips'), findsOneWidget);
+      expect(find.text('Kode: 999'), findsOneWidget);
+      expect(find.text('Snacks'), findsOneWidget);
+      expect(find.text('Rp 5.000'), findsOneWidget);
+      expect(find.text('pcs'), findsOneWidget);
+      expect(find.textContaining('Stok saat ini: 12 pcs'), findsOneWidget);
+      expect(find.text('5 pcs'), findsOneWidget);
+    });
+  });
+
+  testWidgets('tapping Stok masuk/keluar shows "belum tersedia" and does not mutate stock', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 12,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Stok masuk'));
+      await tester.pump();
+      expect(find.text('Fitur ini belum tersedia'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Stok keluar'));
+      await tester.pump();
+      expect(find.text('Fitur ini belum tersedia'), findsOneWidget);
+
+      final unchanged = await productRepository.getById(product.id);
+      expect(unchanged!.currentStock, 12);
+      expect(await stockMutationRepository.getHistoryForProduct(product.id), hasLength(1));
+    });
+  });
+
+  testWidgets('delete on a product with no mutation history succeeds and navigates back', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hapus produk'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(TextButton, 'Hapus'),
+        ),
+      );
+      await settleAfterAsyncWork(tester);
+
+      expect(find.text('Produk List Marker'), findsOneWidget);
+      expect(find.text('Detail Produk'), findsNothing);
+      expect(await productRepository.getById(product.id), isNull);
+    });
+  });
+
+  testWidgets('delete on a product with mutation history shows blocking message', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 5,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hapus produk'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(TextButton, 'Hapus'),
+        ),
+      );
+      await settleAfterAsyncWork(tester);
+
+      expect(
+        find.textContaining('memiliki 1 riwayat mutasi stok'),
+        findsOneWidget,
+      );
+      expect(await productRepository.getById(product.id), isNotNull);
+    });
+  });
+}

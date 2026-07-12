@@ -4,6 +4,7 @@ import 'package:isar_community/isar.dart';
 import '../../../data/models/category.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
+import '../../widgets/category_form_dialog.dart';
 import '../../widgets/confirm_dialog.dart';
 
 class KelolaKategoriScreen extends StatefulWidget {
@@ -41,62 +42,14 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
   }
 
   Future<void> _showCategoryFormDialog({Category? existing}) async {
-    final controller = TextEditingController(text: existing?.name ?? '');
-    String? errorText;
-
-    await showDialog<void>(
+    final result = await showCategoryFormDialog(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            Future<void> submit() async {
-              try {
-                if (existing == null) {
-                  await _repository.create(controller.text);
-                } else {
-                  await _repository.rename(existing.id, controller.text);
-                }
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop();
-                await _loadCategories();
-                _showSnackBar(existing == null ? 'Kategori ditambahkan' : 'Kategori diperbarui');
-              } on ValidationException {
-                setDialogState(() => errorText = 'Nama kategori tidak boleh kosong');
-              } on DuplicateCategoryNameException {
-                setDialogState(() => errorText = 'Kategori dengan nama ini sudah ada');
-              }
-            }
-
-            return AlertDialog(
-              title: Text(
-                existing == null ? 'Tambah Kategori' : 'Ubah Kategori',
-                style: const TextStyle(fontSize: 18),
-              ),
-              content: TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(fontSize: 16),
-                decoration: InputDecoration(
-                  labelText: 'Nama kategori',
-                  errorText: errorText,
-                ),
-                onSubmitted: (_) => submit(),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Batal', style: TextStyle(fontSize: 16)),
-                ),
-                ElevatedButton(
-                  onPressed: submit,
-                  child: const Text('Simpan', style: TextStyle(fontSize: 16)),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      repository: _repository,
+      existing: existing,
     );
+    if (result == null) return;
+    await _loadCategories();
+    _showSnackBar(existing == null ? 'Kategori ditambahkan' : 'Kategori diperbarui');
   }
 
   Future<void> _confirmDelete(Category category) async {

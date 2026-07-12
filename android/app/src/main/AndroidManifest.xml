@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- image_picker: camera capture for product photos. Gallery picking
+         uses the Android system Photo Picker (no runtime permission
+         needed on API 33+, and image_picker's own merged manifest
+         handles the legacy READ_EXTERNAL_STORAGE fallback below that). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="inventaris_toko"
         android:name="${applicationName}"
