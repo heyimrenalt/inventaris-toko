@@ -5,9 +5,11 @@ import 'package:isar_community/isar.dart';
 
 import '../../../data/models/product.dart';
 import '../../../data/repositories/app_settings_repository.dart';
+import '../../../data/repositories/cost_price_adjustment_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../domain/hpp_calculator.dart';
 import '../../../services/photo_storage_service.dart';
 import '../../widgets/category_picker_field.dart';
 
@@ -40,9 +42,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     AppSettingsRepository(widget.isar),
   );
   late final AppSettingsRepository _appSettingsRepository = AppSettingsRepository(widget.isar);
+  late final CostPriceAdjustmentRepository _costPriceAdjustmentRepository =
+      CostPriceAdjustmentRepository(widget.isar);
 
   late final TextEditingController _nameController;
   late final TextEditingController _codeController;
+  late final TextEditingController _costPriceController;
   late final TextEditingController _sellPriceController;
   late final TextEditingController _unitController;
   late final TextEditingController _initialStockController;
@@ -65,6 +70,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final existing = widget.existing;
     _nameController = TextEditingController(text: existing?.name ?? '');
     _codeController = TextEditingController(text: existing?.code ?? '');
+    // Pre-filled with the current HPP in edit mode (this is the "Harga
+    // modal (koreksi)" manual-correction field there), left blank in add
+    // mode (the initial "Harga modal" field).
+    _costPriceController = TextEditingController(
+      text: existing?.averageCostPrice != null ? _formatNumberInput(existing!.averageCostPrice!) : '',
+    );
     _sellPriceController =
         TextEditingController(text: existing != null ? _formatNumberInput(existing.sellPrice) : '');
     _unitController = TextEditingController(text: existing?.unit ?? '');
@@ -75,11 +86,30 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _photoPath = existing?.photoPath;
     _categoryId = existing?.categoryId;
 
+    // Live margin preview reacts to both fields in both modes: the cost
+    // price field is editable in edit mode too now (as a manual HPP
+    // correction), not just at creation.
+    _sellPriceController.addListener(_onLivePriceFieldsChanged);
+    _costPriceController.addListener(_onLivePriceFieldsChanged);
+
     if (existing == null) {
       _loadDefaultThreshold();
     } else {
       _initializing = false;
     }
+  }
+
+  void _onLivePriceFieldsChanged() => setState(() {});
+
+  double? _liveSellPrice() {
+    final value = double.tryParse(_sellPriceController.text.trim().replaceAll(',', '.'));
+    return (value == null || value <= 0) ? null : value;
+  }
+
+  double? _liveCostPrice() {
+    final text = _costPriceController.text.trim();
+    if (text.isEmpty) return null;
+    return double.tryParse(text.replaceAll(',', '.'));
   }
 
   Future<void> _loadDefaultThreshold() async {
@@ -95,6 +125,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void dispose() {
     _nameController.dispose();
     _codeController.dispose();
+    _costPriceController.dispose();
     _sellPriceController.dispose();
     _unitController.dispose();
     _initialStockController.dispose();
@@ -180,6 +211,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           unit: _unitController.text,
           minStockThreshold: minThreshold,
         );
+
+        // Manual HPP correction: only write an adjustment (and only touch
+        // averageCostPrice) if the "Harga modal (koreksi)" field actually
+        // changed from the stored value — leaving it untouched must be a
+        // no-op, not a redundant audit row.
+        final correctedCost = _liveCostPrice();
+        if (correctedCost != widget.existing!.averageCostPrice) {
+          await _costPriceAdjustmentRepository.recordAdjustment(
+            productId: widget.existing!.id,
+            newCost: correctedCost,
+          );
+        }
       } else {
         await _productRepository.create(
           name: _nameController.text,
@@ -190,6 +233,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           photoPath: _photoPath,
           minStockThreshold: minThreshold,
           initialStock: initialStock,
+          averageCostPrice: _liveCostPrice(),
         );
       }
       if (!mounted) return;
@@ -280,6 +324,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       _categoryError = null;
                     }),
                   ),
+                  if (widget.isEditing) ...[
+                    const SizedBox(height: 16),
+                    _buildReadOnlyHpp(),
+                  ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const Key('product_form_cost_price'),
+                    controller: _costPriceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText:
+                          widget.isEditing ? 'Harga modal (koreksi)' : 'Harga modal (opsional)',
+                      hintText: widget.isEditing
+                          ? 'Ubah untuk mengoreksi HPP secara manual'
+                          : 'Harga beli/modal per unit',
+                      prefixText: 'Rp ',
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   TextField(
                     key: const Key('product_form_price'),
@@ -292,6 +355,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       errorText: _priceError,
                     ),
                   ),
+                  _buildMarginPanel(),
                   const SizedBox(height: 16),
                   TextField(
                     key: const Key('product_form_unit'),
@@ -347,6 +411,73 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildReadOnlyHpp() {
+    final avgCost = widget.existing!.averageCostPrice;
+    return Container(
+      key: const Key('product_form_hpp_readonly'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              avgCost == null
+                  ? 'HPP saat ini: belum ada data harga modal'
+                  : 'HPP saat ini: ${_formatCurrency(avgCost)}/unit '
+                      '(diperbarui otomatis saat restock, atau koreksi manual di bawah)',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Live "Untung per unit" / margin preview, recalculated on every rebuild
+  /// from the current sell price and cost price fields — hidden entirely
+  /// when either input is missing/invalid, per spec.
+  Widget _buildMarginPanel() {
+    final sellPrice = _liveSellPrice();
+    final costPrice = _liveCostPrice();
+    final profit = HppCalculator.profitPerUnit(sellPrice ?? 0, costPrice);
+    final margin = HppCalculator.marginPercent(sellPrice ?? 0, costPrice);
+    if (sellPrice == null || profit == null || margin == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        key: const Key('product_form_margin_panel'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Untung per unit: ${_formatCurrency(profit)}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              'Margin: ${margin.round()}%',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -410,4 +541,22 @@ String _formatNumberInput(double value) {
     return value.toInt().toString();
   }
   return value.toString();
+}
+
+/// Unlike Product Detail's currency formatter (which only ever formats
+/// non-negative prices), profit-per-unit can be negative when the cost
+/// price exceeds the sell price — so the sign is split off before grouping
+/// digits rather than being swept into the thousands-separator math.
+String _formatCurrency(double value) {
+  final isNegative = value < 0;
+  final digits = value.abs().round().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    final positionFromEnd = digits.length - i;
+    buffer.write(digits[i]);
+    if (positionFromEnd > 1 && positionFromEnd % 3 == 1) {
+      buffer.write('.');
+    }
+  }
+  return 'Rp ${isNegative ? '-' : ''}$buffer';
 }

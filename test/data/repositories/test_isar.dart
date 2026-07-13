@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:inventaris_toko/data/models/app_settings.dart';
 import 'package:inventaris_toko/data/models/category.dart';
+import 'package:inventaris_toko/data/models/cost_price_adjustment.dart';
 import 'package:inventaris_toko/data/models/product.dart';
 import 'package:inventaris_toko/data/models/stock_mutation.dart';
 import 'package:isar_community/isar.dart';
@@ -29,6 +30,7 @@ Future<Isar> openTestIsar() async {
       ProductSchema,
       StockMutationSchema,
       AppSettingsSchema,
+      CostPriceAdjustmentSchema,
     ],
     directory: dir.path,
     name: 'test_${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(dir)}',

@@ -101,7 +101,13 @@ void main() {
 
         await pumpDetailWithBackStack(tester, product.id);
 
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Stok masuk'));
+        // The new HPP section pushes the action buttons below the fold, so
+        // they need an explicit scroll-into-view before tapping — same
+        // pattern already used elsewhere in this suite for below-the-fold
+        // buttons (e.g. product_form_screen_test.dart's tapSubmit).
+        final stokMasukFinder = find.widgetWithText(ElevatedButton, 'Stok masuk');
+        await tester.ensureVisible(stokMasukFinder);
+        await tester.tap(stokMasukFinder);
         await settleAfterAsyncWork(tester);
 
         expect(find.text('Catat Mutasi'), findsOneWidget);
@@ -310,6 +316,49 @@ void main() {
       expect(find.text('Produk List Marker'), findsOneWidget);
       final archived = await productRepository.getById(product.id);
       expect(archived!.isArchived, isTrue);
+    });
+  });
+
+  testWidgets('shows HPP, untung per unit, and margin when averageCostPrice is available', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        averageCostPrice: 3000,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.byKey(const Key('product_detail_hpp_section')), findsOneWidget);
+      expect(find.text('HPP'), findsOneWidget);
+      expect(find.text('Rp 3.000/unit'), findsOneWidget);
+      expect(find.text('Untung per unit'), findsOneWidget);
+      // 5000 - 3000 = 2000.
+      expect(find.text('Rp 2.000'), findsOneWidget);
+      expect(find.text('Margin'), findsOneWidget);
+      // (5000 - 3000) / 5000 * 100 = 40%.
+      expect(find.text('40%'), findsOneWidget);
+    });
+  });
+
+  testWidgets('shows a neutral HPP placeholder and no margin when averageCostPrice is null', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.text('Belum ada data harga modal'), findsOneWidget);
+      expect(find.text('Untung per unit'), findsNothing);
+      expect(find.text('Margin'), findsNothing);
     });
   });
 }

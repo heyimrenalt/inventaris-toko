@@ -34,6 +34,7 @@ class ProductRepository {
     String? photoPath,
     double? minStockThreshold,
     double initialStock = 0,
+    double? averageCostPrice,
   }) async {
     final trimmedName = _validateName(name);
     final trimmedUnit = _validateUnit(unit);
@@ -64,6 +65,7 @@ class ProductRepository {
       ..unit = trimmedUnit
       ..currentStock = 0
       ..minStockThreshold = threshold
+      ..averageCostPrice = averageCostPrice
       ..createdAt = now
       ..updatedAt = now;
 

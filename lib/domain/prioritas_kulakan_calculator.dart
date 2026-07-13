@@ -17,13 +17,19 @@ class PrioritasKulakanResult {
 
   /// currentStock ÷ dailyVelocity. Still populated (as 0) when
   /// [isOutOfStock] is true, so callers can sort on this field
-  /// uniformly — but it must never be displayed literally as "0 hari
-  /// lagi"; show a "Stok habis sekarang" label instead.
+  /// uniformly — but it must never be displayed literally as a fractional
+  /// day count; see [isBelowOneDay].
   final double estimatedDaysRemaining;
 
   final bool isOutOfStock;
 
   final PriorityUrgency urgency;
+
+  /// True when there's less than a full day of stock left, including the
+  /// [isOutOfStock] case. Display code should show a "Waktunya kulakan!"
+  /// label instead of "X hari lagi" (or a "0"/fractional day count) when
+  /// this is true.
+  bool get isBelowOneDay => isOutOfStock || estimatedDaysRemaining < 1;
 }
 
 /// Pure velocity/priority calculation for "prioritas kulakan" (purchase

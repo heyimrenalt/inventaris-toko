@@ -35,7 +35,7 @@ class PriorityProductCard extends StatelessWidget {
   }
 
   String get _daysLabel {
-    if (result.isOutOfStock) return 'Stok habis sekarang';
+    if (result.isBelowOneDay) return 'Waktunya kulakan!';
     return '${result.estimatedDaysRemaining.round()} hari lagi';
   }
 

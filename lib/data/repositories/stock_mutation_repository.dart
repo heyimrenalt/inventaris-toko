@@ -1,5 +1,6 @@
 import 'package:isar_community/isar.dart';
 
+import '../../domain/hpp_calculator.dart';
 import '../models/product.dart';
 import '../models/stock_mutation.dart';
 import 'repository_exceptions.dart';
@@ -13,11 +14,17 @@ class StockMutationRepository {
 
   final Isar _isar;
 
+  /// [costPricePerUnit] is only meaningful when [type] is
+  /// [StockMutationType.stockIn]: if provided, [Product.averageCostPrice] is
+  /// recalculated via [HppCalculator.calculateNewAverage] and written in the
+  /// same write transaction as the stock update, so the two never diverge.
+  /// Ignored for stockOut, and a no-op when left null (HPP stays unchanged).
   Future<StockMutation> recordMutation({
     required int productId,
     required StockMutationType type,
     required double quantity,
     String? note,
+    double? costPricePerUnit,
   }) async {
     if (quantity <= 0) {
       throw ValidationException('quantity must be > 0');
@@ -32,6 +39,14 @@ class StockMutationRepository {
       final double newStock;
       if (type == StockMutationType.stockIn) {
         newStock = product.currentStock + quantity;
+        if (costPricePerUnit != null) {
+          product.averageCostPrice = HppCalculator.calculateNewAverage(
+            currentStock: product.currentStock,
+            currentAvgCost: product.averageCostPrice ?? 0,
+            incomingQty: quantity,
+            incomingCostPrice: costPricePerUnit,
+          );
+        }
       } else {
         // Stock-out can never take currentStock negative. Rather than
         // clamping to 0, the whole mutation is rejected: no Product or

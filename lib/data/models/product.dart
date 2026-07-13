@@ -35,6 +35,14 @@ class Product {
 
   late double minStockThreshold;
 
+  /// Weighted average cost per unit (HPP). `null` means no cost data has
+  /// ever been recorded for this product — distinct from 0, which would
+  /// mean the product's cost is genuinely zero. Never set directly outside
+  /// of [ProductRepository.create] (initial value) and
+  /// [StockMutationRepository.recordMutation] (recalculated on stockIn
+  /// batches that provide a cost price); persists across stock hitting 0.
+  double? averageCostPrice;
+
   late DateTime createdAt;
 
   late DateTime updatedAt;

@@ -171,4 +171,94 @@ void main() {
     expect(totals.stockIn, 15);
     expect(totals.stockOut, 2);
   });
+
+  group('HPP (averageCostPrice)', () {
+    test('stockIn from zero stock sets HPP directly to the incoming cost price', () async {
+      final category = (await CategoryRepository(isar).create('Drinks')).id;
+      final id = (await productRepository.create(
+        name: 'Teh Botol',
+        categoryId: category,
+        sellPrice: 5000,
+        unit: 'pcs',
+      ))
+          .id;
+
+      await stockMutationRepository.recordMutation(
+        productId: id,
+        type: StockMutationType.stockIn,
+        quantity: 10,
+        costPricePerUnit: 5000,
+      );
+
+      final product = await productRepository.getById(id);
+      expect(product!.averageCostPrice, 5000);
+    });
+
+    test('stockIn with costPricePerUnit computes the weighted average against existing HPP', () async {
+      final category = (await CategoryRepository(isar).create('Drinks')).id;
+      final id = (await productRepository.create(
+        name: 'Teh Botol',
+        categoryId: category,
+        sellPrice: 5000,
+        unit: 'pcs',
+      ))
+          .id;
+
+      await stockMutationRepository.recordMutation(
+        productId: id,
+        type: StockMutationType.stockIn,
+        quantity: 10,
+        costPricePerUnit: 5000,
+      );
+      await stockMutationRepository.recordMutation(
+        productId: id,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+        costPricePerUnit: 8000,
+      );
+
+      // (10 units @ 5000 + 5 units @ 8000) / 15 = 6000.
+      final product = await productRepository.getById(id);
+      expect(product!.averageCostPrice, 6000);
+      // Stock update and HPP update land in the same write transaction, so
+      // both reflect the second batch together.
+      expect(product.currentStock, 15);
+    });
+
+    test('stockIn without costPricePerUnit leaves averageCostPrice unchanged', () async {
+      await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+
+      final product = await productRepository.getById(productId);
+      expect(product!.averageCostPrice, isNull);
+      expect(product.currentStock, 15);
+    });
+
+    test('stockOut never modifies averageCostPrice, even if a cost price were somehow supplied', () async {
+      final category = (await CategoryRepository(isar).create('Drinks')).id;
+      final id = (await productRepository.create(
+        name: 'Teh Botol',
+        categoryId: category,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 10,
+        averageCostPrice: 4000,
+      ))
+          .id;
+
+      await stockMutationRepository.recordMutation(
+        productId: id,
+        type: StockMutationType.stockOut,
+        quantity: 4,
+        costPricePerUnit: 9999,
+      );
+
+      final product = await productRepository.getById(id);
+      expect(product!.averageCostPrice, 4000);
+      expect(product.currentStock, 6);
+    });
+  });
 }

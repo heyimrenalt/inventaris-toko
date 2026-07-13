@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventaris_toko/data/models/product.dart';
 import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/data/repositories/category_repository.dart';
+import 'package:inventaris_toko/data/repositories/cost_price_adjustment_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
 import 'package:inventaris_toko/ui/screens/produk/product_form_screen.dart';
@@ -302,6 +303,174 @@ void main() {
         await settleAfterAsyncWork(tester);
 
         expect(find.text('Drinks'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    'add flow: filling both harga modal and harga jual shows live margin calculation; '
+    'clearing either hides it',
+    (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        expect(find.byKey(const Key('product_form_margin_panel')), findsNothing);
+
+        await tester.enterText(find.byKey(const Key('product_form_cost_price')), '7500');
+        await tester.pump();
+        expect(find.byKey(const Key('product_form_margin_panel')), findsNothing);
+
+        await tester.enterText(find.byKey(const Key('product_form_price')), '10000');
+        await tester.pump();
+
+        expect(find.text('Untung per unit: Rp 2.500'), findsOneWidget);
+        expect(find.text('Margin: 25%'), findsOneWidget);
+
+        await tester.enterText(find.byKey(const Key('product_form_cost_price')), '');
+        await tester.pump();
+
+        expect(find.byKey(const Key('product_form_margin_panel')), findsNothing);
+      });
+    },
+  );
+
+  testWidgets(
+    'add flow: harga modal is passed through as the product\'s initial averageCostPrice',
+    (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_name')), 'Chips');
+        await tester.enterText(find.byKey(const Key('product_form_cost_price')), '3000');
+        await tester.enterText(find.byKey(const Key('product_form_price')), '5000');
+        await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+
+        await tapSubmit(tester);
+
+        final products = await productRepository.getAll();
+        expect(products, hasLength(1));
+        expect(products.first.averageCostPrice, 3000);
+      });
+    },
+  );
+
+  testWidgets(
+    'edit flow: averageCostPrice is shown as read-only context plus a pre-filled '
+    'editable correction field, and the live margin preview updates as the sell '
+    'price changes',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          averageCostPrice: 4000,
+        );
+
+        await pumpForm(tester, existing: product);
+
+        expect(find.byKey(const Key('product_form_hpp_readonly')), findsOneWidget);
+        expect(find.textContaining('HPP saat ini: Rp 4.000/unit'), findsOneWidget);
+        expect(find.byKey(const Key('product_form_cost_price')), findsOneWidget);
+        expect(find.text('Harga modal (koreksi)'), findsOneWidget);
+        expect(find.text('4000'), findsOneWidget);
+
+        // Existing sellPrice (5000) vs. HPP (4000): 1000/5000 = 20%.
+        expect(find.text('Untung per unit: Rp 1.000'), findsOneWidget);
+        expect(find.text('Margin: 20%'), findsOneWidget);
+
+        await tester.enterText(find.byKey(const Key('product_form_price')), '10000');
+        await tester.pump();
+
+        // 10000 - 4000 = 6000; 6000/10000 = 60%.
+        expect(find.text('Untung per unit: Rp 6.000'), findsOneWidget);
+        expect(find.text('Margin: 60%'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    'edit flow: changing the harga modal (koreksi) field and saving updates averageCostPrice '
+    'and writes a CostPriceAdjustment audit row, without creating any StockMutation',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          averageCostPrice: 4000,
+        );
+
+        await pumpForm(tester, existing: product);
+
+        await tester.enterText(find.byKey(const Key('product_form_cost_price')), '4500');
+        await tapSubmit(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.averageCostPrice, 4500);
+
+        final adjustments =
+            await CostPriceAdjustmentRepository(isar).getHistoryForProduct(product.id);
+        expect(adjustments, hasLength(1));
+        expect(adjustments.first.oldCost, 4000);
+        expect(adjustments.first.newCost, 4500);
+
+        final mutations = await StockMutationRepository(isar).getHistoryForProduct(product.id);
+        expect(mutations, isEmpty);
+      });
+    },
+  );
+
+  testWidgets(
+    'edit flow: saving without changing the harga modal (koreksi) field writes no '
+    'CostPriceAdjustment row',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          averageCostPrice: 4000,
+        );
+
+        await pumpForm(tester, existing: product);
+
+        await tester.enterText(find.byKey(const Key('product_form_name')), 'Chips XL');
+        await tapSubmit(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.averageCostPrice, 4000);
+
+        final adjustments =
+            await CostPriceAdjustmentRepository(isar).getHistoryForProduct(product.id);
+        expect(adjustments, isEmpty);
+      });
+    },
+  );
+
+  testWidgets(
+    'edit flow: with no averageCostPrice yet, read-only HPP shows a placeholder and no '
+    'margin preview is shown',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+        );
+
+        await pumpForm(tester, existing: product);
+
+        expect(find.textContaining('HPP saat ini: belum ada data harga modal'), findsOneWidget);
+        expect(find.byKey(const Key('product_form_margin_panel')), findsNothing);
       });
     },
   );

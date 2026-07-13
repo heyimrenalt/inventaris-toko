@@ -295,4 +295,78 @@ void main() {
       });
     },
   );
+
+  testWidgets('harga modal field appears for stockIn and disappears for stockOut', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 10,
+      );
+
+      await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+      expect(find.byKey(const Key('catat_mutasi_cost_price')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('catat_mutasi_type_out')));
+      await tester.pump();
+      expect(find.byKey(const Key('catat_mutasi_cost_price')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('catat_mutasi_type_in')));
+      await tester.pump();
+      expect(find.byKey(const Key('catat_mutasi_cost_price')), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+    'submitting stockIn with harga modal filled recalculates averageCostPrice via recordMutation',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+
+        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '5');
+        await tester.enterText(find.byKey(const Key('catat_mutasi_cost_price')), '6000');
+        await tapSubmit(tester);
+
+        // No prior HPP (null treated as 0): (10*0 + 5*6000) / 15 = 2000.
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.currentStock, 15);
+        expect(updated.averageCostPrice, 2000);
+      });
+    },
+  );
+
+  testWidgets('submitting stockIn with harga modal left blank leaves averageCostPrice unchanged', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 10,
+        averageCostPrice: 2500,
+      );
+
+      await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+
+      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '5');
+      await tapSubmit(tester);
+
+      final updated = await productRepository.getById(product.id);
+      expect(updated!.currentStock, 15);
+      expect(updated.averageCostPrice, 2500);
+    });
+  });
 }

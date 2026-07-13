@@ -136,6 +136,46 @@ void main() {
     expect(justAboveYellowBoundary!.urgency, PriorityUrgency.neutral);
   });
 
+  test('isBelowOneDay is true when currentStock <= 0 ("stok habis sekarang")', () {
+    final mutations = [stockOut(quantity: 5, createdAt: now)];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 0),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    expect(result!.isBelowOneDay, isTrue);
+  });
+
+  test('isBelowOneDay is true for a fractional estimatedDaysRemaining below 1', () {
+    // velocity is 2/day; currentStock 1 -> 0.5 days remaining.
+    final mutations = [stockOut(quantity: 2, createdAt: now)];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 1),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    expect(result!.estimatedDaysRemaining, 0.5);
+    expect(result.isBelowOneDay, isTrue);
+  });
+
+  test('isBelowOneDay is false once estimatedDaysRemaining reaches exactly 1', () {
+    // velocity is 1/day; currentStock 1 -> exactly 1 day remaining.
+    final mutations = [stockOut(quantity: 1, createdAt: now)];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 1),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    expect(result!.estimatedDaysRemaining, 1.0);
+    expect(result.isBelowOneDay, isFalse);
+  });
+
   test('a product with zero stockOut mutations is not eligible (returns null)', () {
     final result = calculator.calculate(
       product: product(currentStock: 10),

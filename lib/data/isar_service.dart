@@ -3,6 +3,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'models/app_settings.dart';
 import 'models/category.dart';
+import 'models/cost_price_adjustment.dart';
 import 'models/product.dart';
 import 'models/stock_mutation.dart';
 
@@ -23,6 +24,7 @@ class IsarService {
         ProductSchema,
         StockMutationSchema,
         AppSettingsSchema,
+        CostPriceAdjustmentSchema,
       ],
       directory: dir.path,
     );

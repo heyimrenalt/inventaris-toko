@@ -42,6 +42,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _costPriceController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
 
   Product? _selectedProduct;
@@ -65,6 +66,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   void dispose() {
     _searchController.dispose();
     _quantityController.dispose();
+    _costPriceController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -119,6 +121,14 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       return;
     }
 
+    double? costPricePerUnit;
+    if (_type == StockMutationType.stockIn) {
+      final costPriceText = _costPriceController.text.trim();
+      if (costPriceText.isNotEmpty) {
+        costPricePerUnit = double.tryParse(costPriceText.replaceAll(',', '.'));
+      }
+    }
+
     setState(() => _saving = true);
     try {
       await _mutationRepository.recordMutation(
@@ -126,6 +136,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
         type: _type,
         quantity: quantity,
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        costPricePerUnit: costPricePerUnit,
       );
       if (!mounted) return;
       final verb = _type == StockMutationType.stockIn ? 'Stok masuk' : 'Stok keluar';
@@ -287,6 +298,20 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                   : _InsufficientStockErrorText(error: _insufficientStockError!),
             ),
           ),
+          if (_type == StockMutationType.stockIn) ...[
+            const SizedBox(height: 16),
+            TextField(
+              key: const Key('catat_mutasi_cost_price'),
+              controller: _costPriceController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontSize: 16),
+              decoration: const InputDecoration(
+                labelText: 'Harga modal per unit (opsional)',
+                hintText: 'Kosongkan jika sama dengan sebelumnya',
+                prefixText: 'Rp ',
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             key: const Key('catat_mutasi_note'),

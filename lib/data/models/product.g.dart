@@ -22,46 +22,51 @@ const ProductSchema = CollectionSchema(
       name: r'archivedAt',
       type: IsarType.dateTime,
     ),
-    r'categoryId': PropertySchema(
+    r'averageCostPrice': PropertySchema(
       id: 1,
+      name: r'averageCostPrice',
+      type: IsarType.double,
+    ),
+    r'categoryId': PropertySchema(
+      id: 2,
       name: r'categoryId',
       type: IsarType.long,
     ),
-    r'code': PropertySchema(id: 2, name: r'code', type: IsarType.string),
+    r'code': PropertySchema(id: 3, name: r'code', type: IsarType.string),
     r'createdAt': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'currentStock': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'currentStock',
       type: IsarType.double,
     ),
     r'isArchived': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isArchived',
       type: IsarType.bool,
     ),
     r'minStockThreshold': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'minStockThreshold',
       type: IsarType.double,
     ),
-    r'name': PropertySchema(id: 7, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 8, name: r'name', type: IsarType.string),
     r'photoPath': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'photoPath',
       type: IsarType.string,
     ),
     r'sellPrice': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'sellPrice',
       type: IsarType.double,
     ),
-    r'unit': PropertySchema(id: 10, name: r'unit', type: IsarType.string),
+    r'unit': PropertySchema(id: 11, name: r'unit', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
@@ -152,17 +157,18 @@ void _productSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.archivedAt);
-  writer.writeLong(offsets[1], object.categoryId);
-  writer.writeString(offsets[2], object.code);
-  writer.writeDateTime(offsets[3], object.createdAt);
-  writer.writeDouble(offsets[4], object.currentStock);
-  writer.writeBool(offsets[5], object.isArchived);
-  writer.writeDouble(offsets[6], object.minStockThreshold);
-  writer.writeString(offsets[7], object.name);
-  writer.writeString(offsets[8], object.photoPath);
-  writer.writeDouble(offsets[9], object.sellPrice);
-  writer.writeString(offsets[10], object.unit);
-  writer.writeDateTime(offsets[11], object.updatedAt);
+  writer.writeDouble(offsets[1], object.averageCostPrice);
+  writer.writeLong(offsets[2], object.categoryId);
+  writer.writeString(offsets[3], object.code);
+  writer.writeDateTime(offsets[4], object.createdAt);
+  writer.writeDouble(offsets[5], object.currentStock);
+  writer.writeBool(offsets[6], object.isArchived);
+  writer.writeDouble(offsets[7], object.minStockThreshold);
+  writer.writeString(offsets[8], object.name);
+  writer.writeString(offsets[9], object.photoPath);
+  writer.writeDouble(offsets[10], object.sellPrice);
+  writer.writeString(offsets[11], object.unit);
+  writer.writeDateTime(offsets[12], object.updatedAt);
 }
 
 Product _productDeserialize(
@@ -173,18 +179,19 @@ Product _productDeserialize(
 ) {
   final object = Product();
   object.archivedAt = reader.readDateTimeOrNull(offsets[0]);
-  object.categoryId = reader.readLongOrNull(offsets[1]);
-  object.code = reader.readStringOrNull(offsets[2]);
-  object.createdAt = reader.readDateTime(offsets[3]);
-  object.currentStock = reader.readDouble(offsets[4]);
+  object.averageCostPrice = reader.readDoubleOrNull(offsets[1]);
+  object.categoryId = reader.readLongOrNull(offsets[2]);
+  object.code = reader.readStringOrNull(offsets[3]);
+  object.createdAt = reader.readDateTime(offsets[4]);
+  object.currentStock = reader.readDouble(offsets[5]);
   object.id = id;
-  object.isArchived = reader.readBool(offsets[5]);
-  object.minStockThreshold = reader.readDouble(offsets[6]);
-  object.name = reader.readString(offsets[7]);
-  object.photoPath = reader.readStringOrNull(offsets[8]);
-  object.sellPrice = reader.readDouble(offsets[9]);
-  object.unit = reader.readString(offsets[10]);
-  object.updatedAt = reader.readDateTime(offsets[11]);
+  object.isArchived = reader.readBool(offsets[6]);
+  object.minStockThreshold = reader.readDouble(offsets[7]);
+  object.name = reader.readString(offsets[8]);
+  object.photoPath = reader.readStringOrNull(offsets[9]);
+  object.sellPrice = reader.readDouble(offsets[10]);
+  object.unit = reader.readString(offsets[11]);
+  object.updatedAt = reader.readDateTime(offsets[12]);
   return object;
 }
 
@@ -198,26 +205,28 @@ P _productDeserializeProp<P>(
     case 0:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 1:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 3:
-      return (reader.readDateTime(offset)) as P;
-    case 4:
-      return (reader.readDouble(offset)) as P;
-    case 5:
-      return (reader.readBool(offset)) as P;
-    case 6:
-      return (reader.readDouble(offset)) as P;
-    case 7:
-      return (reader.readString(offset)) as P;
-    case 8:
       return (reader.readStringOrNull(offset)) as P;
-    case 9:
+    case 4:
+      return (reader.readDateTime(offset)) as P;
+    case 5:
       return (reader.readDouble(offset)) as P;
-    case 10:
+    case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readDouble(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readDouble(offset)) as P;
     case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -645,6 +654,100 @@ extension ProductQueryFilter
           includeLower: includeLower,
           upper: upper,
           includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  averageCostPriceIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'averageCostPrice'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  averageCostPriceIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'averageCostPrice'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> averageCostPriceEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'averageCostPrice',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  averageCostPriceGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'averageCostPrice',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  averageCostPriceLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'averageCostPrice',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> averageCostPriceBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'averageCostPrice',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
         ),
       );
     });
@@ -1769,6 +1872,18 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> sortByAverageCostPrice() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'averageCostPrice', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByAverageCostPriceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'averageCostPrice', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByCategoryId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'categoryId', Sort.asc);
@@ -1913,6 +2028,18 @@ extension ProductQuerySortThenBy
   QueryBuilder<Product, Product, QAfterSortBy> thenByArchivedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'archivedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByAverageCostPrice() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'averageCostPrice', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByAverageCostPriceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'averageCostPrice', Sort.desc);
     });
   }
 
@@ -2069,6 +2196,12 @@ extension ProductQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Product, Product, QDistinct> distinctByAverageCostPrice() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'averageCostPrice');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByCategoryId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'categoryId');
@@ -2155,6 +2288,12 @@ extension ProductQueryProperty
   QueryBuilder<Product, DateTime?, QQueryOperations> archivedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'archivedAt');
+    });
+  }
+
+  QueryBuilder<Product, double?, QQueryOperations> averageCostPriceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'averageCostPrice');
     });
   }
 

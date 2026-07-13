@@ -11,6 +11,7 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../domain/hpp_calculator.dart';
 import '../../../services/photo_storage_service.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
@@ -346,6 +347,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           const SizedBox(height: 8),
           _infoRow('Batas minimum', '${_formatQuantity(product.minStockThreshold)} ${product.unit}'),
+          const SizedBox(height: 8),
+          _buildHppSection(product),
           const SizedBox(height: 20),
           if (product.isArchived)
             SizedBox(
@@ -427,6 +430,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  Widget _buildHppSection(Product product) {
+    final avgCost = product.averageCostPrice;
+    final profit = HppCalculator.profitPerUnit(product.sellPrice, avgCost);
+    final margin = HppCalculator.marginPercent(product.sellPrice, avgCost);
+
+    return Container(
+      key: const Key('product_detail_hpp_section'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _infoRow('HPP', avgCost == null ? 'Belum ada data harga modal' : '${_formatCurrency(avgCost)}/unit'),
+          if (profit != null) _infoRow('Untung per unit', _formatCurrency(profit)),
+          if (margin != null) _infoRow('Margin', '${margin.round()}%'),
+        ],
+      ),
+    );
+  }
+
   Widget _infoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -460,9 +484,12 @@ String _formatDate(DateTime? date) {
   return '$day/$month/${date.year}';
 }
 
+/// Handles negative values (unlike a plain price formatter would need to) —
+/// "Untung per unit" can be negative when the cost price exceeds the sell
+/// price, so the sign is split off before grouping digits.
 String _formatCurrency(double value) {
-  final rounded = value.round();
-  final digits = rounded.toString();
+  final isNegative = value < 0;
+  final digits = value.abs().round().toString();
   final buffer = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
     final positionFromEnd = digits.length - i;
@@ -471,5 +498,5 @@ String _formatCurrency(double value) {
       buffer.write('.');
     }
   }
-  return 'Rp $buffer';
+  return 'Rp ${isNegative ? '-' : ''}$buffer';
 }
