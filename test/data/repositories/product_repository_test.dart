@@ -81,6 +81,16 @@ void main() {
         throwsA(isA<NotFoundException>()),
       );
     });
+
+    test('creates successfully with categoryId: null (uncategorized)', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+
+      expect(product.categoryId, isNull);
+    });
   });
 
   group('Product.code uniqueness', () {
@@ -267,6 +277,55 @@ void main() {
       expect(snacks, hasLength(1));
       expect(snacks.first.name, 'Chips');
     });
+
+    test('getUncategorized returns only products with a null category', () async {
+      await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+      final uncategorized = await productRepository.create(
+        name: 'Misc Item',
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+
+      final results = await productRepository.getUncategorized();
+      expect(results.map((p) => p.id), [uncategorized.id]);
+    });
+
+    test(
+      'getByCategoryIncludingDescendants returns products from the category and its '
+      'descendants, excluding unrelated categories',
+      () async {
+        final alatTulis = await categoryRepository.create('Alat Tulis');
+        final pulpen = await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+        final unrelated = await categoryRepository.create('Drinks');
+
+        final direct = await productRepository.create(
+          name: 'Buku Tulis',
+          categoryId: alatTulis.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+        );
+        final nested = await productRepository.create(
+          name: 'Pulpen Merah',
+          categoryId: pulpen.id,
+          sellPrice: 2000,
+          unit: 'pcs',
+        );
+        await productRepository.create(
+          name: 'Water',
+          categoryId: unrelated.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+        );
+
+        final results = await productRepository.getByCategoryIncludingDescendants(alatTulis.id);
+        expect(results.map((p) => p.id).toSet(), {direct.id, nested.id});
+      },
+    );
   });
 
   group('ProductRepository archive/unarchive', () {

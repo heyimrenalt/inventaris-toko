@@ -20,8 +20,10 @@ class NotFoundException implements Exception {
   String toString() => 'NotFoundException: $message';
 }
 
-/// Thrown by [CategoryRepository.delete] when the category is still
-/// referenced by at least one [Product]. Deletion is refused rather than
+/// Thrown by [CategoryRepository.delete] when the category or any of its
+/// descendant categories (at any depth) is still referenced by at least
+/// one [Product]. [productCount] is the aggregate count across the whole
+/// subtree, not just this category. Deletion is refused rather than
 /// cascading, since silently orphaning or deleting products is never the
 /// right default for inventory data.
 class CategoryInUseException implements Exception {
@@ -33,7 +35,23 @@ class CategoryInUseException implements Exception {
   @override
   String toString() =>
       'CategoryInUseException: category $categoryId is referenced by '
-      '$productCount product(s) and cannot be deleted';
+      '$productCount product(s) (including sub-categories) and cannot be deleted';
+}
+
+/// Thrown by [CategoryRepository.delete] when the category has one or
+/// more child categories. A category's subtree must be deleted from the
+/// leaves up — deleting a parent never implicitly deletes or reassigns
+/// its children.
+class CategoryHasChildrenException implements Exception {
+  CategoryHasChildrenException(this.categoryId, this.childCount);
+
+  final int categoryId;
+  final int childCount;
+
+  @override
+  String toString() =>
+      'CategoryHasChildrenException: category $categoryId has $childCount '
+      'sub-categor${childCount == 1 ? 'y' : 'ies'} and cannot be deleted';
 }
 
 /// Thrown when a category name (case-insensitive) already exists.

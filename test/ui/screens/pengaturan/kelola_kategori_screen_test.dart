@@ -68,7 +68,7 @@ void main() {
     });
   });
 
-  testWidgets('shows list of categories when they exist', (tester) async {
+  testWidgets('shows tree of root categories when they exist', (tester) async {
     await tester.runAsync(() async {
       await categoryRepository.create('Snacks');
       await categoryRepository.create('Drinks');
@@ -84,7 +84,48 @@ void main() {
     });
   });
 
-  testWidgets('add flow: valid name is added to the visible list', (tester) async {
+  testWidgets('a category with no products shows "0 produk"', (tester) async {
+    await tester.runAsync(() async {
+      await categoryRepository.create('Snacks');
+      await pumpScreen(tester);
+
+      expect(find.text('0 produk'), findsOneWidget);
+    });
+  });
+
+  testWidgets('a category with children shows the "termasuk sub-kategori" badge', (tester) async {
+    await tester.runAsync(() async {
+      final alatTulis = await categoryRepository.create('Alat Tulis');
+      await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+
+      await pumpScreen(tester);
+
+      expect(find.text('0 produk (termasuk sub-kategori)'), findsOneWidget);
+    });
+  });
+
+  testWidgets('expanding a node reveals its children, collapsing hides them', (tester) async {
+    await tester.runAsync(() async {
+      final alatTulis = await categoryRepository.create('Alat Tulis');
+      await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+
+      await pumpScreen(tester);
+
+      expect(find.text('Pulpen'), findsNothing);
+
+      await tester.tap(find.byKey(Key('kelola_kategori_expand_${alatTulis.id}')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pulpen'), findsOneWidget);
+
+      await tester.tap(find.byKey(Key('kelola_kategori_expand_${alatTulis.id}')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pulpen'), findsNothing);
+    });
+  });
+
+  testWidgets('add flow: valid name is added as a root category', (tester) async {
     await tester.runAsync(() async {
       await pumpScreen(tester);
 
@@ -95,7 +136,9 @@ void main() {
 
       expect(find.text('Snacks'), findsOneWidget);
       expect(find.text('Kategori ditambahkan'), findsOneWidget);
-      expect(await categoryRepository.getAll(), hasLength(1));
+      final categories = await categoryRepository.getAll();
+      expect(categories, hasLength(1));
+      expect(categories.single.parentId, isNull);
     });
   });
 
@@ -130,12 +173,30 @@ void main() {
     });
   });
 
-  testWidgets('rename flow: renames and reflects new name in the list', (tester) async {
+  testWidgets('add sub-category flow: adds a child under the tapped node', (tester) async {
+    await tester.runAsync(() async {
+      final alatTulis = await categoryRepository.create('Alat Tulis');
+      await pumpScreen(tester);
+
+      await tester.tap(find.byKey(Key('kelola_kategori_add_child_${alatTulis.id}')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Pulpen');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
+      await settleAfterAsyncWork(tester);
+
+      // Adding a child auto-expands the parent node.
+      expect(find.text('Pulpen'), findsOneWidget);
+      final children = await categoryRepository.getChildren(alatTulis.id);
+      expect(children.map((c) => c.name), ['Pulpen']);
+    });
+  });
+
+  testWidgets('rename flow: renames and reflects new name in the tree', (tester) async {
     await tester.runAsync(() async {
       await categoryRepository.create('Snacks');
       await pumpScreen(tester);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Ubah'));
+      await tester.tap(find.byIcon(Icons.edit));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'Minuman');
@@ -148,12 +209,12 @@ void main() {
     });
   });
 
-  testWidgets('delete flow: confirming delete on an unused category removes it', (tester) async {
+  testWidgets('delete flow: confirming delete on an unused leaf category removes it', (tester) async {
     await tester.runAsync(() async {
       await categoryRepository.create('Snacks');
       await pumpScreen(tester);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Hapus'));
+      await tester.tap(find.byIcon(Icons.delete));
       await tester.pumpAndSettle();
 
       // Confirm inside the "Hapus Kategori" confirmation dialog.
@@ -172,7 +233,7 @@ void main() {
   });
 
   testWidgets(
-    'delete flow: category in use shows blocking message with product count and stays in list',
+    'delete flow: category in use shows blocking message with aggregate product count',
     (tester) async {
       await tester.runAsync(() async {
         final category = await categoryRepository.create('Snacks');
@@ -185,7 +246,7 @@ void main() {
 
         await pumpScreen(tester);
 
-        await tester.tap(find.widgetWithText(TextButton, 'Hapus'));
+        await tester.tap(find.byIcon(Icons.delete));
         await tester.pumpAndSettle();
 
         await tester.tap(
@@ -202,6 +263,70 @@ void main() {
         );
         expect(find.text('Snacks'), findsOneWidget);
         expect(await categoryRepository.getAll(), hasLength(1));
+      });
+    },
+  );
+
+  testWidgets(
+    'delete flow: category with a sub-category (no products anywhere) is blocked with a '
+    'distinct message',
+    (tester) async {
+      await tester.runAsync(() async {
+        final alatTulis = await categoryRepository.create('Alat Tulis');
+        await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+
+        await pumpScreen(tester);
+
+        await tester.tap(find.byIcon(Icons.delete));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(TextButton, 'Hapus'),
+          ),
+        );
+        await settleAfterAsyncWork(tester);
+
+        expect(find.textContaining('masih memiliki 1 sub-kategori'), findsOneWidget);
+        expect(find.text('Alat Tulis'), findsOneWidget);
+        expect(await categoryRepository.getAll(), hasLength(2));
+      });
+    },
+  );
+
+  testWidgets(
+    'delete flow: deletion blocked by a grandchild product shows the aggregate count',
+    (tester) async {
+      await tester.runAsync(() async {
+        final alatTulis = await categoryRepository.create('Alat Tulis');
+        final pulpen = await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+        await productRepository.create(
+          name: 'Pulpen Merah',
+          categoryId: pulpen.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+        );
+
+        await pumpScreen(tester);
+
+        // "Alat Tulis" is a root tile — the only visible delete icon
+        // before expanding, so this targets its delete action.
+        await tester.tap(find.byIcon(Icons.delete));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.widgetWithText(TextButton, 'Hapus'),
+          ),
+        );
+        await settleAfterAsyncWork(tester);
+
+        expect(
+          find.textContaining('masih dipakai oleh 1 produk (termasuk sub-kategori)'),
+          findsOneWidget,
+        );
       });
     },
   );

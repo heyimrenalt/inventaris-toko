@@ -4,6 +4,7 @@ import '../models/category.dart';
 import '../models/product.dart';
 import '../models/stock_mutation.dart';
 import 'app_settings_repository.dart';
+import 'category_repository.dart';
 import 'repository_exceptions.dart';
 import 'stock_mutation_repository.dart';
 
@@ -26,7 +27,7 @@ class ProductRepository {
   /// starting value.
   Future<Product> create({
     required String name,
-    required int categoryId,
+    int? categoryId,
     required double sellPrice,
     required String unit,
     String? code,
@@ -39,9 +40,11 @@ class ProductRepository {
     _validateSellPrice(sellPrice);
     final normalizedCode = _normalizeCode(code);
 
-    final category = await _isar.categories.get(categoryId);
-    if (category == null) {
-      throw NotFoundException('Category $categoryId not found');
+    if (categoryId != null) {
+      final category = await _isar.categories.get(categoryId);
+      if (category == null) {
+        throw NotFoundException('Category $categoryId not found');
+      }
     }
 
     if (normalizedCode != null) {
@@ -87,10 +90,17 @@ class ProductRepository {
   /// Updates product fields. There is deliberately no `currentStock`
   /// parameter on this method — stock can only change via
   /// [StockMutationRepository.recordMutation].
+  ///
+  /// [categoryId] follows the same "`null` means leave unchanged"
+  /// convention as every other optional parameter here — which means it
+  /// can't also be how a caller says "clear the category to Lainnya",
+  /// since `categoryId` is itself allowed to be null now that category is
+  /// optional. [clearCategory] is the explicit way to do that instead.
   Future<Product> update({
     required int id,
     String? name,
     int? categoryId,
+    bool clearCategory = false,
     String? code,
     String? photoPath,
     double? sellPrice,
@@ -106,7 +116,9 @@ class ProductRepository {
       product.name = _validateName(name);
     }
 
-    if (categoryId != null) {
+    if (clearCategory) {
+      product.categoryId = null;
+    } else if (categoryId != null) {
       final category = await _isar.categories.get(categoryId);
       if (category == null) {
         throw NotFoundException('Category $categoryId not found');
@@ -228,6 +240,33 @@ class ProductRepository {
       return query.findAll();
     }
     return query.isArchivedEqualTo(false).findAll();
+  }
+
+  /// Products tagged directly to [categoryId], or to any category nested
+  /// under it at any depth — e.g. selecting "Alat Tulis" also returns
+  /// products tagged to "Pulpen" underneath it. [CategoryRepository] is
+  /// constructed locally here rather than injected: it's a thin,
+  /// stateless wrapper over the same [Isar] instance, so there's nothing
+  /// to gain from threading it through this repository's constructor.
+  Future<List<Product>> getByCategoryIncludingDescendants(
+    int categoryId, {
+    bool includeArchived = false,
+  }) async {
+    final descendantIds = await CategoryRepository(_isar).getDescendantIds(categoryId);
+    final ids = [categoryId, ...descendantIds];
+    final query = _isar.products.filter().anyOf(ids, (q, id) => q.categoryIdEqualTo(id));
+    if (includeArchived) {
+      return query.findAll();
+    }
+    return query.isArchivedEqualTo(false).findAll();
+  }
+
+  /// Products with no category at all (the "Lainnya" bucket). Always
+  /// excludes archived products — there is no `includeArchived` option
+  /// since nothing in the app currently needs uncategorized+archived
+  /// together.
+  Future<List<Product>> getUncategorized() {
+    return _isar.products.filter().categoryIdIsNull().isArchivedEqualTo(false).findAll();
   }
 
   Future<List<Product>> searchByName(String query, {bool includeArchived = false}) {

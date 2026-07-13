@@ -6,12 +6,19 @@ import '../../data/repositories/repository_exceptions.dart';
 
 /// Shows the add/rename category dialog and returns the created/renamed
 /// [Category] on success, or `null` if the user cancelled. Shared between
-/// Kelola Kategori (Pengaturan) and the inline "add new category" flow on
-/// the product form, so the name-validation UX only lives in one place.
+/// Kelola Kategori (Pengaturan), [CategoryTreePicker]'s inline add
+/// affordances, and the product form, so the name-validation UX only
+/// lives in one place.
+///
+/// [parentId] only applies when creating (i.e. when [existing] is null):
+/// it's the parent to create the new category under (`null` for a root
+/// category). A rename keeps the category's existing parent, since
+/// re-parenting is out of scope for this dialog.
 Future<Category?> showCategoryFormDialog({
   required BuildContext context,
   required CategoryRepository repository,
   Category? existing,
+  int? parentId,
 }) {
   final controller = TextEditingController(text: existing?.name ?? '');
   String? errorText;
@@ -25,7 +32,7 @@ Future<Category?> showCategoryFormDialog({
             try {
               final Category result;
               if (existing == null) {
-                result = await repository.create(controller.text);
+                result = await repository.create(controller.text, parentId: parentId);
               } else {
                 result = await repository.rename(existing.id, controller.text);
               }

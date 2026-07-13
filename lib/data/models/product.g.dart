@@ -99,6 +99,19 @@ const ProductSchema = CollectionSchema(
         ),
       ],
     ),
+    r'categoryId': IndexSchema(
+      id: -8798048739239305339,
+      name: r'categoryId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'categoryId',
+          type: IndexType.value,
+          caseSensitive: false,
+        ),
+      ],
+    ),
   },
   links: {},
   embeddedSchemas: {},
@@ -160,7 +173,7 @@ Product _productDeserialize(
 ) {
   final object = Product();
   object.archivedAt = reader.readDateTimeOrNull(offsets[0]);
-  object.categoryId = reader.readLong(offsets[1]);
+  object.categoryId = reader.readLongOrNull(offsets[1]);
   object.code = reader.readStringOrNull(offsets[2]);
   object.createdAt = reader.readDateTime(offsets[3]);
   object.currentStock = reader.readDouble(offsets[4]);
@@ -185,7 +198,7 @@ P _productDeserializeProp<P>(
     case 0:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
@@ -227,6 +240,14 @@ extension ProductQueryWhereSort on QueryBuilder<Product, Product, QWhere> {
   QueryBuilder<Product, Product, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhere> anyCategoryId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'categoryId'),
+      );
     });
   }
 }
@@ -424,6 +445,132 @@ extension ProductQueryWhere on QueryBuilder<Product, Product, QWhereClause> {
       }
     });
   }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'categoryId', value: [null]),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'categoryId',
+          lower: [null],
+          includeLower: false,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdEqualTo(
+    int? categoryId,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'categoryId', value: [categoryId]),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdNotEqualTo(
+    int? categoryId,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'categoryId',
+                lower: [],
+                upper: [categoryId],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'categoryId',
+                lower: [categoryId],
+                includeLower: false,
+                upper: [],
+              ),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'categoryId',
+                lower: [categoryId],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'categoryId',
+                lower: [],
+                upper: [categoryId],
+                includeUpper: false,
+              ),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdGreaterThan(
+    int? categoryId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'categoryId',
+          lower: [categoryId],
+          includeLower: include,
+          upper: [],
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdLessThan(
+    int? categoryId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'categoryId',
+          lower: [],
+          upper: [categoryId],
+          includeUpper: include,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterWhereClause> categoryIdBetween(
+    int? lowerCategoryId,
+    int? upperCategoryId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'categoryId',
+          lower: [lowerCategoryId],
+          includeLower: includeLower,
+          upper: [upperCategoryId],
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
 }
 
 extension ProductQueryFilter
@@ -503,8 +650,24 @@ extension ProductQueryFilter
     });
   }
 
+  QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'categoryId'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'categoryId'),
+      );
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdEqualTo(
-    int value,
+    int? value,
   ) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -514,7 +677,7 @@ extension ProductQueryFilter
   }
 
   QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdGreaterThan(
-    int value, {
+    int? value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -529,7 +692,7 @@ extension ProductQueryFilter
   }
 
   QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdLessThan(
-    int value, {
+    int? value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -544,8 +707,8 @@ extension ProductQueryFilter
   }
 
   QueryBuilder<Product, Product, QAfterFilterCondition> categoryIdBetween(
-    int lower,
-    int upper, {
+    int? lower,
+    int? upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
@@ -1995,7 +2158,7 @@ extension ProductQueryProperty
     });
   }
 
-  QueryBuilder<Product, int, QQueryOperations> categoryIdProperty() {
+  QueryBuilder<Product, int?, QQueryOperations> categoryIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'categoryId');
     });

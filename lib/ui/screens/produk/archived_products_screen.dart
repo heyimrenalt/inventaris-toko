@@ -103,7 +103,9 @@ class _ArchivedProductsScreenState extends State<ArchivedProductsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      categoryNameById[product.categoryId] ?? '-',
+                      product.categoryId == null
+                          ? 'Lainnya'
+                          : (categoryNameById[product.categoryId] ?? '-'),
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 2),

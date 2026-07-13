@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
-import '../../../data/models/category.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
@@ -47,7 +46,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   static const int _recentMutationsLimit = 5;
 
   Product? _product;
-  Category? _category;
+  String? _categoryBreadcrumb;
   List<StockMutation> _recentMutations = [];
   bool _loading = true;
 
@@ -74,7 +73,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _load() async {
     final product = await _productRepository.getById(widget.productId);
-    final category = product == null ? null : await _categoryRepository.getById(product.categoryId);
+    final categoryId = product?.categoryId;
+    final categoryBreadcrumb = categoryId == null ? null : await _buildCategoryBreadcrumb(categoryId);
     final recentMutations = product == null
         ? <StockMutation>[]
         : await _stockMutationRepository.getRecentHistoryForProduct(
@@ -84,10 +84,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!mounted) return;
     setState(() {
       _product = product;
-      _category = category;
+      _categoryBreadcrumb = categoryBreadcrumb;
       _recentMutations = recentMutations;
       _loading = false;
     });
+  }
+
+  /// Walks up the parent chain so a nested category shows its full
+  /// "Parent > Child" path here, same as the tree picker's selected-value
+  /// label on the product form — a bare leaf name would be ambiguous
+  /// once the same name can exist under different parents.
+  Future<String> _buildCategoryBreadcrumb(int categoryId) async {
+    final category = await _categoryRepository.getById(categoryId);
+    if (category == null) return '-';
+
+    final parts = [category.name];
+    var current = category;
+    while (current.parentId != null) {
+      final parent = await _categoryRepository.getById(current.parentId!);
+      if (parent == null) break;
+      parts.insert(0, parent.name);
+      current = parent;
+    }
+    return parts.join(' > ');
   }
 
   Future<void> _openCatatMutasi(StockMutationType type) async {
@@ -308,7 +327,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          _infoRow('Kategori', _category?.name ?? '-'),
+          _infoRow('Kategori', _categoryBreadcrumb ?? 'Lainnya'),
           _infoRow('Harga jual', _formatCurrency(product.sellPrice)),
           _infoRow('Satuan', product.unit),
           const SizedBox(height: 8),

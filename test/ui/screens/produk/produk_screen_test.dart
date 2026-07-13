@@ -6,6 +6,7 @@ import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
 import 'package:inventaris_toko/ui/screens/produk/produk_screen.dart';
+import 'package:inventaris_toko/ui/widgets/category_tree_picker.dart';
 import 'package:inventaris_toko/ui/widgets/product_list_item.dart';
 import 'package:isar_community/isar.dart';
 
@@ -69,7 +70,28 @@ void main() {
     });
   });
 
-  testWidgets('category filter chip filters the visible list', (tester) async {
+  Future<void> openCategoryFilterPicker(WidgetTester tester) async {
+    final fieldFinder = find.byKey(const Key('produk_category_filter'));
+    await tester.ensureVisible(fieldFinder);
+    await tester.tap(fieldFinder);
+    // CategoryTreePicker shows a CircularProgressIndicator (indefinite
+    // animation) until its own real Isar getAll() call resolves — a bare
+    // pumpAndSettle() would spin forever waiting on a real Future it
+    // can't see, same reasoning as settleAfterAsyncWork everywhere else.
+    await settleAfterAsyncWork(tester);
+  }
+
+  // The category name can also appear behind the open sheet (in a
+  // product list item's category label), so taps inside the picker are
+  // scoped to CategoryTreePicker to avoid ambiguous finders.
+  Future<void> tapCategoryInPicker(WidgetTester tester, String name) async {
+    await tester.tap(
+      find.descendant(of: find.byType(CategoryTreePicker), matching: find.text(name)),
+    );
+    await settleAfterAsyncWork(tester);
+  }
+
+  testWidgets('category filter picker filters the visible list', (tester) async {
     await tester.runAsync(() async {
       final snacks = await categoryRepository.create('Snacks');
       final drinks = await categoryRepository.create('Drinks');
@@ -91,19 +113,84 @@ void main() {
       expect(find.text('Chips'), findsOneWidget);
       expect(find.text('Water'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Drinks'));
-      await settleAfterAsyncWork(tester);
+      await openCategoryFilterPicker(tester);
+      await tapCategoryInPicker(tester, 'Drinks');
 
       expect(find.text('Water'), findsOneWidget);
       expect(find.text('Chips'), findsNothing);
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Semua'));
+      await openCategoryFilterPicker(tester);
+      await tester.tap(find.byKey(const Key('category_picker_all')));
       await settleAfterAsyncWork(tester);
 
       expect(find.text('Chips'), findsOneWidget);
       expect(find.text('Water'), findsOneWidget);
     });
   });
+
+  testWidgets('"Lainnya" filter shows only uncategorized products', (tester) async {
+    await tester.runAsync(() async {
+      final snacks = await categoryRepository.create('Snacks');
+      await productRepository.create(
+        name: 'Chips',
+        categoryId: snacks.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+      );
+      await productRepository.create(
+        name: 'Misc Item',
+        sellPrice: 3000,
+        unit: 'pcs',
+      );
+
+      await pumpScreen(tester);
+
+      await openCategoryFilterPicker(tester);
+      await tester.tap(find.byKey(const Key('category_picker_uncategorized')));
+      await settleAfterAsyncWork(tester);
+
+      expect(find.text('Misc Item'), findsOneWidget);
+      expect(find.text('Chips'), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'selecting a parent category includes products tagged to its descendants',
+    (tester) async {
+      await tester.runAsync(() async {
+        final alatTulis = await categoryRepository.create('Alat Tulis');
+        final pulpen = await categoryRepository.create('Pulpen', parentId: alatTulis.id);
+        final drinks = await categoryRepository.create('Drinks');
+        await productRepository.create(
+          name: 'Buku Tulis',
+          categoryId: alatTulis.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+        );
+        await productRepository.create(
+          name: 'Pulpen Merah',
+          categoryId: pulpen.id,
+          sellPrice: 2000,
+          unit: 'pcs',
+        );
+        await productRepository.create(
+          name: 'Water',
+          categoryId: drinks.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+        );
+
+        await pumpScreen(tester);
+
+        await openCategoryFilterPicker(tester);
+        await tapCategoryInPicker(tester, 'Alat Tulis');
+
+        expect(find.text('Buku Tulis'), findsOneWidget);
+        expect(find.text('Pulpen Merah'), findsOneWidget);
+        expect(find.text('Water'), findsNothing);
+      });
+    },
+  );
 
   testWidgets('low stock shows red indicator, sufficient stock shows green', (tester) async {
     await tester.runAsync(() async {
@@ -210,7 +297,7 @@ void main() {
     });
   });
 
-  testWidgets('search combined with a selected category chip narrows to both constraints', (tester) async {
+  testWidgets('search combined with a selected category filter narrows to both constraints', (tester) async {
     await tester.runAsync(() async {
       final snacks = await categoryRepository.create('Snacks');
       final drinks = await categoryRepository.create('Drinks');
@@ -235,8 +322,8 @@ void main() {
 
       await pumpScreen(tester);
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Snacks'));
-      await settleAfterAsyncWork(tester);
+      await openCategoryFilterPicker(tester);
+      await tapCategoryInPicker(tester, 'Snacks');
 
       expect(find.text('Chips Original'), findsOneWidget);
       expect(find.text('Chips Pedas'), findsOneWidget);
@@ -323,12 +410,13 @@ void main() {
   });
 
   testWidgets(
-    'adding a category elsewhere (direct repository call) auto-refreshes the filter chips '
+    'adding a category elsewhere (direct repository call) auto-refreshes the filter picker '
     'without any manual trigger',
     (tester) async {
       await tester.runAsync(() async {
         await categoryRepository.create('Snacks');
         await pumpScreen(tester);
+        await openCategoryFilterPicker(tester);
 
         expect(find.text('Snacks'), findsOneWidget);
         expect(find.text('Drinks'), findsNothing);

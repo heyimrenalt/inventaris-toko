@@ -9,6 +9,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/category_tree_picker.dart';
 import '../../widgets/product_list_item.dart';
 import 'archived_products_screen.dart';
 import 'product_detail_screen.dart';
@@ -35,7 +36,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
 
   List<Product> _products = [];
   List<Category> _categories = [];
-  int? _selectedCategoryId;
+  CategorySelection _selection = const CategorySelection.all();
   String _searchQuery = '';
   bool _loading = true;
 
@@ -71,10 +72,16 @@ class _ProdukScreenState extends State<ProdukScreen> {
 
   Future<void> _loadData() async {
     final categories = await _categoryRepository.getAll();
-    final categoryId = _selectedCategoryId;
-    final products = categoryId == null
-        ? await _productRepository.getAll()
-        : await _productRepository.getByCategory(categoryId);
+    final selection = _selection;
+    final Future<List<Product>> productsFuture;
+    if (selection.isUncategorized) {
+      productsFuture = _productRepository.getUncategorized();
+    } else if (selection.isCategory) {
+      productsFuture = _productRepository.getByCategoryIncludingDescendants(selection.categoryId!);
+    } else {
+      productsFuture = _productRepository.getAll();
+    }
+    final products = await productsFuture;
     if (!mounted) return;
     setState(() {
       _categories = categories;
@@ -83,9 +90,17 @@ class _ProdukScreenState extends State<ProdukScreen> {
     });
   }
 
-  void _selectCategory(int? categoryId) {
+  Future<void> _openCategoryFilterPicker() async {
+    final result = await showCategoryTreePicker(
+      context: context,
+      isar: widget.isar,
+      includeAllOption: true,
+      current: _selection,
+    );
+    if (result == null) return;
+
     setState(() {
-      _selectedCategoryId = categoryId;
+      _selection = result;
       _loading = true;
     });
     _loadData();
@@ -141,7 +156,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildSearchField()),
-          SliverToBoxAdapter(child: _buildCategoryChips()),
+          SliverToBoxAdapter(child: _buildCategoryFilter()),
           const SliverToBoxAdapter(child: Divider(height: 1)),
           SliverToBoxAdapter(
             child: Align(
@@ -206,31 +221,43 @@ class _ProdukScreenState extends State<ProdukScreen> {
     );
   }
 
-  Widget _buildCategoryChips() {
-    return SizedBox(
-      height: 56,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: const Text('Semua', style: TextStyle(fontSize: 14)),
-              selected: _selectedCategoryId == null,
-              onSelected: (_) => _selectCategory(null),
-            ),
-          ),
-          for (final category in _categories)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(
-                label: Text(category.name, style: const TextStyle(fontSize: 14)),
-                selected: _selectedCategoryId == category.id,
-                onSelected: (_) => _selectCategory(category.id),
+  /// A tappable filter row rather than the flat horizontal chips this
+  /// screen used before nesting existed — a deep category tree doesn't
+  /// fit into a single-row chip list, so filtering now opens
+  /// [CategoryTreePicker] (with fixed "Semua"/"Lainnya" options above the
+  /// tree) instead.
+  Widget _buildCategoryFilter() {
+    final selection = _selection;
+    final String label;
+    if (selection.isAll) {
+      label = 'Semua';
+    } else if (selection.isUncategorized) {
+      label = 'Lainnya';
+    } else {
+      label = selection.breadcrumb!;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: InkWell(
+        key: const Key('produk_category_filter'),
+        onTap: _openCategoryFilterPicker,
+        borderRadius: BorderRadius.circular(8),
+        child: InputDecorator(
+          decoration: const InputDecoration(labelText: 'Kategori'),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-        ],
+              const Icon(Icons.arrow_drop_down),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -241,7 +268,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
     // all" — same distinction MutasiScreen makes between "Tidak
     // ditemukan." and its own no-history empty state.
     final message = _products.isEmpty
-        ? (_selectedCategoryId == null
+        ? (_selection.isAll
             ? 'Belum ada produk. Tambahkan produk pertama untuk mulai.'
             : 'Tidak ada produk pada kategori ini.')
         : 'Tidak ditemukan.';
@@ -267,9 +294,10 @@ class _ProdukScreenState extends State<ProdukScreen> {
       separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final product = visible[index];
+        final categoryId = product.categoryId;
         return ProductListItem(
           product: product,
-          categoryName: categoryNameById[product.categoryId] ?? '-',
+          categoryName: categoryId == null ? 'Lainnya' : (categoryNameById[categoryId] ?? '-'),
           onTap: () => _openDetail(product),
         );
       },

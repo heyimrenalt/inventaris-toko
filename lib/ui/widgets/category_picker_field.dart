@@ -5,15 +5,16 @@ import 'package:isar_community/isar.dart';
 
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
-import 'category_form_dialog.dart';
+import 'category_tree_picker.dart';
 
-/// Dropdown of existing categories with an inline "add new category" item
-/// that opens the shared category dialog without leaving the current
-/// screen. On successful creation, the new category is auto-selected.
+/// Tappable field showing the product's assigned category as a full
+/// "Parent > Child" breadcrumb (or "Lainnya (tanpa kategori)" when
+/// unassigned), opening [CategoryTreePicker] on tap to change it.
 ///
-/// Selection is a controlled value owned by the parent (via
-/// [selectedCategoryId]/[onChanged]); this widget only owns the category
-/// *list*, since it needs to reload that after creating a new one.
+/// Category assignment is optional, so there is always a valid selection
+/// — [errorText] exists only for the rare case a previously-selected
+/// category no longer exists (e.g. deleted from another screen while
+/// this form was open), not for "nothing picked yet".
 class CategoryPickerField extends StatefulWidget {
   const CategoryPickerField({
     super.key,
@@ -33,8 +34,6 @@ class CategoryPickerField extends StatefulWidget {
 }
 
 class _CategoryPickerFieldState extends State<CategoryPickerField> {
-  static const int _addNewSentinel = -1;
-
   late final CategoryRepository _repository = CategoryRepository(widget.isar);
 
   List<Category> _categories = [];
@@ -49,9 +48,8 @@ class _CategoryPickerFieldState extends State<CategoryPickerField> {
     // This field is embedded in ProductFormScreen, which stays mounted
     // while the user fills out the rest of the form — a category added
     // from Kelola Kategori (Pengaturan tab, a separately-mounted screen)
-    // in another app session/navigation wouldn't otherwise be picked up
-    // until this field remounts. Same watchLazy() pattern as
-    // ProdukScreen's category/product streams.
+    // needs to reach this field's breadcrumb resolution without a
+    // manual reload or app restart.
     _categoriesSubscription = widget.isar.categories.watchLazy().listen((_) => _loadCategories());
   }
 
@@ -70,11 +68,36 @@ class _CategoryPickerFieldState extends State<CategoryPickerField> {
     });
   }
 
-  Future<void> _handleAddNewCategory() async {
-    final created = await showCategoryFormDialog(context: context, repository: _repository);
-    if (created == null) return;
-    await _loadCategories();
-    widget.onChanged(created.id);
+  String _breadcrumbFor(int categoryId) {
+    final byId = {for (final category in _categories) category.id: category};
+    final category = byId[categoryId];
+    if (category == null) return 'Lainnya (tanpa kategori)';
+
+    final parts = [category.name];
+    var current = category;
+    while (current.parentId != null) {
+      final parent = byId[current.parentId];
+      if (parent == null) break;
+      parts.insert(0, parent.name);
+      current = parent;
+    }
+    return parts.join(' > ');
+  }
+
+  Future<void> _openPicker() async {
+    final selectedId = widget.selectedCategoryId;
+    final current = selectedId == null
+        ? const CategorySelection.uncategorized()
+        : CategorySelection.category(selectedId, _breadcrumbFor(selectedId));
+
+    final result = await showCategoryTreePicker(
+      context: context,
+      isar: widget.isar,
+      includeAllOption: false,
+      current: current,
+    );
+    if (result == null) return;
+    widget.onChanged(result.categoryId);
   }
 
   @override
@@ -87,33 +110,18 @@ class _CategoryPickerFieldState extends State<CategoryPickerField> {
     }
 
     final selectedId = widget.selectedCategoryId;
-    final hasSelectedCategory = _categories.any((category) => category.id == selectedId);
+    final label = selectedId == null ? 'Lainnya (tanpa kategori)' : _breadcrumbFor(selectedId);
 
-    return DropdownButtonFormField<int>(
-      initialValue: hasSelectedCategory ? selectedId : null,
-      decoration: InputDecoration(
-        labelText: 'Kategori',
-        errorText: widget.errorText,
-      ),
-      style: const TextStyle(fontSize: 16, color: Colors.black87),
-      items: [
-        for (final category in _categories)
-          DropdownMenuItem(value: category.id, child: Text(category.name)),
-        const DropdownMenuItem(
-          value: _addNewSentinel,
-          child: Text(
-            '+ Tambah kategori baru',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+    return InkWell(
+      key: const Key('category_picker_field'),
+      onTap: _openPicker,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Kategori',
+          errorText: widget.errorText,
         ),
-      ],
-      onChanged: (value) {
-        if (value == _addNewSentinel) {
-          _handleAddNewCategory();
-        } else {
-          widget.onChanged(value);
-        }
-      },
+        child: Text(label, style: const TextStyle(fontSize: 16, color: Colors.black87)),
+      ),
     );
   }
 }

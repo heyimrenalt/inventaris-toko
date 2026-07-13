@@ -157,10 +157,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     });
 
     final categoryId = _categoryId;
-    if (categoryId == null) {
-      setState(() => _categoryError = 'Pilih kategori terlebih dahulu');
-      return;
-    }
 
     final sellPrice = double.tryParse(_sellPriceController.text.replaceAll(',', '.')) ?? -1;
     final minThreshold = double.tryParse(_minStockController.text.replaceAll(',', '.'));
@@ -173,6 +169,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           id: widget.existing!.id,
           name: _nameController.text,
           categoryId: categoryId,
+          // categoryId itself can't distinguish "leave unchanged" from
+          // "clear to Lainnya" now that null is a valid category value —
+          // clearCategory is the explicit signal for the latter. See the
+          // comment on ProductRepository.update.
+          clearCategory: categoryId == null,
           code: _codeController.text,
           photoPath: _photoPath ?? '',
           sellPrice: sellPrice,

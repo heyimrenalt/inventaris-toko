@@ -19,8 +19,10 @@ class Product {
   String? code;
 
   /// Foreign key to [Category.id]. Stored as a plain field (not an
-  /// IsarLink) per spec.
-  late int categoryId;
+  /// IsarLink) per spec. `null` means the product is uncategorized (the
+  /// "Lainnya" bucket) — category assignment is optional.
+  @Index()
+  int? categoryId;
 
   String? photoPath;
 
