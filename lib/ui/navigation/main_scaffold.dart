@@ -21,7 +21,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      const BerandaScreen(),
+      BerandaScreen(isar: widget.isar),
       ProdukScreen(isar: widget.isar),
       MutasiScreen(isar: widget.isar),
       PengaturanScreen(isar: widget.isar),

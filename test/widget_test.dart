@@ -31,9 +31,11 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: MainScaffold(isar: isar)));
       await settleAfterAsyncWork(tester);
 
-      expect(find.text('Beranda'), findsOneWidget);
+      // 'Beranda' now appears twice (bottom nav label + the tab's own
+      // AppBar title), unlike the other still-placeholder/simple tabs.
+      expect(find.text('Beranda'), findsNWidgets(2));
       expect(find.text('Mutasi'), findsOneWidget);
-      expect(find.text('Beranda — belum diimplementasikan'), findsOneWidget);
+      expect(find.text('Total Produk'), findsOneWidget);
 
       await tapTab(tester, 'Produk');
       await settleAfterAsyncWork(tester);

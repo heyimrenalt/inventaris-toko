@@ -73,6 +73,18 @@ class StockMutationRepository {
         .findAll();
   }
 
+  /// All stockOut mutations for [productId], oldest first. Feeds
+  /// [PrioritasKulakanCalculator], which needs the earliest stockOut date
+  /// (and every quantity in between) to compute daily velocity.
+  Future<List<StockMutation>> getStockOutHistoryForProduct(int productId) {
+    return _isar.stockMutations
+        .filter()
+        .productIdEqualTo(productId)
+        .typeEqualTo(StockMutationType.stockOut)
+        .sortByCreatedAt()
+        .findAll();
+  }
+
   /// Same as [getHistoryForProduct] but capped at [limit] — for previews
   /// (e.g. Product Detail's recent-history section) that link out to the
   /// full history via [getHistoryForProduct] instead of loading everything

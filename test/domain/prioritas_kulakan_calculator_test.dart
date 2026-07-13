@@ -1,0 +1,166 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/data/models/product.dart';
+import 'package:inventaris_toko/data/models/stock_mutation.dart';
+import 'package:inventaris_toko/domain/prioritas_kulakan_calculator.dart';
+
+void main() {
+  const calculator = PrioritasKulakanCalculator();
+  final now = DateTime(2026, 7, 13);
+
+  Product product({required double currentStock}) {
+    return Product()
+      ..id = 1
+      ..name = 'Test Product'
+      ..categoryId = 1
+      ..sellPrice = 1000
+      ..unit = 'pcs'
+      ..currentStock = currentStock
+      ..minStockThreshold = 5
+      ..createdAt = now
+      ..updatedAt = now;
+  }
+
+  StockMutation stockOut({required double quantity, required DateTime createdAt}) {
+    return StockMutation()
+      ..productId = 1
+      ..type = StockMutationType.stockOut
+      ..quantity = quantity
+      ..stockAfter = 0
+      ..createdAt = createdAt;
+  }
+
+  test('computes daily velocity across several days of stockOut history', () {
+    final mutations = [
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 3))),
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 1))),
+      stockOut(quantity: 2, createdAt: now),
+    ];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 10),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    // 6 units total / 3 days since the earliest mutation = 2/day.
+    expect(result, isNotNull);
+    expect(result!.dailyVelocity, 2.0);
+  });
+
+  test('a single stockOut mutation uses a minimum 1-day divisor, no division by zero', () {
+    final mutations = [stockOut(quantity: 5, createdAt: now)];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 10),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.dailyVelocity, 5.0);
+    expect(result.dailyVelocity.isFinite, isTrue);
+  });
+
+  test('estimated days remaining is currentStock / dailyVelocity', () {
+    final mutations = [
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 3))),
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 1))),
+      stockOut(quantity: 2, createdAt: now),
+    ];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 10),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    // velocity is 2/day (see the earlier test); 10 / 2 = 5 days.
+    expect(result!.estimatedDaysRemaining, 5.0);
+    expect(result.isOutOfStock, isFalse);
+  });
+
+  test('currentStock <= 0 produces the "stok habis sekarang" special case', () {
+    final mutations = [stockOut(quantity: 5, createdAt: now)];
+
+    final zeroStockResult = calculator.calculate(
+      product: product(currentStock: 0),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(zeroStockResult!.isOutOfStock, isTrue);
+    expect(zeroStockResult.estimatedDaysRemaining, 0.0);
+    expect(zeroStockResult.urgency, PriorityUrgency.red);
+
+    final negativeStockResult = calculator.calculate(
+      product: product(currentStock: -1),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(negativeStockResult!.isOutOfStock, isTrue);
+    expect(negativeStockResult.estimatedDaysRemaining, 0.0);
+    expect(negativeStockResult.urgency, PriorityUrgency.red);
+  });
+
+  test('urgency boundaries: exactly 2 days is red, exactly 7 days is yellow, above 7 is neutral', () {
+    // velocity is exactly 1/day, so currentStock == estimatedDaysRemaining.
+    final mutations = [stockOut(quantity: 1, createdAt: now)];
+
+    final atRedBoundary = calculator.calculate(
+      product: product(currentStock: 2),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(atRedBoundary!.estimatedDaysRemaining, 2.0);
+    expect(atRedBoundary.urgency, PriorityUrgency.red);
+
+    final justAboveRedBoundary = calculator.calculate(
+      product: product(currentStock: 3),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(justAboveRedBoundary!.urgency, PriorityUrgency.yellow);
+
+    final atYellowBoundary = calculator.calculate(
+      product: product(currentStock: 7),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(atYellowBoundary!.estimatedDaysRemaining, 7.0);
+    expect(atYellowBoundary.urgency, PriorityUrgency.yellow);
+
+    final justAboveYellowBoundary = calculator.calculate(
+      product: product(currentStock: 8),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(justAboveYellowBoundary!.urgency, PriorityUrgency.neutral);
+  });
+
+  test('a product with zero stockOut mutations is not eligible (returns null)', () {
+    final result = calculator.calculate(
+      product: product(currentStock: 10),
+      stockOutMutations: const [],
+      now: now,
+    );
+
+    expect(result, isNull);
+  });
+
+  test('calculateAll excludes ineligible products and sorts most-urgent first', () {
+    final urgent = product(currentStock: 2)..id = 1;
+    final mild = product(currentStock: 20)..id = 2;
+    final ineligible = product(currentStock: 10)..id = 3;
+
+    final results = calculator.calculateAll(
+      products: [mild, urgent, ineligible],
+      stockOutMutationsByProductId: {
+        1: [stockOut(quantity: 1, createdAt: now)], // velocity 1/day -> 2 days left
+        2: [stockOut(quantity: 1, createdAt: now)], // velocity 1/day -> 20 days left
+        // product 3 has no stockOut history at all.
+      },
+      now: now,
+    );
+
+    expect(results.map((r) => r.product.id).toList(), [1, 2]);
+  });
+}
