@@ -56,6 +56,27 @@ class DuplicateProductCodeException implements Exception {
   String toString() => 'DuplicateProductCodeException: "$code" already exists';
 }
 
+/// Thrown by [StockMutationRepository.recordMutation] when a stock-out
+/// quantity exceeds the product's current stock. Stock-out is rejected
+/// outright in that case — no mutation is recorded and [Product.currentStock]
+/// is left untouched.
+class InsufficientStockException implements Exception {
+  InsufficientStockException({
+    required this.productId,
+    required this.currentStock,
+    required this.requestedQuantity,
+  });
+
+  final int productId;
+  final double currentStock;
+  final double requestedQuantity;
+
+  @override
+  String toString() =>
+      'InsufficientStockException: product $productId has $currentStock in '
+      'stock, requested $requestedQuantity';
+}
+
 /// Thrown by [ProductRepository.delete] when the product still has
 /// [StockMutation] history. See the comment on that method for why
 /// deletion is blocked rather than cascading.

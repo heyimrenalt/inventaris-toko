@@ -207,4 +207,28 @@ void main() {
       );
     });
   });
+
+  testWidgets(
+    'adding a category elsewhere (direct repository call) auto-refreshes the category '
+    'dropdown without any manual trigger',
+    (tester) async {
+      await tester.runAsync(() async {
+        await categoryRepository.create('Snacks');
+        await pumpForm(tester);
+
+        // Simulates a category added from Kelola Kategori (Pengaturan
+        // tab, a separately mounted screen) while this form stays open —
+        // exactly the case the watchLazy() subscription is meant to fix.
+        await categoryRepository.create('Drinks');
+        await settleAfterAsyncWork(tester);
+
+        final dropdownFinder = find.byType(DropdownButtonFormField<int>);
+        await tester.ensureVisible(dropdownFinder);
+        await tester.tap(dropdownFinder);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Drinks'), findsOneWidget);
+      });
+    },
+  );
 }

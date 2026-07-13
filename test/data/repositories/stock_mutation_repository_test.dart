@@ -94,18 +94,23 @@ void main() {
     expect(product!.currentStock, 6);
   });
 
-  test('stockOut exceeding currentStock clamps to 0 but records requested quantity', () async {
-    final mutation = await stockMutationRepository.recordMutation(
-      productId: productId,
-      type: StockMutationType.stockOut,
-      quantity: 999,
+  test('stockOut exceeding currentStock is rejected and leaves stock/history untouched', () async {
+    final historyBefore = await stockMutationRepository.getHistoryForProduct(productId);
+
+    expect(
+      () => stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockOut,
+        quantity: 999,
+      ),
+      throwsA(isA<InsufficientStockException>()),
     );
 
-    expect(mutation.quantity, 999);
-    expect(mutation.stockAfter, 0);
-
     final product = await productRepository.getById(productId);
-    expect(product!.currentStock, 0);
+    expect(product!.currentStock, 10);
+
+    final historyAfter = await stockMutationRepository.getHistoryForProduct(productId);
+    expect(historyAfter, hasLength(historyBefore.length));
   });
 
   test('history and recent mutations are ordered newest first', () async {
@@ -127,5 +132,43 @@ void main() {
 
     final recent = await stockMutationRepository.getRecentMutations(2);
     expect(recent, hasLength(2));
+  });
+
+  test('getTotalsSince sums stockIn and stockOut separately, excluding mutations outside the window', () async {
+    final now = DateTime.now();
+
+    // Within the window (setUp's "Stok awal" of 10 already counts too).
+    await stockMutationRepository.recordMutation(
+      productId: productId,
+      type: StockMutationType.stockIn,
+      quantity: 5,
+    );
+    await stockMutationRepository.recordMutation(
+      productId: productId,
+      type: StockMutationType.stockOut,
+      quantity: 2,
+    );
+
+    // Outside the window: recordMutation always stamps `createdAt` with
+    // the real current time, so an old mutation has to be inserted
+    // directly to simulate one that happened long ago.
+    final oldMutation = StockMutation()
+      ..productId = productId
+      ..type = StockMutationType.stockIn
+      ..quantity = 100
+      ..stockAfter = 999
+      ..createdAt = now.subtract(const Duration(days: 30));
+    await isar.writeTxn(() async {
+      await isar.stockMutations.put(oldMutation);
+    });
+
+    final totals = await stockMutationRepository.getTotalsSince(
+      now.subtract(const Duration(days: 7)),
+    );
+
+    // setUp's "Stok awal" (10) + this test's stockIn (5) = 15; the
+    // 30-day-old 100 must not be included.
+    expect(totals.stockIn, 15);
+    expect(totals.stockOut, 2);
   });
 }

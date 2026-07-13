@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
@@ -38,10 +40,25 @@ class _CategoryPickerFieldState extends State<CategoryPickerField> {
   List<Category> _categories = [];
   bool _loading = true;
 
+  StreamSubscription<void>? _categoriesSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadCategories();
+    // This field is embedded in ProductFormScreen, which stays mounted
+    // while the user fills out the rest of the form — a category added
+    // from Kelola Kategori (Pengaturan tab, a separately-mounted screen)
+    // in another app session/navigation wouldn't otherwise be picked up
+    // until this field remounts. Same watchLazy() pattern as
+    // ProdukScreen's category/product streams.
+    _categoriesSubscription = widget.isar.categories.watchLazy().listen((_) => _loadCategories());
+  }
+
+  @override
+  void dispose() {
+    _categoriesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {

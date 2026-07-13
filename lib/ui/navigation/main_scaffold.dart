@@ -23,7 +23,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     final screens = [
       const BerandaScreen(),
       ProdukScreen(isar: widget.isar),
-      const MutasiScreen(),
+      MutasiScreen(isar: widget.isar),
       PengaturanScreen(isar: widget.isar),
     ];
 

@@ -33,13 +33,18 @@ class StockMutationRepository {
       if (type == StockMutationType.stockIn) {
         newStock = product.currentStock + quantity;
       } else {
-        // Product decision: stock-out never goes negative. If the
-        // requested quantity exceeds what's on hand, the real result is
-        // clamped to 0 rather than rejecting the mutation. The mutation
-        // record still stores the quantity the user actually entered,
-        // for audit honesty.
-        final result = product.currentStock - quantity;
-        newStock = result < 0 ? 0 : result;
+        // Stock-out can never take currentStock negative. Rather than
+        // clamping to 0, the whole mutation is rejected: no Product or
+        // StockMutation write happens, so the ledger never contains a
+        // stock-out that doesn't reflect what actually left the shelf.
+        if (quantity > product.currentStock) {
+          throw InsufficientStockException(
+            productId: productId,
+            currentStock: product.currentStock,
+            requestedQuantity: quantity,
+          );
+        }
+        newStock = product.currentStock - quantity;
       }
 
       product.currentStock = newStock;
@@ -68,6 +73,19 @@ class StockMutationRepository {
         .findAll();
   }
 
+  /// Same as [getHistoryForProduct] but capped at [limit] — for previews
+  /// (e.g. Product Detail's recent-history section) that link out to the
+  /// full history via [getHistoryForProduct] instead of loading everything
+  /// just to show a handful of rows.
+  Future<List<StockMutation>> getRecentHistoryForProduct(int productId, int limit) {
+    return _isar.stockMutations
+        .filter()
+        .productIdEqualTo(productId)
+        .sortByCreatedAtDesc()
+        .limit(limit)
+        .findAll();
+  }
+
   Future<List<StockMutation>> getRecentMutations(int limit) {
     return _isar.stockMutations
         .where()
@@ -75,4 +93,40 @@ class StockMutationRepository {
         .limit(limit)
         .findAll();
   }
+
+  /// Full mutation history across all products, newest first — used by
+  /// the Mutasi tab, which shows the complete ledger with no filters.
+  Future<List<StockMutation>> getAllMutations() {
+    return _isar.stockMutations.where().sortByCreatedAtDesc().findAll();
+  }
+
+  /// Sums stock-in and stock-out quantities separately for mutations
+  /// created at or after [since] (e.g. `DateTime.now().subtract(const
+  /// Duration(days: 7))` for a rolling 7-day window). Computed as a
+  /// single indexed query rather than loading everything and summing in
+  /// the UI layer.
+  Future<StockMutationTotals> getTotalsSince(DateTime since) async {
+    final mutations = await _isar.stockMutations
+        .filter()
+        .createdAtGreaterThan(since, include: true)
+        .findAll();
+
+    var stockIn = 0.0;
+    var stockOut = 0.0;
+    for (final mutation in mutations) {
+      if (mutation.type == StockMutationType.stockIn) {
+        stockIn += mutation.quantity;
+      } else {
+        stockOut += mutation.quantity;
+      }
+    }
+    return StockMutationTotals(stockIn: stockIn, stockOut: stockOut);
+  }
+}
+
+class StockMutationTotals {
+  const StockMutationTotals({required this.stockIn, required this.stockOut});
+
+  final double stockIn;
+  final double stockOut;
 }

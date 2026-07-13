@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/data/models/stock_mutation.dart';
 import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
@@ -75,7 +76,7 @@ void main() {
 
       await pumpDetailWithBackStack(tester, product.id);
 
-      expect(find.text('Chips'), findsOneWidget);
+      expect(find.byKey(const Key('product_detail_name')), findsOneWidget);
       expect(find.text('Kode: 999'), findsOneWidget);
       expect(find.text('Snacks'), findsOneWidget);
       expect(find.text('Rp 5.000'), findsOneWidget);
@@ -85,32 +86,86 @@ void main() {
     });
   });
 
-  testWidgets('tapping Stok masuk/keluar shows "belum tersedia" and does not mutate stock', (tester) async {
-    await tester.runAsync(() async {
-      final category = await categoryRepository.create('Snacks');
-      final product = await productRepository.create(
-        name: 'Chips',
-        categoryId: category.id,
-        sellPrice: 5000,
-        unit: 'pcs',
-        initialStock: 12,
-      );
+  testWidgets(
+    'tapping Stok masuk navigates to Catat Mutasi pre-selected, and returning refreshes stock + history',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          initialStock: 12,
+        );
 
-      await pumpDetailWithBackStack(tester, product.id);
+        await pumpDetailWithBackStack(tester, product.id);
 
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Stok masuk'));
-      await tester.pump();
-      expect(find.text('Fitur ini belum tersedia'), findsOneWidget);
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Stok masuk'));
+        await settleAfterAsyncWork(tester);
 
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Stok keluar'));
-      await tester.pump();
-      expect(find.text('Fitur ini belum tersedia'), findsOneWidget);
+        expect(find.text('Catat Mutasi'), findsOneWidget);
+        expect(
+          find.textContaining('Chips — stok saat ini: 12 pcs'),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('catat_mutasi_type_in')),
+            matching: find.byType(ElevatedButton),
+          ),
+          findsOneWidget,
+        );
 
-      final unchanged = await productRepository.getById(product.id);
-      expect(unchanged!.currentStock, 12);
-      expect(await stockMutationRepository.getHistoryForProduct(product.id), hasLength(1));
-    });
-  });
+        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '8');
+        final submitFinder = find.byKey(const Key('catat_mutasi_submit'));
+        await tester.ensureVisible(submitFinder);
+        await tester.tap(submitFinder);
+        await settleAfterAsyncWork(tester);
+
+        // Back on Detail without a manual reload: stock figure and
+        // recent history both reflect the new mutation immediately.
+        expect(find.text('Detail Produk'), findsOneWidget);
+        expect(find.textContaining('Stok saat ini: 20 pcs'), findsOneWidget);
+        expect(find.text('+8 pcs'), findsOneWidget);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.currentStock, 20);
+      });
+    },
+  );
+
+  testWidgets(
+    'recording a stock mutation elsewhere updates the displayed stock without navigating away',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 5000,
+          unit: 'pcs',
+          initialStock: 12,
+        );
+
+        await pumpDetailWithBackStack(tester, product.id);
+
+        expect(find.textContaining('Stok saat ini: 12 pcs'), findsOneWidget);
+
+        // Simulates a mutation recorded elsewhere (not through this
+        // screen's own Stok masuk/keluar buttons), which this screen can
+        // only pick up via its own watch subscription.
+        await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockIn,
+          quantity: 8,
+        );
+        await settleAfterAsyncWork(tester);
+
+        expect(find.textContaining('Stok saat ini: 20 pcs'), findsOneWidget);
+      });
+    },
+  );
 
   testWidgets('delete on a product with no mutation history succeeds and navigates back', (tester) async {
     await tester.runAsync(() async {

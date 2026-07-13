@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:isar_community/isar.dart';
 
 import '../../../data/models/category.dart';
 import '../../../data/models/product.dart';
+import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
@@ -12,6 +14,9 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../services/photo_storage_service.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/mutation_list_item.dart';
+import '../mutasi/catat_mutasi_screen.dart';
+import '../mutasi/product_mutation_history_screen.dart';
 import 'product_form_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -31,37 +36,77 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  late final StockMutationRepository _stockMutationRepository = StockMutationRepository(widget.isar);
   late final ProductRepository _productRepository = ProductRepository(
     widget.isar,
-    StockMutationRepository(widget.isar),
+    _stockMutationRepository,
     AppSettingsRepository(widget.isar),
   );
   late final CategoryRepository _categoryRepository = CategoryRepository(widget.isar);
 
+  static const int _recentMutationsLimit = 5;
+
   Product? _product;
   Category? _category;
+  List<StockMutation> _recentMutations = [];
   bool _loading = true;
+
+  StreamSubscription<void>? _mutationsSubscription;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Every Product.currentStock change goes through
+    // StockMutationRepository.recordMutation, which always writes a
+    // StockMutation alongside it — so watching the stockMutations
+    // collection (same pattern as MutasiScreen) is enough to catch every
+    // stock change for this product without a manual reload after
+    // navigation.
+    _mutationsSubscription = widget.isar.stockMutations.watchLazy().listen((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _mutationsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
     final product = await _productRepository.getById(widget.productId);
     final category = product == null ? null : await _categoryRepository.getById(product.categoryId);
+    final recentMutations = product == null
+        ? <StockMutation>[]
+        : await _stockMutationRepository.getRecentHistoryForProduct(
+            product.id,
+            _recentMutationsLimit,
+          );
     if (!mounted) return;
     setState(() {
       _product = product;
       _category = category;
+      _recentMutations = recentMutations;
       _loading = false;
     });
   }
 
-  void _showNotAvailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fitur ini belum tersedia')),
+  Future<void> _openCatatMutasi(StockMutationType type) async {
+    final product = _product;
+    if (product == null) return;
+
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CatatMutasiScreen(isar: widget.isar, product: product, initialType: type),
+      ),
+    );
+    await _load();
+  }
+
+  void _openFullHistory(Product product) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProductMutationHistoryScreen(isar: widget.isar, product: product),
+      ),
     );
   }
 
@@ -250,7 +295,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          Text(product.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(
+            product.name,
+            key: const Key('product_detail_name'),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           if (product.code != null && product.code!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -294,7 +343,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _showNotAvailable,
+                    onPressed: () => _openCatatMutasi(StockMutationType.stockIn),
                     icon: const Icon(Icons.add_box_outlined),
                     label: const Text('Stok masuk', style: TextStyle(fontSize: 16)),
                   ),
@@ -302,7 +351,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _showNotAvailable,
+                    onPressed: () => _openCatatMutasi(StockMutationType.stockOut),
                     icon: const Icon(Icons.remove_circle_outline),
                     label: const Text('Stok keluar', style: TextStyle(fontSize: 16)),
                   ),
@@ -312,10 +361,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 24),
           const Text('Riwayat Mutasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(
-            'Riwayat mutasi belum tersedia',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-          ),
+          if (_recentMutations.isEmpty)
+            Text(
+              'Belum ada riwayat mutasi.',
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            )
+          else ...[
+            for (final mutation in _recentMutations)
+              MutationListItem(mutation: mutation, productName: product.name, unit: product.unit),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _openFullHistory(product),
+                child: const Text('Lihat semua', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          ],
         ],
       ),
     );

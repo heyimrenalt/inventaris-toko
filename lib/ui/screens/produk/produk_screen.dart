@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
@@ -29,15 +31,42 @@ class _ProdukScreenState extends State<ProdukScreen> {
   );
   late final CategoryRepository _categoryRepository = CategoryRepository(widget.isar);
 
+  final TextEditingController _searchController = TextEditingController();
+
   List<Product> _products = [];
   List<Category> _categories = [];
   int? _selectedCategoryId;
+  String _searchQuery = '';
   bool _loading = true;
+
+  StreamSubscription<void>? _productsSubscription;
+  StreamSubscription<void>? _categoriesSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    // MainScaffold keeps every tab alive in an IndexedStack, so this
+    // screen's own initState only runs once — recording a stock mutation
+    // from Product Detail or the Mutasi tab (both separately-mounted
+    // screens) changes Product.currentStock without this list ever
+    // reloading. watchLazy() fires whenever the products collection
+    // changes anywhere in the app, so the list stays correct without a
+    // manual reload. Same pattern as MutasiScreen's mutation stream.
+    _productsSubscription = widget.isar.products.watchLazy().listen((_) => _loadData());
+    // Same reasoning for categories: adding/renaming one from Kelola
+    // Kategori (Pengaturan tab, a separately-mounted screen) needs to
+    // reach both the filter chips here and the dropdown in
+    // CategoryPickerField without a manual reload or app restart.
+    _categoriesSubscription = widget.isar.categories.watchLazy().listen((_) => _loadData());
+  }
+
+  @override
+  void dispose() {
+    _productsSubscription?.cancel();
+    _categoriesSubscription?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -61,6 +90,15 @@ class _ProdukScreenState extends State<ProdukScreen> {
     });
     _loadData();
   }
+
+  /// [_products] (already scoped to the selected category, and always
+  /// excluding archived products, by [_loadData]'s repository query)
+  /// further filtered by [_searchQuery] in memory — same reasoning as
+  /// MutasiScreen's `_visibleMutations`: this app's expected data scale
+  /// makes in-memory filtering of the already-loaded list cheap, so
+  /// there's no need for a separate repository query per keystroke.
+  List<Product> get _visibleProducts =>
+      filterProducts(products: _products, searchQuery: _searchQuery);
 
   Future<void> _openAddForm() async {
     await Navigator.of(context).push<bool>(
@@ -89,25 +127,41 @@ class _ProdukScreenState extends State<ProdukScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Produk')),
-      body: Column(
-        children: [
-          _buildCategoryChips(),
-          const Divider(height: 1),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: _openArchivedProducts,
-              icon: const Icon(Icons.archive_outlined),
-              label: const Text('Lihat produk diarsipkan', style: TextStyle(fontSize: 14)),
+      // One CustomScrollView for the whole body (header controls as
+      // sliver-wrapped boxes, the product list as a sliver list) rather
+      // than a Column with a fixed-size header + Expanded list: with the
+      // latter, a short viewport (landscape orientation, a small phone,
+      // or a keyboard eating vertical space) can't shrink the header
+      // controls, so once their combined height exceeds what's left
+      // after the bottomNavigationBar and AppBar, the Expanded child gets
+      // squeezed to nothing and the layout still overflows. A single
+      // scrollable lets the whole screen — header included — scroll
+      // instead, so it never overflows regardless of viewport size. Same
+      // reasoning as MutasiScreen's body (see its build() comment).
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _buildSearchField()),
+          SliverToBoxAdapter(child: _buildCategoryChips()),
+          const SliverToBoxAdapter(child: Divider(height: 1)),
+          SliverToBoxAdapter(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _openArchivedProducts,
+                icon: const Icon(Icons.archive_outlined),
+                label: const Text('Lihat produk diarsipkan', style: TextStyle(fontSize: 14)),
+              ),
             ),
           ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _products.isEmpty
-                    ? _buildEmptyState()
-                    : _buildProductList(),
-          ),
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_visibleProducts.isEmpty)
+            SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
+          else
+            _buildProductList(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -123,6 +177,31 @@ class _ProdukScreenState extends State<ProdukScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        key: const Key('produk_search'),
+        controller: _searchController,
+        style: const TextStyle(fontSize: 16),
+        decoration: InputDecoration(
+          labelText: 'Cari produk',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
       ),
     );
   }
@@ -157,13 +236,21 @@ class _ProdukScreenState extends State<ProdukScreen> {
   }
 
   Widget _buildEmptyState() {
+    // Search/category yielding nothing from a non-empty product list is
+    // shown distinctly from "there are no products (in this category) at
+    // all" — same distinction MutasiScreen makes between "Tidak
+    // ditemukan." and its own no-history empty state.
+    final message = _products.isEmpty
+        ? (_selectedCategoryId == null
+            ? 'Belum ada produk. Tambahkan produk pertama untuk mulai.'
+            : 'Tidak ada produk pada kategori ini.')
+        : 'Tidak ditemukan.';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          _selectedCategoryId == null
-              ? 'Belum ada produk. Tambahkan produk pertama untuk mulai.'
-              : 'Tidak ada produk pada kategori ini.',
+          message,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 16),
         ),
@@ -173,12 +260,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
 
   Widget _buildProductList() {
     final categoryNameById = {for (final category in _categories) category.id: category.name};
+    final visible = _visibleProducts;
 
-    return ListView.separated(
-      itemCount: _products.length,
+    return SliverList.separated(
+      itemCount: visible.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final product = _products[index];
+        final product = visible[index];
         return ProductListItem(
           product: product,
           categoryName: categoryNameById[product.categoryId] ?? '-',
@@ -187,4 +275,21 @@ class _ProdukScreenState extends State<ProdukScreen> {
       },
     );
   }
+}
+
+/// Pure filtering logic, extracted so it's directly unit-testable — same
+/// reasoning as MutasiScreen's `filterMutations`. Matches product name or
+/// code (when present), case-insensitive substring.
+List<Product> filterProducts({
+  required List<Product> products,
+  String searchQuery = '',
+}) {
+  final query = searchQuery.trim().toLowerCase();
+  if (query.isEmpty) return products;
+
+  return products.where((product) {
+    final nameMatch = product.name.toLowerCase().contains(query);
+    final codeMatch = (product.code ?? '').toLowerCase().contains(query);
+    return nameMatch || codeMatch;
+  }).toList();
 }

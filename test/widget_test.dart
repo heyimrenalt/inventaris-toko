@@ -44,7 +44,7 @@ void main() {
 
       await tapTab(tester, 'Mutasi');
       await settleAfterAsyncWork(tester);
-      expect(find.text('Mutasi — belum diimplementasikan'), findsOneWidget);
+      expect(find.text('Belum ada riwayat mutasi stok.'), findsOneWidget);
 
       await tapTab(tester, 'Pengaturan');
       await settleAfterAsyncWork(tester);

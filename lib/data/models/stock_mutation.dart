@@ -17,8 +17,10 @@ class StockMutation {
   @Enumerated(EnumType.name)
   late StockMutationType type;
 
-  /// Always > 0. What the user actually entered, even if the applied
-  /// effect on stock was clamped (see [StockMutationRepository]).
+  /// Always > 0. What the user actually entered. For stockOut, this is
+  /// always <= the product's stock at the time (see
+  /// [StockMutationRepository.recordMutation], which rejects the mutation
+  /// outright otherwise).
   late double quantity;
 
   String? note;
