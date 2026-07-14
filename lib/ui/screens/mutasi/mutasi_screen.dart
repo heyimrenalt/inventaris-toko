@@ -8,10 +8,12 @@ import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 import 'catat_mutasi_screen.dart';
+import 'catat_stok_keluar_batch_screen.dart';
 
 class MutasiScreen extends StatefulWidget {
   const MutasiScreen({super.key, required this.isar});
@@ -34,6 +36,7 @@ class _MutasiScreenState extends State<MutasiScreen> {
 
   List<StockMutation> _allMutations = [];
   Map<int, Product> _productById = {};
+  Map<int, int> _mostRecentMutationIdByProduct = {};
   StockMutationTotals _totals = const StockMutationTotals(stockIn: 0, stockOut: 0);
   DateTimeRange? _selectedRange;
   String _searchQuery = '';
@@ -72,11 +75,23 @@ class _MutasiScreenState extends State<MutasiScreen> {
     // includeArchived so mutation history for an archived product still
     // shows a real product name instead of falling back to "-".
     final products = await _productRepository.getAll(includeArchived: true);
+
+    // Only the most recent mutation for a product is eligible for the
+    // history screen's "Batalkan" action, so look it up per distinct
+    // product referenced in the ledger rather than per row.
+    final distinctProductIds = mutations.map((m) => m.productId).toSet();
+    final mostRecentByProduct = <int, int>{};
+    for (final productId in distinctProductIds) {
+      final recent = await _mutationRepository.getMostRecentMutationForProduct(productId);
+      if (recent != null) mostRecentByProduct[productId] = recent.id;
+    }
+
     if (!mounted) return;
     setState(() {
       _allMutations = mutations;
       _totals = totals;
       _productById = {for (final product in products) product.id: product};
+      _mostRecentMutationIdByProduct = mostRecentByProduct;
       _loading = false;
     });
   }
@@ -99,6 +114,31 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
+  Future<void> _openBatch() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CatatStokKeluarBatchScreen(isar: widget.isar)),
+    );
+  }
+
+  Future<void> _cancelMutation(StockMutation mutation) async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: 'Batalkan Mutasi',
+      message: 'Batalkan mutasi ini? Ini akan membuat entri pembalik di riwayat.',
+      confirmLabel: 'Batalkan',
+      isDestructive: true,
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    await _mutationRepository.undoMutation(mutation.id);
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Mutasi dibatalkan')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,14 +155,30 @@ class _MutasiScreenState extends State<MutasiScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _openCatat,
-              icon: const Icon(Icons.add),
-              label: const Text('Catat', style: TextStyle(fontSize: 16)),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _openBatch,
+                    icon: const Icon(Icons.playlist_add),
+                    label: const Text('Catat banyak', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _openCatat,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Catat', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -227,6 +283,8 @@ class _MutasiScreenState extends State<MutasiScreen> {
                 mutation: mutation,
                 productName: _productById[mutation.productId]?.name ?? '-',
                 unit: _productById[mutation.productId]?.unit ?? '',
+                canCancel: _mostRecentMutationIdByProduct[mutation.productId] == mutation.id,
+                onCancel: () => _cancelMutation(mutation),
               ),
           ],
       ],

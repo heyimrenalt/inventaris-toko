@@ -16,6 +16,7 @@ import '../../../services/photo_storage_service.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../mutasi/catat_mutasi_screen.dart';
+import '../mutasi/catat_stok_keluar_batch_screen.dart';
 import '../mutasi/product_mutation_history_screen.dart';
 import 'product_form_screen.dart';
 
@@ -117,6 +118,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CatatMutasiScreen(isar: widget.isar, product: product, initialType: type),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _openBatchStokKeluar() async {
+    final product = _product;
+    if (product == null) return;
+
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CatatStokKeluarBatchScreen(isar: widget.isar, initialProduct: product),
       ),
     );
     await _load();
@@ -373,7 +386,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _openCatatMutasi(StockMutationType.stockOut),
+                    onPressed: _openBatchStokKeluar,
                     icon: const Icon(Icons.remove_circle_outline),
                     label: const Text('Stok keluar', style: TextStyle(fontSize: 16)),
                   ),

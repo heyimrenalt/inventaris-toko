@@ -88,6 +88,53 @@ class StockMutationRepository {
         .findAll();
   }
 
+  /// The single newest mutation for [productId], or `null` if it has no
+  /// history. Used by callers to decide whether a given mutation row is
+  /// eligible for cancellation (only the most recent mutation for a
+  /// product may be undone from the history screens).
+  Future<StockMutation?> getMostRecentMutationForProduct(int productId) {
+    return _isar.stockMutations
+        .filter()
+        .productIdEqualTo(productId)
+        .sortByCreatedAtDesc()
+        .findFirst();
+  }
+
+  /// Reverses [mutationId] by recording a compensating mutation of the
+  /// opposite type for the same quantity — a stockOut is undone by a
+  /// stockIn and vice versa. The original record is never deleted or
+  /// modified: the ledger stays append-only, and the undo shows up as a
+  /// new opposing entry.
+  ///
+  /// Whether [mutationId] is actually eligible to be undone (e.g. "only
+  /// the most recent mutation for a product") is entirely the caller's
+  /// concern — this method just executes the compensating write.
+  Future<void> undoMutation(int mutationId) async {
+    final original = await _isar.stockMutations.get(mutationId);
+    if (original == null) {
+      throw NotFoundException('Mutation $mutationId not found');
+    }
+
+    final product = await _isar.products.get(original.productId);
+    final compensatingType = original.type == StockMutationType.stockIn
+        ? StockMutationType.stockOut
+        : StockMutationType.stockIn;
+
+    // Strips any existing "Dibatalkan: " prefix first, so undoing an
+    // already-undone mutation produces a single clean "Dibatalkan: X"
+    // note instead of nesting ("Dibatalkan: Dibatalkan: X") every time
+    // the same chain is undone back and forth.
+    final baseNote =
+        original.note?.replaceFirst(RegExp(r'^Dibatalkan:\s*'), '') ?? product?.name ?? 'mutasi';
+
+    await recordMutation(
+      productId: original.productId,
+      type: compensatingType,
+      quantity: original.quantity,
+      note: 'Dibatalkan: $baseNote',
+    );
+  }
+
   /// All stockOut mutations for [productId], oldest first. Feeds
   /// [PrioritasKulakanCalculator], which needs the earliest stockOut date
   /// (and every quantity in between) to compute daily velocity.

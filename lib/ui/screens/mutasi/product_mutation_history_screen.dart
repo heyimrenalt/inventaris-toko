@@ -4,6 +4,7 @@ import 'package:isar_community/isar.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 
@@ -23,6 +24,7 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   late final StockMutationRepository _mutationRepository = StockMutationRepository(widget.isar);
 
   List<StockMutation> _mutations = [];
+  int? _mostRecentMutationId;
   bool _loading = true;
 
   @override
@@ -33,11 +35,32 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
 
   Future<void> _load() async {
     final mutations = await _mutationRepository.getHistoryForProduct(widget.product.id);
+    final mostRecent = await _mutationRepository.getMostRecentMutationForProduct(widget.product.id);
     if (!mounted) return;
     setState(() {
       _mutations = mutations;
+      _mostRecentMutationId = mostRecent?.id;
       _loading = false;
     });
+  }
+
+  Future<void> _cancelMutation(StockMutation mutation) async {
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: 'Batalkan Mutasi',
+      message: 'Batalkan mutasi ini? Ini akan membuat entri pembalik di riwayat.',
+      confirmLabel: 'Batalkan',
+      isDestructive: true,
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    await _mutationRepository.undoMutation(mutation.id);
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Mutasi dibatalkan')),
+    );
   }
 
   @override
@@ -80,6 +103,8 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
               mutation: mutation,
               productName: widget.product.name,
               unit: widget.product.unit,
+              canCancel: _mostRecentMutationId == mutation.id,
+              onCancel: () => _cancelMutation(mutation),
             ),
         ],
       ],

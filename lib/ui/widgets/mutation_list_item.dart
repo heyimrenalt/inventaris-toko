@@ -14,11 +14,24 @@ class MutationListItem extends StatelessWidget {
     required this.mutation,
     required this.productName,
     required this.unit,
+    this.canCancel = false,
+    this.onCancel,
   });
 
   final StockMutation mutation;
   final String productName;
   final String unit;
+
+  /// Whether this mutation is currently eligible to be cancelled — the
+  /// calling screen decides this (it's "the most recent mutation for this
+  /// product") and passes the result down rather than this widget
+  /// re-deriving it.
+  final bool canCancel;
+
+  /// Called when the user taps the cancel action. Only rendered when
+  /// [canCancel] is true. The calling screen owns confirmation, calling
+  /// [StockMutationRepository.undoMutation], and refreshing afterwards.
+  final VoidCallback? onCancel;
 
   bool get _isIn => mutation.type == StockMutationType.stockIn;
 
@@ -72,6 +85,15 @@ class MutationListItem extends StatelessWidget {
             '$sign${formatMutationQuantity(mutation.quantity)} $unit',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
           ),
+          if (canCancel) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              key: ValueKey('mutation_cancel_${mutation.id}'),
+              icon: const Icon(Icons.undo),
+              tooltip: 'Batalkan',
+              onPressed: onCancel,
+            ),
+          ],
         ],
       ),
     );

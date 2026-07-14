@@ -108,4 +108,103 @@ void main() {
       });
     },
   );
+
+  testWidgets(
+    'only the most recent mutation shows a "Batalkan" action, and cancelling it records a compensating entry',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+        final older = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 3,
+        );
+        final latest = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockIn,
+          quantity: 2,
+        );
+
+        await tester.pumpWidget(MaterialApp(
+          home: ProductMutationHistoryScreen(isar: isar, product: product),
+        ));
+        await settleAfterAsyncWork(tester);
+
+        expect(find.byIcon(Icons.undo), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${latest.id}')), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${older.id}')), findsNothing);
+
+        await tester.tap(find.byKey(Key('mutation_cancel_${latest.id}')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, 'Batalkan').last);
+        await settleAfterAsyncWork(tester);
+
+        expect(find.text('Mutasi dibatalkan'), findsOneWidget);
+
+        final history = await stockMutationRepository.getHistoryForProduct(product.id);
+        expect(
+          history.any(
+            (m) => m.type == StockMutationType.stockOut && (m.note ?? '').startsWith('Dibatalkan'),
+          ),
+          isTrue,
+        );
+
+        // Undoing the newest mutation created a brand-new stockOut entry,
+        // which is now the newest — so cancel eligibility has moved off
+        // of `latest` entirely.
+        expect(find.byKey(Key('mutation_cancel_${latest.id}')), findsNothing);
+      });
+    },
+  );
+
+  testWidgets(
+    'with 3 mutations for the same product, only the newest shows a cancel button — the other two show none at all',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 20,
+        );
+
+        final m1 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+        final m2 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+        final m3 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+
+        await tester.pumpWidget(MaterialApp(
+          home: ProductMutationHistoryScreen(isar: isar, product: product),
+        ));
+        await settleAfterAsyncWork(tester);
+
+        // Exactly one cancel button anywhere in the screen — not "disabled
+        // but present" on the older two, but genuinely absent.
+        expect(find.byIcon(Icons.undo), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${m3.id}')), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${m2.id}')), findsNothing);
+        expect(find.byKey(Key('mutation_cancel_${m1.id}')), findsNothing);
+      });
+    },
+  );
 }

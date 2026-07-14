@@ -296,6 +296,77 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a successful save shows a SnackBar with a "Batalkan" undo action',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
+
+        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tapSubmit(tester);
+
+        expect(find.text('Stok keluar dicatat: -4 Indomie Goreng'), findsOneWidget);
+        expect(find.widgetWithText(SnackBarAction, 'Batalkan'), findsOneWidget);
+      });
+    },
+  );
+
+  testWidgets(
+    'tapping "Batalkan" in the SnackBar undoes the mutation via undoMutation',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
+
+        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tapSubmit(tester);
+
+        final historyBeforeUndo = await stockMutationRepository.getHistoryForProduct(product.id);
+        final savedMutation = historyBeforeUndo.first;
+        expect(savedMutation.type, StockMutationType.stockOut);
+        expect(savedMutation.quantity, 4);
+
+        await tester.tap(find.widgetWithText(SnackBarAction, 'Batalkan'));
+        await settleAfterAsyncWork(tester);
+
+        expect(find.text('Mutasi dibatalkan'), findsOneWidget);
+
+        final historyAfterUndo = await stockMutationRepository.getHistoryForProduct(product.id);
+        expect(historyAfterUndo, hasLength(historyBeforeUndo.length + 1));
+        // The compensating entry is a stockIn of the same quantity, and
+        // the original stockOut record is still present untouched.
+        expect(
+          historyAfterUndo.any(
+            (m) => m.type == StockMutationType.stockIn && m.quantity == 4 && (m.note ?? '').startsWith('Dibatalkan'),
+          ),
+          isTrue,
+        );
+        expect(historyAfterUndo.any((m) => m.id == savedMutation.id), isTrue);
+
+        final updated = await productRepository.getById(product.id);
+        // 10 - 4 (stockOut) + 4 (undo stockIn) = 10.
+        expect(updated!.currentStock, 10);
+      });
+    },
+  );
+
   testWidgets('harga modal field appears for stockIn and disappears for stockOut', (tester) async {
     await tester.runAsync(() async {
       final category = await categoryRepository.create('Snacks');

@@ -461,6 +461,143 @@ void main() {
     },
   );
 
+  testWidgets(
+    'only the most recent mutation for a product shows a "Batalkan" action, and cancelling it records a compensating entry',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+        await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 3,
+        );
+        final latest = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockIn,
+          quantity: 2,
+        );
+
+        await pumpScreen(tester);
+
+        // Only one "Batalkan" (undo) icon button exists across the whole
+        // history — the older stockOut mutation is not the most recent
+        // for this product, so it must not show the action.
+        expect(find.byIcon(Icons.undo), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${latest.id}')), findsOneWidget);
+
+        await tester.tap(find.byKey(Key('mutation_cancel_${latest.id}')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, 'Batalkan').last);
+        await settleAfterAsyncWork(tester);
+
+        expect(find.text('Mutasi dibatalkan'), findsOneWidget);
+
+        final history = await stockMutationRepository.getHistoryForProduct(product.id);
+        expect(
+          history.any(
+            (m) => m.type == StockMutationType.stockOut && (m.note ?? '').startsWith('Dibatalkan'),
+          ),
+          isTrue,
+        );
+      });
+    },
+  );
+
+  testWidgets(
+    'with 3 mutations for the same product, only the newest shows a cancel button — the other two show none at all',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 20,
+        );
+
+        final m1 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+        final m2 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+        final m3 = await stockMutationRepository.recordMutation(
+          productId: product.id,
+          type: StockMutationType.stockOut,
+          quantity: 1,
+        );
+
+        await pumpScreen(tester);
+
+        expect(find.byIcon(Icons.undo), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${m3.id}')), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${m2.id}')), findsNothing);
+        expect(find.byKey(Key('mutation_cancel_${m1.id}')), findsNothing);
+      });
+    },
+  );
+
+  testWidgets(
+    'with multiple products each having their own history, each product shows its own cancel button only on its own newest row',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final chips = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 20,
+        );
+        final soda = await productRepository.create(
+          name: 'Soda',
+          categoryId: category.id,
+          sellPrice: 2000,
+          unit: 'botol',
+          initialStock: 20,
+        );
+
+        // Each product gets its own 3-mutation history, interleaved in
+        // time, so a naive "last mutation in the whole ledger" check
+        // (instead of a per-product one) would wrongly single out just
+        // one row across both products.
+        await stockMutationRepository.recordMutation(
+            productId: chips.id, type: StockMutationType.stockOut, quantity: 1);
+        await stockMutationRepository.recordMutation(
+            productId: soda.id, type: StockMutationType.stockOut, quantity: 1);
+        await stockMutationRepository.recordMutation(
+            productId: chips.id, type: StockMutationType.stockOut, quantity: 1);
+        final sodaMiddle = await stockMutationRepository.recordMutation(
+            productId: soda.id, type: StockMutationType.stockOut, quantity: 1);
+        final chipsNewest = await stockMutationRepository.recordMutation(
+            productId: chips.id, type: StockMutationType.stockOut, quantity: 1);
+        final sodaNewest = await stockMutationRepository.recordMutation(
+            productId: soda.id, type: StockMutationType.stockOut, quantity: 1);
+
+        await pumpScreen(tester);
+
+        // Exactly one cancel button per product — not one for the whole
+        // list, and not one for every row.
+        expect(find.byIcon(Icons.undo), findsNWidgets(2));
+        expect(find.byKey(Key('mutation_cancel_${chipsNewest.id}')), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${sodaNewest.id}')), findsOneWidget);
+        expect(find.byKey(Key('mutation_cancel_${sodaMiddle.id}')), findsNothing);
+      });
+    },
+  );
+
   group('filterMutations (pure logic)', () {
     late Product chips;
     late Product soda;

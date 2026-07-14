@@ -131,7 +131,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
 
     setState(() => _saving = true);
     try {
-      await _mutationRepository.recordMutation(
+      final mutation = await _mutationRepository.recordMutation(
         productId: product.id,
         type: _type,
         quantity: quantity,
@@ -141,10 +141,17 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       if (!mounted) return;
       final verb = _type == StockMutationType.stockIn ? 'Stok masuk' : 'Stok keluar';
       final sign = _type == StockMutationType.stockIn ? '+' : '-';
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      final mutationId = mutation.id;
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             '$verb dicatat: $sign${formatMutationQuantity(quantity)} ${product.name}',
+          ),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Batalkan',
+            onPressed: () => _undoMutation(messenger, mutationId),
           ),
         ),
       );
@@ -161,6 +168,18 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Reverses the just-saved mutation via the SnackBar's "Batalkan"
+  /// action. By the time this fires (up to 5 seconds later, per the
+  /// SnackBar's duration), this screen has already been popped — so this
+  /// deliberately doesn't touch `context`/`mounted` for the repository
+  /// call itself, only for the follow-up confirmation SnackBar, which
+  /// uses the [messenger] reference resolved *before* the pop (it belongs
+  /// to an ancestor Scaffold that outlives this screen).
+  Future<void> _undoMutation(ScaffoldMessengerState messenger, int mutationId) async {
+    await _mutationRepository.undoMutation(mutationId);
+    messenger.showSnackBar(const SnackBar(content: Text('Mutasi dibatalkan')));
   }
 
   @override

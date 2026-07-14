@@ -172,6 +172,144 @@ void main() {
     expect(totals.stockOut, 2);
   });
 
+  group('undoMutation', () {
+    test('undoing a stockOut creates a compensating stockIn with the same quantity and a note', () async {
+      final outMutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockOut,
+        quantity: 4,
+        note: 'Terjual',
+      );
+
+      await stockMutationRepository.undoMutation(outMutation.id);
+
+      final history = await stockMutationRepository.getHistoryForProduct(productId);
+      final undoEntry = history.firstWhere((m) => m.id != outMutation.id && m.note != null && m.note!.startsWith('Dibatalkan'));
+      expect(undoEntry.type, StockMutationType.stockIn);
+      expect(undoEntry.quantity, 4);
+      expect(undoEntry.note, 'Dibatalkan: Terjual');
+
+      final product = await productRepository.getById(productId);
+      // setUp's initial stock (10) - 4 (stockOut) + 4 (undo stockIn) = 10.
+      expect(product!.currentStock, 10);
+    });
+
+    test('undoing a stockIn creates a compensating stockOut', () async {
+      final inMutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+
+      await stockMutationRepository.undoMutation(inMutation.id);
+
+      final history = await stockMutationRepository.getHistoryForProduct(productId);
+      final undoEntry = history.firstWhere((m) => m.id != inMutation.id && m.note != null && m.note!.startsWith('Dibatalkan'));
+      expect(undoEntry.type, StockMutationType.stockOut);
+      expect(undoEntry.quantity, 5);
+
+      final product = await productRepository.getById(productId);
+      // setUp's initial stock (10) + 5 (stockIn) - 5 (undo stockOut) = 10.
+      expect(product!.currentStock, 10);
+    });
+
+    test('falls back to the product name in the note when the original mutation has no note', () async {
+      final inMutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+
+      await stockMutationRepository.undoMutation(inMutation.id);
+
+      final history = await stockMutationRepository.getHistoryForProduct(productId);
+      final undoEntry = history.firstWhere((m) => m.id != inMutation.id && m.type == StockMutationType.stockOut);
+      expect(undoEntry.note, 'Dibatalkan: Chips');
+    });
+
+    test(
+      'undoing an already-undone mutation produces a clean single "Dibatalkan: X" note, not a nested one',
+      () async {
+        final outMutation = await stockMutationRepository.recordMutation(
+          productId: productId,
+          type: StockMutationType.stockOut,
+          quantity: 3,
+          note: 'Buku',
+        );
+
+        // First undo: "Buku" -> "Dibatalkan: Buku".
+        await stockMutationRepository.undoMutation(outMutation.id);
+        final historyAfterFirstUndo = await stockMutationRepository.getHistoryForProduct(productId);
+        final firstUndoEntry = historyAfterFirstUndo.firstWhere((m) => m.id != outMutation.id);
+        expect(firstUndoEntry.note, 'Dibatalkan: Buku');
+
+        // Second undo (of the undo itself): must not nest into
+        // "Dibatalkan: Dibatalkan: Buku" — the existing prefix is
+        // stripped before re-prepending it.
+        await stockMutationRepository.undoMutation(firstUndoEntry.id);
+        final historyAfterSecondUndo = await stockMutationRepository.getHistoryForProduct(productId);
+        final secondUndoEntry = historyAfterSecondUndo.firstWhere(
+          (m) => m.id != outMutation.id && m.id != firstUndoEntry.id,
+        );
+        expect(secondUndoEntry.note, 'Dibatalkan: Buku');
+      },
+    );
+
+    test('undoing a non-existent mutation id throws NotFoundException', () async {
+      expect(
+        () => stockMutationRepository.undoMutation(999999),
+        throwsA(isA<NotFoundException>()),
+      );
+    });
+
+    test('the original mutation record still exists after being undone (append-only ledger)', () async {
+      final outMutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockOut,
+        quantity: 4,
+      );
+      final historyBefore = await stockMutationRepository.getHistoryForProduct(productId);
+
+      await stockMutationRepository.undoMutation(outMutation.id);
+
+      final historyAfter = await stockMutationRepository.getHistoryForProduct(productId);
+      expect(historyAfter, hasLength(historyBefore.length + 1));
+      expect(historyAfter.any((m) => m.id == outMutation.id), isTrue);
+    });
+  });
+
+  group('getMostRecentMutationForProduct', () {
+    test('returns the most recently created mutation for the given product', () async {
+      await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+      final latest = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockOut,
+        quantity: 2,
+      );
+
+      final result = await stockMutationRepository.getMostRecentMutationForProduct(productId);
+      expect(result!.id, latest.id);
+    });
+
+    test('returns null when the product has no mutation history', () async {
+      final category = (await CategoryRepository(isar).create('Drinks')).id;
+      final id = (await productRepository.create(
+        name: 'Teh Botol',
+        categoryId: category,
+        sellPrice: 5000,
+        unit: 'pcs',
+      ))
+          .id;
+
+      final result = await stockMutationRepository.getMostRecentMutationForProduct(id);
+      expect(result, isNull);
+    });
+  });
+
   group('HPP (averageCostPrice)', () {
     test('stockIn from zero stock sets HPP directly to the incoming cost price', () async {
       final category = (await CategoryRepository(isar).create('Drinks')).id;
