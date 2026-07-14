@@ -243,4 +243,30 @@ void main() {
       });
     },
   );
+
+  testWidgets(
+    'a single-item save shows a "Tersimpan" SnackBar with a "Batalkan" action that auto-dismisses',
+    (tester) async {
+      await tester.runAsync(() async {
+        await createProduct(name: 'Gula Pasir', initialStock: 12);
+
+        await pumpWithBackStack(tester);
+        await searchAndAdd(tester, 'gula', 'Gula Pasir');
+
+        await tester.tap(find.byKey(const Key('batch_save_button')));
+        await settleAfterAsyncWork(tester);
+
+        expect(find.textContaining('Tersimpan: Gula Pasir'), findsOneWidget);
+        expect(find.widgetWithText(SnackBarAction, 'Batalkan'), findsOneWidget);
+
+        // Same bug as CatatMutasiScreen's undo SnackBar: SnackBar.persist
+        // defaults to true whenever action is non-null, which silently
+        // turns `duration` into a no-op — so this SnackBar must set
+        // persist: false explicitly, or it never auto-dismisses.
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(snackBar.persist, isFalse);
+        expect(snackBar.duration, const Duration(seconds: 5));
+      });
+    },
+  );
 }

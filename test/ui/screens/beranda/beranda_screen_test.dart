@@ -140,11 +140,21 @@ void main() {
 
       expect(find.byKey(const Key('beranda_priority_preview_list')), findsOneWidget);
 
+      // Scoped to the priority preview list specifically — every seeded
+      // product here shares the same velocity (default stockOutQuantity),
+      // so several of them are equally likely to also appear in the
+      // separate "Sering keluar" section, which an unscoped find.text
+      // would double-count.
+      Finder inPreview(String text) => find.descendant(
+            of: find.byKey(const Key('beranda_priority_preview_list')),
+            matching: find.text(text),
+          );
+
       // Only the 5 most urgent (1..5 hari) are in the preview.
-      expect(find.text('Produk 1 Hari'), findsOneWidget);
-      expect(find.text('Produk 5 Hari'), findsOneWidget);
-      expect(find.text('Produk 6 Hari'), findsNothing);
-      expect(find.text('Produk 10 Hari'), findsNothing);
+      expect(inPreview('Produk 1 Hari'), findsOneWidget);
+      expect(inPreview('Produk 5 Hari'), findsOneWidget);
+      expect(inPreview('Produk 6 Hari'), findsNothing);
+      expect(inPreview('Produk 10 Hari'), findsNothing);
 
       // The most urgent card is positioned to the left of a less urgent
       // one in the horizontal-scroll preview.
@@ -222,6 +232,68 @@ void main() {
 
       expect(find.widgetWithText(AppBar, 'Prioritas Kulakan'), findsOneWidget);
       expect(find.byKey(const Key('prioritas_kulakan_list')), findsOneWidget);
+    });
+  });
+
+  testWidgets('"Sering keluar" section appears when there are eligible products with sales history',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Umum');
+      await seedEligibleProduct(category.id, 'Produk 1 Hari', 1);
+
+      await pumpScreen(tester);
+
+      expect(find.text('Sering keluar'), findsOneWidget);
+      expect(find.byKey(const Key('beranda_frequently_sold_list')), findsOneWidget);
+    });
+  });
+
+  testWidgets('"Sering keluar" ranks products by highest daily velocity, not urgency',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Umum');
+      // Low velocity (1/day) but urgent (2 days left) — should rank behind
+      // the high-velocity product in "Sering keluar" despite being first
+      // in "Prioritas Kulakan".
+      final urgentButSlow = await seedEligibleProduct(
+        category.id,
+        'Lambat',
+        2,
+        stockOutQuantity: 1,
+      );
+      final fastSeller = await seedEligibleProduct(
+        category.id,
+        'Laris',
+        20,
+        stockOutQuantity: 10,
+      );
+
+      await pumpScreen(tester);
+
+      final fastCard = find.byKey(Key('frequently_sold_card_${fastSeller.id}'));
+      final slowCard = find.byKey(Key('frequently_sold_card_${urgentButSlow.id}'));
+      expect(fastCard, findsOneWidget);
+      expect(slowCard, findsOneWidget);
+      expect(tester.getTopLeft(fastCard).dx, lessThan(tester.getTopLeft(slowCard).dx));
+    });
+  });
+
+  testWidgets('"Sering keluar" section is hidden when no products have sales history',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Umum');
+      await productRepository.create(
+        name: 'Produk Tanpa Riwayat',
+        categoryId: category.id,
+        sellPrice: 1000,
+        unit: 'pcs',
+        initialStock: 10,
+      );
+
+      await pumpScreen(tester);
+
+      expect(find.text('Sering keluar'), findsNothing);
+      expect(find.byKey(const Key('beranda_frequently_sold_list')), findsNothing);
     });
   });
 }

@@ -10,6 +10,7 @@ class PrioritasKulakanResult {
     required this.estimatedDaysRemaining,
     required this.isOutOfStock,
     required this.urgency,
+    required this.suggestedRestockQty,
   });
 
   final Product product;
@@ -24,6 +25,13 @@ class PrioritasKulakanResult {
   final bool isOutOfStock;
 
   final PriorityUrgency urgency;
+
+  /// Suggested quantity to buy so currentStock covers 7 more days at the
+  /// current sell rate: `ceil(dailyVelocity × 7) − currentStock`, never
+  /// less than 1 — a product that already has 7+ days of cover still gets
+  /// a token restock suggestion rather than 0, since this number only
+  /// feeds a shopping-list line the user can edit after sharing anyway.
+  final int suggestedRestockQty;
 
   /// True when there's less than a full day of stock left, including the
   /// [isOutOfStock] case. Display code should show a "Waktunya kulakan!"
@@ -76,7 +84,13 @@ class PrioritasKulakanCalculator {
       estimatedDaysRemaining: estimatedDaysRemaining,
       isOutOfStock: isOutOfStock,
       urgency: _urgencyFor(estimatedDaysRemaining, isOutOfStock),
+      suggestedRestockQty: _suggestedRestockQty(dailyVelocity, product.currentStock),
     );
+  }
+
+  int _suggestedRestockQty(double dailyVelocity, double currentStock) {
+    final needed = (dailyVelocity * 7).ceil() - currentStock;
+    return needed.ceil() < 1 ? 1 : needed.ceil();
   }
 
   /// Convenience for what the Beranda and Prioritas Kulakan screens

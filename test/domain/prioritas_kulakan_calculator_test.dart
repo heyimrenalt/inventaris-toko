@@ -186,6 +186,51 @@ void main() {
     expect(result, isNull);
   });
 
+  test('suggestedRestockQty is ceil(velocity x 7) - currentStock, minimum 1', () {
+    final mutations = [
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 3))),
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 1))),
+      stockOut(quantity: 2, createdAt: now),
+    ];
+
+    // velocity is 2/day (see the earlier test); ceil(2*7) - 10 = 14 - 10 = 4.
+    final result = calculator.calculate(
+      product: product(currentStock: 10),
+      stockOutMutations: mutations,
+      now: now,
+    );
+    expect(result!.dailyVelocity, 2.0);
+    expect(result.suggestedRestockQty, 4);
+
+    // A fractional velocity still rounds the 7-day target up before
+    // subtracting: ceil(1.5*7) - 5 = ceil(10.5) - 5 = 11 - 5 = 6.
+    final fractionalMutations = [stockOut(quantity: 1.5, createdAt: now)];
+    final fractionalResult = calculator.calculate(
+      product: product(currentStock: 5),
+      stockOutMutations: fractionalMutations,
+      now: now,
+    );
+    expect(fractionalResult!.dailyVelocity, 1.5);
+    expect(fractionalResult.suggestedRestockQty, 6);
+  });
+
+  test('suggestedRestockQty is at least 1 even when currentStock already covers 7+ days', () {
+    // velocity is 2/day; ceil(2*7) = 14, well below currentStock of 100.
+    final mutations = [
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 3))),
+      stockOut(quantity: 2, createdAt: now.subtract(const Duration(days: 1))),
+      stockOut(quantity: 2, createdAt: now),
+    ];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 100),
+      stockOutMutations: mutations,
+      now: now,
+    );
+
+    expect(result!.suggestedRestockQty, 1);
+  });
+
   test('calculateAll excludes ineligible products and sorts most-urgent first', () {
     final urgent = product(currentStock: 2)..id = 1;
     final mild = product(currentStock: 20)..id = 2;

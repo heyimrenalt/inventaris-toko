@@ -9,6 +9,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../widgets/frequently_sold_card.dart';
 import '../../widgets/priority_product_card.dart';
 import '../../widgets/product_search_bar.dart';
 import '../produk/product_detail_screen.dart';
@@ -35,6 +36,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
 
   int _totalProducts = 0;
   List<PrioritasKulakanResult> _priorityResults = [];
+  List<PrioritasKulakanResult> _frequentlySoldResults = [];
   bool _loading = true;
 
   StreamSubscription<void>? _productsSubscription;
@@ -83,10 +85,18 @@ class _BerandaScreenState extends State<BerandaScreen> {
       stockOutMutationsByProductId: stockOutByProduct,
     );
 
+    // Same eligible results as the priority list, just re-sorted by raw
+    // sales frequency instead of urgency — a product can be a top seller
+    // while still being well stocked, which "Prioritas Kulakan" alone
+    // wouldn't surface.
+    final byVelocity = results.toList()
+      ..sort((a, b) => b.dailyVelocity.compareTo(a.dailyVelocity));
+
     if (!mounted) return;
     setState(() {
       _totalProducts = products.length;
       _priorityResults = results;
+      _frequentlySoldResults = byVelocity.take(_previewCount).toList();
       _loading = false;
     });
   }
@@ -130,6 +140,10 @@ class _BerandaScreenState extends State<BerandaScreen> {
                 _buildSummaryCards(),
                 const SizedBox(height: 24),
                 _buildPrioritasKulakanSection(),
+                if (_frequentlySoldResults.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildFrequentlySoldSection(),
+                ],
               ],
             ),
     );
@@ -209,6 +223,35 @@ class _BerandaScreenState extends State<BerandaScreen> {
               },
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildFrequentlySoldSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Sering keluar',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          key: const Key('beranda_frequently_sold_list'),
+          height: 130,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _frequentlySoldResults.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final result = _frequentlySoldResults[index];
+              return FrequentlySoldCard(
+                result: result,
+                onTap: () => _openDetail(result.product),
+              );
+            },
+          ),
+        ),
       ],
     );
   }

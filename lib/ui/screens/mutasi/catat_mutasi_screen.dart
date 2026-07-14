@@ -7,6 +7,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../domain/prioritas_kulakan_calculator.dart';
 import '../../widgets/mutation_list_item.dart';
 
 /// Quick-entry form for recording a stock mutation. Two entry modes:
@@ -39,6 +40,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     _mutationRepository,
     AppSettingsRepository(widget.isar),
   );
+  static const _calculator = PrioritasKulakanCalculator();
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
@@ -48,6 +50,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   Product? _selectedProduct;
   StockMutationType _type = StockMutationType.stockIn;
   List<Product> _searchResults = [];
+  List<PrioritasKulakanResult> _frequentlySold = [];
   String? _quantityErrorText;
   _InsufficientStockError? _insufficientStockError;
   bool _saving = false;
@@ -60,6 +63,30 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     if (initialType != null) {
       _type = initialType;
     }
+    // Only search mode (no product pre-selected) ever shows the quick-select
+    // shortcuts, so there's no reason to spend the query when the form
+    // already skips straight past search.
+    if (_selectedProduct == null) {
+      _loadFrequentlySold();
+    }
+  }
+
+  Future<void> _loadFrequentlySold() async {
+    final products = await _productRepository.getAll();
+
+    final stockOutByProduct = <int, List<StockMutation>>{};
+    for (final product in products) {
+      stockOutByProduct[product.id] =
+          await _mutationRepository.getStockOutHistoryForProduct(product.id);
+    }
+
+    final results = _calculator.calculateAll(
+      products: products,
+      stockOutMutationsByProductId: stockOutByProduct,
+    )..sort((a, b) => b.dailyVelocity.compareTo(a.dailyVelocity));
+
+    if (!mounted) return;
+    setState(() => _frequentlySold = results.take(5).toList());
   }
 
   @override
@@ -149,6 +176,11 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
             '$verb dicatat: $sign${formatMutationQuantity(quantity)} ${product.name}',
           ),
           duration: const Duration(seconds: 5),
+          // SnackBar.persist defaults to true whenever action is non-null
+          // (see SnackBar's own doc comment on `persist`), which makes the
+          // `duration` above a no-op — the SnackBar would otherwise sit
+          // there until manually swiped away instead of auto-dismissing.
+          persist: false,
           action: SnackBarAction(
             label: 'Batalkan',
             onPressed: () => _undoMutation(messenger, mutationId),
@@ -198,6 +230,31 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_frequentlySold.isNotEmpty) ...[
+          const Text(
+            'Sering keluar',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            key: const Key('catat_mutasi_frequently_sold_chips'),
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _frequentlySold.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final product = _frequentlySold[index].product;
+                return ActionChip(
+                  key: Key('frequently_sold_chip_${product.id}'),
+                  label: Text(product.name),
+                  onPressed: () => _selectProduct(product),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

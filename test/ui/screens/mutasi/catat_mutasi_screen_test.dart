@@ -316,6 +316,16 @@ void main() {
 
         expect(find.text('Stok keluar dicatat: -4 Indomie Goreng'), findsOneWidget);
         expect(find.widgetWithText(SnackBarAction, 'Batalkan'), findsOneWidget);
+
+        // SnackBar.persist defaults to true whenever action is non-null,
+        // which silently turns `duration` into a no-op (Flutter's own
+        // dismiss-timer callback just returns early when persist is
+        // true) — so this SnackBar must set persist: false explicitly, or
+        // it never auto-dismisses and just sits there until manually
+        // swiped away.
+        final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(snackBar.persist, isFalse);
+        expect(snackBar.duration, const Duration(seconds: 5));
       });
     },
   );
@@ -438,6 +448,115 @@ void main() {
       final updated = await productRepository.getById(product.id);
       expect(updated!.currentStock, 15);
       expect(updated.averageCostPrice, 2500);
+    });
+  });
+
+  testWidgets('search mode: "Sering keluar" quick-select chips appear before a product is selected',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 20,
+      );
+      await stockMutationRepository.recordMutation(
+        productId: product.id,
+        type: StockMutationType.stockOut,
+        quantity: 5,
+      );
+
+      await pumpWithBackStack(tester);
+
+      expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsOneWidget);
+      expect(find.byKey(Key('frequently_sold_chip_${product.id}')), findsOneWidget);
+      expect(find.text('Indomie Goreng'), findsOneWidget);
+    });
+  });
+
+  testWidgets(
+    'search mode: no products with sales history means no "Sering keluar" chips',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 20,
+        );
+
+        await pumpWithBackStack(tester);
+
+        expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsNothing);
+      });
+    },
+  );
+
+  testWidgets('tapping a "Sering keluar" chip pre-fills that product and hides the chips',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 20,
+      );
+      await stockMutationRepository.recordMutation(
+        productId: product.id,
+        type: StockMutationType.stockOut,
+        quantity: 5,
+      );
+
+      await pumpWithBackStack(tester);
+
+      await tester.tap(find.byKey(Key('frequently_sold_chip_${product.id}')));
+      await settleAfterAsyncWork(tester);
+
+      expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsNothing);
+      expect(find.byKey(const Key('catat_mutasi_quantity')), findsOneWidget);
+      expect(find.textContaining('Indomie Goreng — stok saat ini: 15 pcs'), findsOneWidget);
+    });
+  });
+
+  testWidgets('quick-select chips are hidden once a product is selected via search',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final frequent = await productRepository.create(
+        name: 'Kopi Kapal Api',
+        categoryId: category.id,
+        sellPrice: 2000,
+        unit: 'pcs',
+        initialStock: 20,
+      );
+      await stockMutationRepository.recordMutation(
+        productId: frequent.id,
+        type: StockMutationType.stockOut,
+        quantity: 5,
+      );
+      await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 12,
+      );
+
+      await pumpWithBackStack(tester);
+      expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('catat_mutasi_search')), 'goreng');
+      await settleAfterAsyncWork(tester);
+      await tester.tap(find.text('Indomie Goreng'));
+      await settleAfterAsyncWork(tester);
+
+      expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsNothing);
     });
   });
 }

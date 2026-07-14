@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar_community/isar.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
@@ -32,6 +34,15 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
 
   List<PrioritasKulakanResult> _results = [];
   bool _loading = true;
+
+  /// Which products' checkboxes are currently ticked. Defaulted once per
+  /// product the first time it's seen (see [_seenProductIds]) — red/yellow
+  /// urgency starts checked, neutral starts unchecked — then left entirely
+  /// to the user's own toggling from that point on, so a background
+  /// [_load] triggered by an unrelated mutation elsewhere in the app never
+  /// silently resets a choice the user already made on this screen.
+  final Set<int> _checkedProductIds = {};
+  final Set<int> _seenProductIds = {};
 
   StreamSubscription<void>? _productsSubscription;
   StreamSubscription<void>? _mutationsSubscription;
@@ -65,6 +76,12 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
       stockOutMutationsByProductId: stockOutByProduct,
     );
 
+    for (final result in results) {
+      if (_seenProductIds.add(result.product.id) && result.urgency != PriorityUrgency.neutral) {
+        _checkedProductIds.add(result.product.id);
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _results = results;
@@ -81,10 +98,51 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
     await _load();
   }
 
+  void _toggleChecked(int productId) {
+    setState(() {
+      if (!_checkedProductIds.remove(productId)) {
+        _checkedProductIds.add(productId);
+      }
+    });
+  }
+
+  Future<void> _shareList() async {
+    final text = buildKulakanShareText(results: _results, checkedProductIds: _checkedProductIds);
+    await SharePlus.instance.share(ShareParams(text: text));
+  }
+
+  Future<void> _copyList() async {
+    final text = buildKulakanShareText(results: _results, checkedProductIds: _checkedProductIds);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Teks disalin ke clipboard')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasCheckedItems = _checkedProductIds.isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: const Text('Prioritas Kulakan')),
+      appBar: AppBar(
+        title: const Text('Prioritas Kulakan'),
+        actions: _results.isEmpty
+            ? null
+            : [
+                IconButton(
+                  key: const Key('kulakan_share_button'),
+                  icon: const Icon(Icons.share),
+                  tooltip: 'Bagikan daftar belanja',
+                  onPressed: hasCheckedItems ? _shareList : null,
+                ),
+                IconButton(
+                  key: const Key('kulakan_copy_button'),
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'Salin teks',
+                  onPressed: hasCheckedItems ? _copyList : null,
+                ),
+              ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _results.isEmpty
@@ -95,9 +153,20 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
                   separatorBuilder: (context, index) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final result = _results[index];
-                    return PriorityProductCard(
-                      result: result,
-                      onTap: () => _openDetail(result.product),
+                    return Row(
+                      children: [
+                        Checkbox(
+                          key: Key('kulakan_checkbox_${result.product.id}'),
+                          value: _checkedProductIds.contains(result.product.id),
+                          onChanged: (_) => _toggleChecked(result.product.id),
+                        ),
+                        Expanded(
+                          child: PriorityProductCard(
+                            result: result,
+                            onTap: () => _openDetail(result.product),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -119,3 +188,41 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
     );
   }
 }
+
+const _shareMonths = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+
+/// Formatted shopping-list text for the currently-checked items only —
+/// unchecked items are left out of both the shared text and the "Total"
+/// count, so "Bagikan" and "Salin teks" never send the user's own
+/// deliberately-unchecked items along by accident. Both actions call this
+/// same function so they can never drift out of sync with each other. A
+/// top-level function (not a private method) so it's directly
+/// unit-testable without needing to drive the share sheet or clipboard.
+String buildKulakanShareText({
+  required List<PrioritasKulakanResult> results,
+  required Set<int> checkedProductIds,
+  DateTime? now,
+}) {
+  final checked = results.where((result) => checkedProductIds.contains(result.product.id)).toList();
+
+  final buffer = StringBuffer()
+    ..writeln('Daftar Belanja Kulakan')
+    ..writeln('Toko Mama · ${_formatShareDate(now ?? DateTime.now())}')
+    ..writeln('─────────────────────');
+  for (final result in checked) {
+    buffer.writeln(
+      '✓ ${result.product.name} — ${result.suggestedRestockQty} ${result.product.unit}',
+    );
+  }
+  buffer
+    ..writeln('─────────────────────')
+    ..writeln('Total: ${checked.length} barang')
+    ..write('Dibuat dari aplikasi inventaris toko');
+
+  return buffer.toString();
+}
+
+String _formatShareDate(DateTime date) => '${date.day} ${_shareMonths[date.month - 1]} ${date.year}';

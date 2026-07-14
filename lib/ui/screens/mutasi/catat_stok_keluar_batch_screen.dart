@@ -150,6 +150,12 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
               'Tersimpan: ${item.product.name} -${formatMutationQuantity(item.quantity.toDouble())}',
             ),
             duration: const Duration(seconds: 5),
+            // SnackBar.persist defaults to true whenever action is
+            // non-null (see SnackBar's own doc comment on `persist`),
+            // which makes the `duration` above a no-op — the SnackBar
+            // would otherwise sit there until manually swiped away
+            // instead of auto-dismissing.
+            persist: false,
             action: SnackBarAction(
               label: 'Batalkan',
               onPressed: () => _undoMutation(messenger, mutationId),
