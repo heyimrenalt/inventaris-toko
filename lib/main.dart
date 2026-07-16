@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:isar_community/isar.dart';
 
 import 'data/isar_service.dart';
+import 'services/notification_service.dart';
 import 'ui/navigation/main_scaffold.dart';
 
 void main() {
@@ -17,6 +18,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Inventaris Toko',
+      navigatorKey: NotificationService.navigatorKey,
       // Every screen in this app is already hand-written in Indonesian;
       // the only place this locale setting actually matters is Flutter's
       // own built-in components (the date range picker, specifically) —
@@ -31,7 +33,7 @@ class MyApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('id')],
       home: FutureBuilder<Isar>(
-        future: IsarService.open(),
+        future: _openAndInitialize(),
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(
@@ -49,5 +51,11 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<Isar> _openAndInitialize() async {
+    final isar = await IsarService.open();
+    await NotificationService.initialize();
+    return isar;
   }
 }

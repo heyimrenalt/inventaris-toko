@@ -45,10 +45,11 @@ class CatatStokKeluarBatchScreen extends StatefulWidget {
 
 class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen> {
   late final StockMutationRepository _mutationRepository = StockMutationRepository(widget.isar);
+  late final AppSettingsRepository _appSettingsRepository = AppSettingsRepository(widget.isar);
   late final ProductRepository _productRepository = ProductRepository(
     widget.isar,
     _mutationRepository,
-    AppSettingsRepository(widget.isar),
+    _appSettingsRepository,
   );
 
   final List<_CartItem> _cart = [];

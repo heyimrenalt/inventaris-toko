@@ -38,35 +38,40 @@ const ProductSchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'currentStock': PropertySchema(
+    r'criticalStockAlertState': PropertySchema(
       id: 5,
+      name: r'criticalStockAlertState',
+      type: IsarType.long,
+    ),
+    r'currentStock': PropertySchema(
+      id: 6,
       name: r'currentStock',
       type: IsarType.double,
     ),
     r'isArchived': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isArchived',
       type: IsarType.bool,
     ),
     r'minStockThreshold': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'minStockThreshold',
       type: IsarType.double,
     ),
-    r'name': PropertySchema(id: 8, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 9, name: r'name', type: IsarType.string),
     r'photoPath': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'photoPath',
       type: IsarType.string,
     ),
     r'sellPrice': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'sellPrice',
       type: IsarType.double,
     ),
-    r'unit': PropertySchema(id: 11, name: r'unit', type: IsarType.string),
+    r'unit': PropertySchema(id: 12, name: r'unit', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
@@ -161,14 +166,15 @@ void _productSerialize(
   writer.writeLong(offsets[2], object.categoryId);
   writer.writeString(offsets[3], object.code);
   writer.writeDateTime(offsets[4], object.createdAt);
-  writer.writeDouble(offsets[5], object.currentStock);
-  writer.writeBool(offsets[6], object.isArchived);
-  writer.writeDouble(offsets[7], object.minStockThreshold);
-  writer.writeString(offsets[8], object.name);
-  writer.writeString(offsets[9], object.photoPath);
-  writer.writeDouble(offsets[10], object.sellPrice);
-  writer.writeString(offsets[11], object.unit);
-  writer.writeDateTime(offsets[12], object.updatedAt);
+  writer.writeLong(offsets[5], object.criticalStockAlertState);
+  writer.writeDouble(offsets[6], object.currentStock);
+  writer.writeBool(offsets[7], object.isArchived);
+  writer.writeDouble(offsets[8], object.minStockThreshold);
+  writer.writeString(offsets[9], object.name);
+  writer.writeString(offsets[10], object.photoPath);
+  writer.writeDouble(offsets[11], object.sellPrice);
+  writer.writeString(offsets[12], object.unit);
+  writer.writeDateTime(offsets[13], object.updatedAt);
 }
 
 Product _productDeserialize(
@@ -183,15 +189,16 @@ Product _productDeserialize(
   object.categoryId = reader.readLongOrNull(offsets[2]);
   object.code = reader.readStringOrNull(offsets[3]);
   object.createdAt = reader.readDateTime(offsets[4]);
-  object.currentStock = reader.readDouble(offsets[5]);
+  object.criticalStockAlertState = reader.readLongOrNull(offsets[5]);
+  object.currentStock = reader.readDouble(offsets[6]);
   object.id = id;
-  object.isArchived = reader.readBool(offsets[6]);
-  object.minStockThreshold = reader.readDouble(offsets[7]);
-  object.name = reader.readString(offsets[8]);
-  object.photoPath = reader.readStringOrNull(offsets[9]);
-  object.sellPrice = reader.readDouble(offsets[10]);
-  object.unit = reader.readString(offsets[11]);
-  object.updatedAt = reader.readDateTime(offsets[12]);
+  object.isArchived = reader.readBool(offsets[7]);
+  object.minStockThreshold = reader.readDouble(offsets[8]);
+  object.name = reader.readString(offsets[9]);
+  object.photoPath = reader.readStringOrNull(offsets[10]);
+  object.sellPrice = reader.readDouble(offsets[11]);
+  object.unit = reader.readString(offsets[12]);
+  object.updatedAt = reader.readDateTime(offsets[13]);
   return object;
 }
 
@@ -213,20 +220,22 @@ P _productDeserializeProp<P>(
     case 4:
       return (reader.readDateTime(offset)) as P;
     case 5:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 6:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 7:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
-    case 9:
-      return (reader.readStringOrNull(offset)) as P;
-    case 10:
       return (reader.readDouble(offset)) as P;
-    case 11:
+    case 9:
       return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
+      return (reader.readDouble(offset)) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1040,6 +1049,82 @@ extension ProductQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'createdAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'criticalStockAlertState'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'criticalStockAlertState'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertState',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertState',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertState',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  criticalStockAlertStateBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertState',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -1920,6 +2005,19 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> sortByCriticalStockAlertState() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertState', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy>
+  sortByCriticalStockAlertStateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertState', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByCurrentStock() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'currentStock', Sort.asc);
@@ -2079,6 +2177,19 @@ extension ProductQuerySortThenBy
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> thenByCriticalStockAlertState() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertState', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy>
+  thenByCriticalStockAlertStateDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertState', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> thenByCurrentStock() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'currentStock', Sort.asc);
@@ -2222,6 +2333,13 @@ extension ProductQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Product, Product, QDistinct>
+  distinctByCriticalStockAlertState() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertState');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByCurrentStock() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'currentStock');
@@ -2312,6 +2430,13 @@ extension ProductQueryProperty
   QueryBuilder<Product, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<Product, int?, QQueryOperations>
+  criticalStockAlertStateProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertState');
     });
   }
 

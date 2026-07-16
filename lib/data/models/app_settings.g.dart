@@ -17,13 +17,63 @@ const AppSettingsSchema = CollectionSchema(
   name: r'AppSettings',
   id: -5633561779022347008,
   properties: {
-    r'defaultMinStockThreshold': PropertySchema(
+    r'criticalStockAlertEnabled': PropertySchema(
       id: 0,
+      name: r'criticalStockAlertEnabled',
+      type: IsarType.bool,
+    ),
+    r'criticalStockAlertHour1': PropertySchema(
+      id: 1,
+      name: r'criticalStockAlertHour1',
+      type: IsarType.long,
+    ),
+    r'criticalStockAlertHour2': PropertySchema(
+      id: 2,
+      name: r'criticalStockAlertHour2',
+      type: IsarType.long,
+    ),
+    r'criticalStockAlertHour3': PropertySchema(
+      id: 3,
+      name: r'criticalStockAlertHour3',
+      type: IsarType.long,
+    ),
+    r'criticalStockAlertMinute1': PropertySchema(
+      id: 4,
+      name: r'criticalStockAlertMinute1',
+      type: IsarType.long,
+    ),
+    r'criticalStockAlertMinute2': PropertySchema(
+      id: 5,
+      name: r'criticalStockAlertMinute2',
+      type: IsarType.long,
+    ),
+    r'criticalStockAlertMinute3': PropertySchema(
+      id: 6,
+      name: r'criticalStockAlertMinute3',
+      type: IsarType.long,
+    ),
+    r'dailySummaryEnabled': PropertySchema(
+      id: 7,
+      name: r'dailySummaryEnabled',
+      type: IsarType.bool,
+    ),
+    r'dailySummaryHour': PropertySchema(
+      id: 8,
+      name: r'dailySummaryHour',
+      type: IsarType.long,
+    ),
+    r'dailySummaryMinute': PropertySchema(
+      id: 9,
+      name: r'dailySummaryMinute',
+      type: IsarType.long,
+    ),
+    r'defaultMinStockThreshold': PropertySchema(
+      id: 10,
       name: r'defaultMinStockThreshold',
       type: IsarType.double,
     ),
     r'lastBackupAt': PropertySchema(
-      id: 1,
+      id: 11,
       name: r'lastBackupAt',
       type: IsarType.dateTime,
     ),
@@ -59,8 +109,18 @@ void _appSettingsSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDouble(offsets[0], object.defaultMinStockThreshold);
-  writer.writeDateTime(offsets[1], object.lastBackupAt);
+  writer.writeBool(offsets[0], object.criticalStockAlertEnabled);
+  writer.writeLong(offsets[1], object.criticalStockAlertHour1);
+  writer.writeLong(offsets[2], object.criticalStockAlertHour2);
+  writer.writeLong(offsets[3], object.criticalStockAlertHour3);
+  writer.writeLong(offsets[4], object.criticalStockAlertMinute1);
+  writer.writeLong(offsets[5], object.criticalStockAlertMinute2);
+  writer.writeLong(offsets[6], object.criticalStockAlertMinute3);
+  writer.writeBool(offsets[7], object.dailySummaryEnabled);
+  writer.writeLong(offsets[8], object.dailySummaryHour);
+  writer.writeLong(offsets[9], object.dailySummaryMinute);
+  writer.writeDouble(offsets[10], object.defaultMinStockThreshold);
+  writer.writeDateTime(offsets[11], object.lastBackupAt);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -70,9 +130,19 @@ AppSettings _appSettingsDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = AppSettings();
-  object.defaultMinStockThreshold = reader.readDouble(offsets[0]);
+  object.criticalStockAlertEnabled = reader.readBool(offsets[0]);
+  object.criticalStockAlertHour1 = reader.readLong(offsets[1]);
+  object.criticalStockAlertHour2 = reader.readLongOrNull(offsets[2]);
+  object.criticalStockAlertHour3 = reader.readLongOrNull(offsets[3]);
+  object.criticalStockAlertMinute1 = reader.readLong(offsets[4]);
+  object.criticalStockAlertMinute2 = reader.readLongOrNull(offsets[5]);
+  object.criticalStockAlertMinute3 = reader.readLongOrNull(offsets[6]);
+  object.dailySummaryEnabled = reader.readBool(offsets[7]);
+  object.dailySummaryHour = reader.readLong(offsets[8]);
+  object.dailySummaryMinute = reader.readLong(offsets[9]);
+  object.defaultMinStockThreshold = reader.readDouble(offsets[10]);
   object.id = id;
-  object.lastBackupAt = reader.readDateTimeOrNull(offsets[1]);
+  object.lastBackupAt = reader.readDateTimeOrNull(offsets[11]);
   return object;
 }
 
@@ -84,8 +154,28 @@ P _appSettingsDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 1:
+      return (reader.readLong(offset)) as P;
+    case 2:
+      return (reader.readLongOrNull(offset)) as P;
+    case 3:
+      return (reader.readLongOrNull(offset)) as P;
+    case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
+      return (reader.readLongOrNull(offset)) as P;
+    case 6:
+      return (reader.readLongOrNull(offset)) as P;
+    case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
+      return (reader.readDouble(offset)) as P;
+    case 11:
       return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -192,6 +282,557 @@ extension AppSettingsQueryWhere
 
 extension AppSettingsQueryFilter
     on QueryBuilder<AppSettings, AppSettings, QFilterCondition> {
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertEnabledEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertEnabled',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour1EqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertHour1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour1GreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertHour1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour1LessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertHour1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour1Between(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertHour1',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2IsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'criticalStockAlertHour2'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2IsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'criticalStockAlertHour2'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2EqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertHour2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2GreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertHour2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2LessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertHour2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour2Between(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertHour2',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3IsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'criticalStockAlertHour3'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3IsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'criticalStockAlertHour3'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3EqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertHour3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3GreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertHour3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3LessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertHour3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertHour3Between(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertHour3',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute1EqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertMinute1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute1GreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertMinute1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute1LessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertMinute1',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute1Between(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertMinute1',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2IsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'criticalStockAlertMinute2'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2IsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'criticalStockAlertMinute2'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2EqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertMinute2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2GreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertMinute2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2LessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertMinute2',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute2Between(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertMinute2',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3IsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'criticalStockAlertMinute3'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3IsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'criticalStockAlertMinute3'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3EqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'criticalStockAlertMinute3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3GreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'criticalStockAlertMinute3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3LessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'criticalStockAlertMinute3',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  criticalStockAlertMinute3Between(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'criticalStockAlertMinute3',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryEnabledEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dailySummaryEnabled', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryHourEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dailySummaryHour', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryHourGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dailySummaryHour',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryHourLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dailySummaryHour',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryHourBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dailySummaryHour',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryMinuteEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'dailySummaryMinute', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryMinuteGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'dailySummaryMinute',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryMinuteLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'dailySummaryMinute',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  dailySummaryMinuteBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'dailySummaryMinute',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   defaultMinStockThresholdEqualTo(
     double value, {
@@ -412,6 +1053,146 @@ extension AppSettingsQueryLinks
 extension AppSettingsQuerySortBy
     on QueryBuilder<AppSettings, AppSettings, QSortBy> {
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour1', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour1Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour1', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour2', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour2Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour2', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertHour3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour3', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute1', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute1Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute1', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute2', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute2Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute2', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByCriticalStockAlertMinute3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute3', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryHour() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryHour', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryHourDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryHour', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryMinute() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryMinute', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByDailySummaryMinuteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryMinute', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   sortByDefaultMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'defaultMinStockThreshold', Sort.asc);
@@ -441,6 +1222,146 @@ extension AppSettingsQuerySortBy
 
 extension AppSettingsQuerySortThenBy
     on QueryBuilder<AppSettings, AppSettings, QSortThenBy> {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour1', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour1Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour1', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour2', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour2Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour2', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertHour3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertHour3', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute1', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute1Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute1', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute2', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute2Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute2', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute3', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByCriticalStockAlertMinute3Desc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'criticalStockAlertMinute3', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryEnabled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryEnabledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryEnabled', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryHour() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryHour', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryHourDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryHour', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryMinute() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryMinute', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByDailySummaryMinuteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'dailySummaryMinute', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   thenByDefaultMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
@@ -484,6 +1405,76 @@ extension AppSettingsQuerySortThenBy
 extension AppSettingsQueryWhereDistinct
     on QueryBuilder<AppSettings, AppSettings, QDistinct> {
   QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertEnabled');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertHour1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertHour1');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertHour2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertHour2');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertHour3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertHour3');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertMinute1() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertMinute1');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertMinute2() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertMinute2');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByCriticalStockAlertMinute3() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'criticalStockAlertMinute3');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByDailySummaryEnabled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dailySummaryEnabled');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByDailySummaryHour() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dailySummaryHour');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByDailySummaryMinute() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'dailySummaryMinute');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
   distinctByDefaultMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'defaultMinStockThreshold');
@@ -502,6 +1493,75 @@ extension AppSettingsQueryProperty
   QueryBuilder<AppSettings, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<AppSettings, bool, QQueryOperations>
+  criticalStockAlertEnabledProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertEnabled');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations>
+  criticalStockAlertHour1Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertHour1');
+    });
+  }
+
+  QueryBuilder<AppSettings, int?, QQueryOperations>
+  criticalStockAlertHour2Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertHour2');
+    });
+  }
+
+  QueryBuilder<AppSettings, int?, QQueryOperations>
+  criticalStockAlertHour3Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertHour3');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations>
+  criticalStockAlertMinute1Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertMinute1');
+    });
+  }
+
+  QueryBuilder<AppSettings, int?, QQueryOperations>
+  criticalStockAlertMinute2Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertMinute2');
+    });
+  }
+
+  QueryBuilder<AppSettings, int?, QQueryOperations>
+  criticalStockAlertMinute3Property() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'criticalStockAlertMinute3');
+    });
+  }
+
+  QueryBuilder<AppSettings, bool, QQueryOperations>
+  dailySummaryEnabledProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dailySummaryEnabled');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations> dailySummaryHourProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dailySummaryHour');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations>
+  dailySummaryMinuteProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'dailySummaryMinute');
     });
   }
 

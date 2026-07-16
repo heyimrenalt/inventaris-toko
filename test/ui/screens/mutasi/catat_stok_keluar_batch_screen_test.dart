@@ -6,17 +6,37 @@ import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
+import 'package:inventaris_toko/services/notification_service.dart';
 import 'package:inventaris_toko/ui/screens/mutasi/catat_stok_keluar_batch_screen.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/repositories/test_isar.dart';
 import '../../widget_test_helpers.dart';
 
+class _FakeNotificationSender implements NotificationSender {
+  final List<String> bodies = [];
+
+  @override
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required bool highImportance,
+    String? payload,
+  }) async {
+    bodies.add(body);
+  }
+}
+
 void main() {
   late Isar isar;
   late CategoryRepository categoryRepository;
   late ProductRepository productRepository;
   late StockMutationRepository stockMutationRepository;
+  late _FakeNotificationSender fakeSender;
 
   setUp(() async {
     isar = await openTestIsar();
@@ -27,6 +47,8 @@ void main() {
       stockMutationRepository,
       AppSettingsRepository(isar),
     );
+    fakeSender = _FakeNotificationSender();
+    NotificationService.sender = fakeSender;
   });
 
   tearDown(() async {
@@ -266,6 +288,53 @@ void main() {
         final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
         expect(snackBar.persist, isFalse);
         expect(snackBar.duration, const Duration(seconds: 5));
+      });
+    },
+  );
+
+  testWidgets(
+    'saving an item that brings its stock to exactly 0 queues it for the next critical stock '
+    'alert, without sending anything instantly',
+    (tester) async {
+      await tester.runAsync(() async {
+        final product = await createProduct(name: 'Gula Pasir', initialStock: 1);
+
+        await pumpWithBackStack(tester);
+        await searchAndAdd(tester, 'gula', 'Gula Pasir');
+
+        await tester.tap(find.byKey(const Key('batch_save_button')));
+        await settleAfterAsyncWork(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.criticalStockAlertState, criticalStockAlertStatePending);
+        expect(fakeSender.bodies, isEmpty);
+      });
+    },
+  );
+
+  testWidgets(
+    'saving 4 items that each hit 0 stock queues all 4, without sending anything instantly',
+    (tester) async {
+      await tester.runAsync(() async {
+        final products = <Product>[];
+        for (final name in ['Produk A', 'Produk B', 'Produk C', 'Produk D']) {
+          products.add(await createProduct(name: name, initialStock: 1));
+        }
+
+        await pumpWithBackStack(tester);
+        await searchAndAdd(tester, 'produk a', 'Produk A');
+        await searchAndAdd(tester, 'produk b', 'Produk B');
+        await searchAndAdd(tester, 'produk c', 'Produk C');
+        await searchAndAdd(tester, 'produk d', 'Produk D');
+
+        await tester.tap(find.byKey(const Key('batch_save_button')));
+        await settleAfterAsyncWork(tester);
+
+        for (final product in products) {
+          final updated = await productRepository.getById(product.id);
+          expect(updated!.criticalStockAlertState, criticalStockAlertStatePending);
+        }
+        expect(fakeSender.bodies, isEmpty);
       });
     },
   );

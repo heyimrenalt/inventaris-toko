@@ -35,10 +35,11 @@ class CatatMutasiScreen extends StatefulWidget {
 
 class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   late final StockMutationRepository _mutationRepository = StockMutationRepository(widget.isar);
+  late final AppSettingsRepository _appSettingsRepository = AppSettingsRepository(widget.isar);
   late final ProductRepository _productRepository = ProductRepository(
     widget.isar,
     _mutationRepository,
-    AppSettingsRepository(widget.isar),
+    _appSettingsRepository,
   );
   static const _calculator = PrioritasKulakanCalculator();
 
@@ -165,6 +166,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         costPricePerUnit: costPricePerUnit,
       );
+
       if (!mounted) return;
       final verb = _type == StockMutationType.stockIn ? 'Stok masuk' : 'Stok keluar';
       final sign = _type == StockMutationType.stockIn ? '+' : '-';

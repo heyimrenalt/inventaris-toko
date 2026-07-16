@@ -6,17 +6,37 @@ import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
+import 'package:inventaris_toko/services/notification_service.dart';
 import 'package:inventaris_toko/ui/screens/mutasi/catat_mutasi_screen.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/repositories/test_isar.dart';
 import '../../widget_test_helpers.dart';
 
+class _FakeNotificationSender implements NotificationSender {
+  final List<String> bodies = [];
+
+  @override
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required bool highImportance,
+    String? payload,
+  }) async {
+    bodies.add(body);
+  }
+}
+
 void main() {
   late Isar isar;
   late CategoryRepository categoryRepository;
   late ProductRepository productRepository;
   late StockMutationRepository stockMutationRepository;
+  late _FakeNotificationSender fakeSender;
 
   setUp(() async {
     isar = await openTestIsar();
@@ -27,6 +47,8 @@ void main() {
       stockMutationRepository,
       AppSettingsRepository(isar),
     );
+    fakeSender = _FakeNotificationSender();
+    NotificationService.sender = fakeSender;
   });
 
   tearDown(() async {
@@ -557,6 +579,57 @@ void main() {
       await settleAfterAsyncWork(tester);
 
       expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'stock-out that brings a product to exactly 0 queues it for the next critical stock alert, '
+    'without sending anything instantly',
+    (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 4,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
+
+        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tapSubmit(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.currentStock, 0);
+        expect(updated.criticalStockAlertState, criticalStockAlertStatePending);
+        expect(fakeSender.bodies, isEmpty);
+      });
+    },
+  );
+
+  testWidgets('stock-out that leaves stock above the threshold does not queue a critical stock alert',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie Goreng',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        initialStock: 10,
+      );
+
+      await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
+
+      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+      await tapSubmit(tester);
+
+      final updated = await productRepository.getById(product.id);
+      expect(updated!.currentStock, 6);
+      expect(updated.criticalStockAlertState, isNull);
+      expect(fakeSender.bodies, isEmpty);
     });
   });
 }

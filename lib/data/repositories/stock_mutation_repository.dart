@@ -65,6 +65,20 @@ class StockMutationRepository {
       product.currentStock = newStock;
       product.updatedAt = DateTime.now();
 
+      // Maintain the "Alert stok kritis" queue state alongside the stock
+      // change itself, in the same write transaction — this is the only
+      // place currentStock changes, so it's the single correct place to
+      // detect a critical-episode transition (see
+      // Product.criticalStockAlertState doc comment for the state
+      // machine). `??=` leaves an already-pending/notified product
+      // untouched while it stays critical, so a run of stock-out
+      // mutations on the same low-stock product doesn't re-queue it.
+      if (newStock <= product.minStockThreshold) {
+        product.criticalStockAlertState ??= criticalStockAlertStatePending;
+      } else {
+        product.criticalStockAlertState = null;
+      }
+
       final mutation = StockMutation()
         ..productId = productId
         ..type = type

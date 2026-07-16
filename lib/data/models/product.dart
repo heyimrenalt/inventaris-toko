@@ -2,6 +2,14 @@ import 'package:isar_community/isar.dart';
 
 part 'product.g.dart';
 
+/// [Product.criticalStockAlertState]: queued, waiting for the next
+/// scheduled "Alert stok kritis" notification.
+const criticalStockAlertStatePending = 1;
+
+/// [Product.criticalStockAlertState]: already included in a past "Alert
+/// stok kritis" notification, still critical since then.
+const criticalStockAlertStateNotified = 2;
+
 @Collection(accessor: 'products')
 class Product {
   Id id = Isar.autoIncrement;
@@ -54,4 +62,14 @@ class Product {
   bool isArchived = false;
 
   DateTime? archivedAt;
+
+  /// Critical-stock notification queue state for "Alert stok kritis" (see
+  /// [NotificationService]). `null` when the product isn't in a critical
+  /// episode (stock above [minStockThreshold]). [criticalStockAlertStatePending]
+  /// while critical and waiting for the next scheduled alert;
+  /// [criticalStockAlertStateNotified] once it has been included in one,
+  /// so it isn't queued again on every subsequent stock-out while still
+  /// critical. Reset to `null` when stock recovers above the threshold —
+  /// a later drop back to critical is then treated as a new episode.
+  int? criticalStockAlertState;
 }
