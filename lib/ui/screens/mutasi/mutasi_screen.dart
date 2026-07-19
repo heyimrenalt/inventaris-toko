@@ -8,36 +8,52 @@ import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
-import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 import 'catat_mutasi_screen.dart';
 import 'catat_stok_keluar_batch_screen.dart';
 
 class MutasiScreen extends StatefulWidget {
-  const MutasiScreen({super.key, required this.isar});
+  const MutasiScreen({
+    super.key,
+    required this.isar,
+    this.scrollController,
+    this.mutationRepository,
+    this.productRepository,
+  });
 
   final Isar isar;
+
+  /// Owned by [MainScaffold] so a re-tap of the Mutasi nav item (while
+  /// already on this tab) can animate this screen's list back to the top
+  /// without this screen needing to know about the nav bar at all.
+  final ScrollController? scrollController;
+
+  /// Test seams only — real callers always let these default to real
+  /// repositories built from [isar]. Lets a widget test inject a
+  /// call-counting fake to verify pull-to-refresh actually re-queries.
+  final StockMutationRepository? mutationRepository;
+  final ProductRepository? productRepository;
 
   @override
   State<MutasiScreen> createState() => _MutasiScreenState();
 }
 
 class _MutasiScreenState extends State<MutasiScreen> {
-  late final StockMutationRepository _mutationRepository = StockMutationRepository(widget.isar);
-  late final ProductRepository _productRepository = ProductRepository(
-    widget.isar,
-    _mutationRepository,
-    AppSettingsRepository(widget.isar),
-  );
-
-  final TextEditingController _searchController = TextEditingController();
+  late final StockMutationRepository _mutationRepository =
+      widget.mutationRepository ?? StockMutationRepository(widget.isar);
+  late final ProductRepository _productRepository = widget.productRepository ??
+      ProductRepository(
+        widget.isar,
+        _mutationRepository,
+        AppSettingsRepository(widget.isar),
+      );
 
   List<StockMutation> _allMutations = [];
   Map<int, Product> _productById = {};
   Map<int, int> _mostRecentMutationIdByProduct = {};
-  StockMutationTotals _totals = const StockMutationTotals(stockIn: 0, stockOut: 0);
   DateTimeRange? _selectedRange;
   String _searchQuery = '';
   bool _loading = true;
@@ -63,22 +79,13 @@ class _MutasiScreenState extends State<MutasiScreen> {
   @override
   void dispose() {
     _mutationsSubscription?.cancel();
-    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     final mutations = await _mutationRepository.getAllMutations();
-    final totals = await _mutationRepository.getTotalsSince(
-      DateTime.now().subtract(const Duration(days: 7)),
-    );
-    // includeArchived so mutation history for an archived product still
-    // shows a real product name instead of falling back to "-".
     final products = await _productRepository.getAll(includeArchived: true);
 
-    // Only the most recent mutation for a product is eligible for the
-    // history screen's "Batalkan" action, so look it up per distinct
-    // product referenced in the ledger rather than per row.
     final distinctProductIds = mutations.map((m) => m.productId).toSet();
     final mostRecentByProduct = <int, int>{};
     for (final productId in distinctProductIds) {
@@ -89,7 +96,6 @@ class _MutasiScreenState extends State<MutasiScreen> {
     if (!mounted) return;
     setState(() {
       _allMutations = mutations;
-      _totals = totals;
       _productById = {for (final product in products) product.id: product};
       _mostRecentMutationIdByProduct = mostRecentByProduct;
       _loading = false;
@@ -107,6 +113,19 @@ class _MutasiScreenState extends State<MutasiScreen> {
         range: _selectedRange,
         searchQuery: _searchQuery,
       );
+
+  /// Wrapped with a minimum visible duration so a fast local Isar query
+  /// doesn't make the RefreshIndicator flash and vanish — that would read
+  /// as broken to a non-technical user pulling to refresh an offline app.
+  /// [_load] itself already re-reads the current [_selectedRange] and
+  /// [_searchQuery] from state, so the active date filter and search term
+  /// carry over automatically.
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      _load(),
+      Future<void>.delayed(const Duration(milliseconds: 300)),
+    ]);
+  }
 
   Future<void> _openCatat() async {
     await Navigator.of(context).push<bool>(
@@ -142,28 +161,31 @@ class _MutasiScreenState extends State<MutasiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mutasi')),
-      // The whole body is one scrollable ListView (not a Column with a
-      // fixed-size header + Expanded list) specifically so nothing can
-      // ever overflow when the on-screen keyboard opens for the search
-      // field: a Column's fixed-height children (summary card, search
-      // field, filter bar) don't shrink, and when the keyboard eats
-      // enough vertical space the Expanded list was pushed to used to
-      // report a bottom overflow. A single ListView just scrolls
-      // instead, regardless of how much space the keyboard takes.
-      body: _loading ? const Center(child: CircularProgressIndicator()) : _buildBody(),
+      body: Column(
+        children: [
+          const AppHeader(title: 'Mutasi stok'),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(onRefresh: _handleRefresh, child: _buildBody()),
+          ),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Expanded(
                 child: SizedBox(
                   height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: _openBatch,
-                    icon: const Icon(Icons.playlist_add),
-                    label: const Text('Catat banyak', style: TextStyle(fontSize: 16)),
+                  child: ElevatedButton.icon(
+                    onPressed: _openCatat,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Stok masuk', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00AA0D),
+                    ),
                   ),
                 ),
               ),
@@ -172,9 +194,12 @@ class _MutasiScreenState extends State<MutasiScreen> {
                 child: SizedBox(
                   height: 48,
                   child: ElevatedButton.icon(
-                    onPressed: _openCatat,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Catat', style: TextStyle(fontSize: 16)),
+                    onPressed: _openBatch,
+                    icon: const Icon(Icons.remove),
+                    label: const Text('Stok keluar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD32F2F),
+                    ),
                   ),
                 ),
               ),
@@ -185,28 +210,58 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
-  Widget _buildSummaryCard() {
+
+  Widget _buildFilterBar() {
+    final now = DateTime.now();
+    final start = _selectedRange?.start ?? now.subtract(const Duration(days: 7));
+    final end = _selectedRange?.end ?? now;
+    final dateLabel =
+        '${start.day} ${_monthName(start.month)} — ${end.day} ${_monthName(end.month)} ${end.year}';
+
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           Expanded(
-            child: _SummaryTile(
-              key: const Key('mutasi_summary_in'),
-              label: 'Stok masuk (7 hari)',
-              value: _totals.stockIn,
-              color: Colors.green[700]!,
-              icon: Icons.arrow_upward,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _SummaryTile(
-              key: const Key('mutasi_summary_out'),
-              label: 'Stok keluar (7 hari)',
-              value: _totals.stockOut,
-              color: Colors.red[700]!,
-              icon: Icons.arrow_downward,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () {
+                showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(now.year - 2),
+                  lastDate: now,
+                  initialDateRange: _selectedRange,
+                ).then((range) {
+                  if (range != null) {
+                    setState(() => _selectedRange = range);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        dateLabel,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1C1C1C),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(Icons.expand_more, size: 18),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -214,68 +269,42 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: TextField(
-        key: const Key('mutasi_search'),
-        controller: _searchController,
-        style: const TextStyle(fontSize: 16),
-        decoration: InputDecoration(
-          labelText: 'Cari produk atau catatan',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchQuery.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                ),
-        ),
-        onChanged: (value) => setState(() => _searchQuery = value),
-      ),
-    );
+  String _monthName(int month) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ];
+    return months[month - 1];
   }
 
-  Widget _buildFilterBar() {
-    final now = DateTime.now();
-    return DateRangeFilterBar(
-      selectedRange: _selectedRange,
-      firstDate: DateTime(now.year - 2),
-      lastDate: now,
-      onChanged: (range) => setState(() => _selectedRange = range),
-    );
-  }
-
-  /// Everything — summary card, search field, filter bar, and the
-  /// (possibly day-grouped) history — as children of one ListView, so
-  /// the whole screen scrolls as a unit instead of relying on a fixed
-  /// header + a separately-scrolling Expanded list (see the comment on
-  /// `body:` in build() for why that split caused a keyboard overflow).
   Widget _buildBody() {
     final hasAnyMutations = _allMutations.isNotEmpty;
     final visible = hasAnyMutations ? _visibleMutations : const <StockMutation>[];
     final grouped = groupMutationsByDay(visible);
 
     return ListView(
+      controller: widget.scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        _buildSummaryCard(),
-        const Divider(height: 1),
         if (hasAnyMutations) ...[
-          _buildSearchField(),
           _buildFilterBar(),
-          const Divider(height: 1),
+          const Divider(height: 0.5, thickness: 0.5),
         ],
         if (!hasAnyMutations)
           _buildMessage('Belum ada riwayat mutasi stok.')
         else if (visible.isEmpty)
           _buildMessage('Tidak ditemukan.')
         else
-          // Already sorted newest-first by the repository, so grouping
-          // by insertion order naturally keeps both the day groups and
-          // each day's entries in newest-first order too.
           for (final entry in grouped.entries) ...[
             DayHeader(label: formatDayLabel(entry.key)),
             for (final mutation in entry.value)
@@ -338,51 +367,3 @@ List<StockMutation> filterMutations({
   return result.toList();
 }
 
-class _SummaryTile extends StatelessWidget {
-  const _SummaryTile({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final double value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            formatMutationQuantity(value),
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-}

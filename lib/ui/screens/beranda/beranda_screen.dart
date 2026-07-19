@@ -3,34 +3,65 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
+import '../../../data/models/app_settings.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_text_styles.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/frequently_sold_card.dart';
 import '../../widgets/priority_product_card.dart';
 import '../../widgets/product_search_bar.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/stat_card.dart';
 import '../produk/product_detail_screen.dart';
+import 'frequently_sold_screen.dart';
 import 'prioritas_kulakan_screen.dart';
 
 class BerandaScreen extends StatefulWidget {
-  const BerandaScreen({super.key, required this.isar});
+  const BerandaScreen({
+    super.key,
+    required this.isar,
+    this.scrollController,
+    this.mutationRepository,
+    this.settingsRepository,
+    this.productRepository,
+  });
 
   final Isar isar;
+
+  /// Owned by [MainScaffold] so a re-tap of the Beranda nav item (while
+  /// already on this tab) can animate this screen's list back to the top
+  /// without this screen needing to know about the nav bar at all.
+  final ScrollController? scrollController;
+
+  /// Test seams only — real callers always let these default to real
+  /// repositories built from [isar]. Lets a widget test inject a
+  /// call-counting fake to verify pull-to-refresh actually re-queries.
+  final StockMutationRepository? mutationRepository;
+  final AppSettingsRepository? settingsRepository;
+  final ProductRepository? productRepository;
 
   @override
   State<BerandaScreen> createState() => _BerandaScreenState();
 }
 
 class _BerandaScreenState extends State<BerandaScreen> {
-  late final StockMutationRepository _mutationRepository = StockMutationRepository(widget.isar);
-  late final ProductRepository _productRepository = ProductRepository(
-    widget.isar,
-    _mutationRepository,
-    AppSettingsRepository(widget.isar),
-  );
+  late final StockMutationRepository _mutationRepository =
+      widget.mutationRepository ?? StockMutationRepository(widget.isar);
+  late final AppSettingsRepository _settingsRepository =
+      widget.settingsRepository ?? AppSettingsRepository(widget.isar);
+  late final ProductRepository _productRepository = widget.productRepository ??
+      ProductRepository(
+        widget.isar,
+        _mutationRepository,
+        _settingsRepository,
+      );
   static const _calculator = PrioritasKulakanCalculator();
   static const int _previewCount = 5;
 
@@ -41,6 +72,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
 
   StreamSubscription<void>? _productsSubscription;
   StreamSubscription<void>? _mutationsSubscription;
+  StreamSubscription<void>? _settingsSubscription;
 
   @override
   void initState() {
@@ -54,12 +86,18 @@ class _BerandaScreenState extends State<BerandaScreen> {
     // watchLazy() pattern as MutasiScreen/ProdukScreen.
     _productsSubscription = widget.isar.products.watchLazy().listen((_) => _load());
     _mutationsSubscription = widget.isar.stockMutations.watchLazy().listen((_) => _load());
+    // Editing restockLeadTimeDays/restockCoverDays in Pengaturan changes
+    // this screen's urgency/quantity math even though no product or
+    // mutation changed — without this, a settings edit wouldn't show up
+    // here until some unrelated reload happened to fire.
+    _settingsSubscription = widget.isar.appSettings.watchLazy().listen((_) => _load());
   }
 
   @override
   void dispose() {
     _productsSubscription?.cancel();
     _mutationsSubscription?.cancel();
+    _settingsSubscription?.cancel();
     super.dispose();
   }
 
@@ -68,6 +106,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
   /// already excluding them internally — search) per this task's
   /// requirement to treat them as if they don't exist here.
   Future<void> _load() async {
+    final settings = await _settingsRepository.get();
     final products = await _productRepository.getAll();
 
     // A small store's product catalog is small enough that one query per
@@ -83,6 +122,8 @@ class _BerandaScreenState extends State<BerandaScreen> {
     final results = _calculator.calculateAll(
       products: products,
       stockOutMutationsByProductId: stockOutByProduct,
+      restockLeadTimeDays: settings.restockLeadTimeDays,
+      restockCoverDays: settings.restockCoverDays,
     );
 
     // Same eligible results as the priority list, just re-sorted by raw
@@ -99,6 +140,16 @@ class _BerandaScreenState extends State<BerandaScreen> {
       _frequentlySoldResults = byVelocity.take(_previewCount).toList();
       _loading = false;
     });
+  }
+
+  /// Wrapped with a minimum visible duration so a fast local Isar query
+  /// doesn't make the RefreshIndicator flash and vanish — that would read
+  /// as broken to a non-technical user pulling to refresh an offline app.
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      _load(),
+      Future<void>.delayed(const Duration(milliseconds: 300)),
+    ]);
   }
 
   int get _perluKulakanCount =>
@@ -119,59 +170,140 @@ class _BerandaScreenState extends State<BerandaScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Beranda')),
-      // One scrollable body (not a Column with a fixed-size search
-      // header + Expanded content) so nothing overflows when the search
-      // dropdown or the keyboard grows — same reasoning as
-      // MutasiScreen/ProdukScreen's body.
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                ProductSearchBar(
-                  productRepository: _productRepository,
-                  onProductSelected: _openDetail,
-                ),
-                const SizedBox(height: 16),
-                _buildSummaryCards(),
-                const SizedBox(height: 24),
-                _buildPrioritasKulakanSection(),
-                if (_frequentlySoldResults.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildFrequentlySoldSection(),
-                ],
-              ],
-            ),
+  void _openFrequentlySold() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => FrequentlySoldScreen(isar: widget.isar)),
     );
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
+      body: Column(
+        children: [
+          const AppHeader(title: 'Beranda'),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _handleRefresh,
+                    child: ListView(
+                      controller: widget.scrollController,
+                      // AlwaysScrollable so the pull-to-refresh gesture still
+                      // works even when the content is short enough to not
+                      // otherwise need scrolling (e.g. no priority/frequently
+                      // sold sections yet).
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _buildSearchBar(),
+                        const SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildSummaryCards(),
+                        ),
+                        _buildPrioritasKulakanSection(),
+                        if (_frequentlySoldResults.isNotEmpty) _buildFrequentlySoldSection(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Wraps the shared [ProductSearchBar] with the elevated white card
+  /// treatment the mockup gives Beranda's search field specifically — a
+  /// local [Theme] override rather than a change to the shared widget, so
+  /// its other embedding (Mutasi's batch stock-out screen) keeps its
+  /// existing plain look.
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          boxShadow: AppDimensions.elevatedSearchShadow,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        // The search-results dropdown's ListTiles paint their background/ink
+        // on the nearest Material ancestor — without this, that would be
+        // whatever Scaffold-level Material sits behind this Container's own
+        // painted background, which Flutter flags as unsafe (invisible ink).
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              // Every border variant must be overridden explicitly — Material
+              // only falls back to `border` for the *enabled* state; leaving
+              // `focusedBorder` unset makes InputDecorator derive one that
+              // tints the outline with the theme's primary color (a green
+              // ring on focus), which is exactly the artifact this is
+              // avoiding.
+              //
+              // `filled` is explicitly forced to false here — the app's
+              // global inputDecorationTheme (app_theme.dart) sets
+              // `filled: true, fillColor: gray100` for every other text field
+              // in the app, and `copyWith` only overrides the fields listed
+              // here, so simply omitting `filled` would silently inherit that
+              // `true`. The white rounded pill is already fully painted by
+              // this method's own Container below; a filled TextField on top
+              // of it paints a *second*, unrounded background — a
+              // sharp-cornered box peeking out from under the rounded pill at
+              // all four corners.
+              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
+            ),
+            child: ProductSearchBar(
+              productRepository: _productRepository,
+              onProductSelected: _openDetail,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // IntrinsicHeight + a stretching Row is what actually guarantees the two
+  // cards render at the exact same height — Expanded alone only equalizes
+  // their width, so any difference in content (e.g. label text wrapping
+  // differently) would otherwise let one card grow taller than the other.
   Widget _buildSummaryCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _SummaryCard(
-            key: const Key('beranda_summary_total_produk'),
-            label: 'Total Produk',
-            value: _totalProducts,
-            color: Colors.blue[700]!,
-            icon: Icons.inventory_2_outlined,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: StatCard(
+              key: const Key('beranda_summary_total_produk'),
+              label: 'Total Produk',
+              value: '$_totalProducts',
+              variant: StatCardVariant.green,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _SummaryCard(
-            key: const Key('beranda_summary_perlu_kulakan'),
-            label: 'Perlu Kulakan',
-            value: _perluKulakanCount,
-            color: Colors.orange[800]!,
-            icon: Icons.priority_high,
+          const SizedBox(width: 12),
+          Expanded(
+            child: StatCard(
+              key: const Key('beranda_summary_perlu_kulakan'),
+              label: 'Perlu Kulakan',
+              value: '$_perluKulakanCount',
+              variant: StatCardVariant.red,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -179,30 +311,20 @@ class _BerandaScreenState extends State<BerandaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Prioritas Kulakan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            if (_priorityResults.isNotEmpty)
-              TextButton(
-                key: const Key('beranda_lihat_semua_button'),
-                onPressed: _openPrioritasKulakan,
-                child: const Text('Lihat semua', style: TextStyle(fontSize: 14)),
-              ),
-          ],
+        SectionHeader(
+          title: 'Prioritas Kulakan',
+          actionLabel: _priorityResults.isNotEmpty ? 'Lihat semua' : null,
+          actionKey: const Key('beranda_lihat_semua_button'),
+          onActionTap: _openPrioritasKulakan,
         ),
-        const SizedBox(height: 8),
         if (_priorityResults.isEmpty)
           Padding(
             key: const Key('beranda_priority_empty_state'),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Text(
               'Belum ada data penjualan untuk dihitung. Catat beberapa mutasi '
               'stok keluar dulu.',
-              style: TextStyle(fontSize: 15, color: Colors.grey[700]),
+              style: AppTextStyles.body.copyWith(color: AppColors.gray700),
             ),
           )
         else
@@ -210,6 +332,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
             key: const Key('beranda_priority_preview_list'),
             height: 130,
             child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
               itemCount: _priorityResults.take(_previewCount).length,
               separatorBuilder: (context, index) => const SizedBox(width: 10),
@@ -231,15 +354,24 @@ class _BerandaScreenState extends State<BerandaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Sering keluar',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        SectionHeader(
+          title: 'Sering keluar',
+          actionLabel: 'Lihat semua',
+          actionKey: const Key('beranda_frequently_sold_lihat_semua_button'),
+          onActionTap: _openFrequentlySold,
         ),
-        const SizedBox(height: 8),
         SizedBox(
           key: const Key('beranda_frequently_sold_list'),
-          height: 130,
+          // Taller than the priority-preview list (130): this card has an
+          // extra data-age/confidence caption line under the velocity
+          // figure that the priority card doesn't, plus a StockBadge
+          // (17px extrabold number chip) that needs more room than the
+          // plain caption text it replaced. 180 (rather than a tighter fit)
+          // leaves headroom for the velocity/data-age captions to each wrap
+          // to their allowed 2 lines without clipping mid-word.
+          height: 180,
           child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: _frequentlySoldResults.length,
             separatorBuilder: (context, index) => const SizedBox(width: 10),
@@ -253,55 +385,6 @@ class _BerandaScreenState extends State<BerandaScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final int value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$value',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
     );
   }
 }
