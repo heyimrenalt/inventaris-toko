@@ -670,12 +670,9 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
   Widget build(BuildContext context) {
     final settings = _settings;
     return Scaffold(
-      body: Column(
+      appBar: const AppHeader(title: 'Pengaturan'),
+      body: ListView(
         children: [
-          const AppHeader(title: 'Pengaturan'),
-          Expanded(
-            child: ListView(
-              children: [
           const _SectionHeader('Produk'),
           ListTile(
             minVerticalPadding: 16,
@@ -734,9 +731,6 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                 MaterialPageRoute(builder: (_) => const TentangAplikasiScreen()),
               );
             },
-          ),
-        ],
-            ),
           ),
         ],
       ),

@@ -174,46 +174,40 @@ class _ProdukScreenState extends State<ProdukScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          const AppHeader(title: 'Produk'),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              child: CustomScrollView(
-                controller: widget.scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 12),
-                        AppSearchBar(
-                          controller: _searchController,
-                          hintText: 'Cari produk...',
-                          onChanged: (query) {
-                            setState(() => _searchQuery = query);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildFilterBar(),
-                      ],
-                    ),
+      appBar: const AppHeader(title: 'Produk'),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: CustomScrollView(
+          controller: widget.scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  AppSearchBar(
+                    controller: _searchController,
+                    hintText: 'Cari produk...',
+                    onChanged: (query) {
+                      setState(() => _searchQuery = query);
+                    },
                   ),
-                  if (_loading)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (_visibleProducts.isEmpty)
-                    SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
-                  else
-                    _buildProductList(),
+                  const SizedBox(height: 12),
+                  _buildFilterBar(),
                 ],
               ),
             ),
-          ),
-        ],
+            if (_loading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_visibleProducts.isEmpty)
+              SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
+            else
+              _buildProductList(),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddForm,

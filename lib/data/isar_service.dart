@@ -5,6 +5,7 @@ import 'models/app_settings.dart';
 import 'models/category.dart';
 import 'models/cost_price_adjustment.dart';
 import 'models/product.dart';
+import 'models/restock_list.dart';
 import 'models/stock_mutation.dart';
 
 class IsarService {
@@ -25,6 +26,7 @@ class IsarService {
         StockMutationSchema,
         AppSettingsSchema,
         CostPriceAdjustmentSchema,
+        RestockListSchema,
       ],
       directory: dir.path,
     );

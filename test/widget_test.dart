@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/ui/navigation/main_scaffold.dart';
 import 'package:isar_community/isar.dart';
 
@@ -28,6 +29,10 @@ void main() {
 
   testWidgets('all 4 tabs render and can be switched without crashing', (tester) async {
     await tester.runAsync(() async {
+      // Otherwise the one-time OEM battery-optimization dialog (auto-shown
+      // by PengaturanScreen, which IndexedStack builds eagerly alongside
+      // Beranda) covers the screen and swallows every tab tap below.
+      await AppSettingsRepository(isar).dismissBatteryOptimizationDialog();
       await tester.pumpWidget(MaterialApp(home: MainScaffold(isar: isar)));
       await settleAfterAsyncWork(tester);
 

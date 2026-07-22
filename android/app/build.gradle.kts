@@ -34,6 +34,20 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // This project had never been release-built before this round of
+            // on-device verification. R8 minification/obfuscation (on by
+            // Flutter's own default, even with no `isMinifyEnabled` set here)
+            // turned out to break multiple plugins that resolve their own
+            // classes by name at runtime — androidx.work's WorkDatabase_Impl
+            // (reflective no-arg constructor lookup) and
+            // android_alarm_manager_plus's RebootBroadcastReceiver
+            // (ComponentName built from `.class`, resolved post-rename) both
+            // crashed with no proguard-rules.pro in place to protect them.
+            // Turning shrinking off entirely rather than chasing each
+            // plugin's specific reflection pattern one at a time — this app
+            // has no APK-size constraint that would justify that risk.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

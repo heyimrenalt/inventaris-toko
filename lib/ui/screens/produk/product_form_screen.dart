@@ -4,13 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/models/product.dart';
+import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/cost_price_adjustment_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/hpp_calculator.dart';
+import '../../../domain/unit_conversion.dart';
 import '../../../services/photo_storage_service.dart';
+import '../../theme/app_text_styles.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/category_picker_field.dart';
 
 /// Shared add/edit form. [existing] null means "add"; non-null means
@@ -50,11 +54,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   late final TextEditingController _costPriceController;
   late final TextEditingController _sellPriceController;
   late final TextEditingController _unitController;
+  late final TextEditingController _unitsPerPackController;
+  late final TextEditingController _unitsPerDusController;
   late final TextEditingController _initialStockController;
   late final TextEditingController _minStockController;
 
   String? _photoPath;
   int? _categoryId;
+  bool _allowsFractionalQuantity = false;
   bool _saving = false;
   bool _initializing = true;
 
@@ -63,6 +70,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _categoryError;
   String? _priceError;
   String? _unitError;
+  String? _unitsPerPackError;
+  String? _unitsPerDusError;
 
   @override
   void initState() {
@@ -79,18 +88,33 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _sellPriceController =
         TextEditingController(text: existing != null ? _formatNumberInput(existing.sellPrice) : '');
     _unitController = TextEditingController(text: existing?.unit ?? '');
+    _unitsPerPackController = TextEditingController(
+      text: existing?.unitsPerPack != null ? existing!.unitsPerPack.toString() : '',
+    );
+    _unitsPerDusController = TextEditingController(
+      text: existing?.unitsPerDus != null ? existing!.unitsPerDus.toString() : '',
+    );
     _initialStockController = TextEditingController(text: '0');
     _minStockController = TextEditingController(
       text: existing != null ? _formatNumberInput(existing.minStockThreshold) : '',
     );
     _photoPath = existing?.photoPath;
     _categoryId = existing?.categoryId;
+    _allowsFractionalQuantity = existing?.allowsFractionalQuantity ?? false;
 
     // Live margin preview reacts to both fields in both modes: the cost
     // price field is editable in edit mode too now (as a manual HPP
     // correction), not just at creation.
     _sellPriceController.addListener(_onLivePriceFieldsChanged);
     _costPriceController.addListener(_onLivePriceFieldsChanged);
+
+    // Drives the live "Ringkasan kemasan" summary, the conditional
+    // visibility of the dus field, and the min-stock pack/dus caption —
+    // all three need to recompute on every keystroke in any of these
+    // three fields, not just their own.
+    _unitsPerPackController.addListener(_onPackagingFieldsChanged);
+    _unitsPerDusController.addListener(_onPackagingFieldsChanged);
+    _minStockController.addListener(_onPackagingFieldsChanged);
 
     if (existing == null) {
       _loadDefaultThreshold();
@@ -100,6 +124,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   void _onLivePriceFieldsChanged() => setState(() {});
+
+  /// Drives the live "Ringkasan kemasan" summary, the dus field's hint
+  /// text, and the min-stock pack/dus caption on every keystroke in any
+  /// of the three fields. Deliberately does *not* cascade-clear "Isi per
+  /// dus" when "Isi per pack" is cleared — a dus can be configured
+  /// directly in pcs with no pack tier at all (see UnitConversion), so
+  /// clearing pack doesn't make an existing dus value meaningless.
+  void _onPackagingFieldsChanged() => setState(() {});
+
+  bool get _packagingHasValidPack {
+    final (value, valid) = _parseUnitsPerPack();
+    return valid && value != null;
+  }
 
   double? _liveSellPrice() {
     final value = double.tryParse(_sellPriceController.text.trim().replaceAll(',', '.'));
@@ -128,15 +165,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _costPriceController.dispose();
     _sellPriceController.dispose();
     _unitController.dispose();
+    _unitsPerPackController.dispose();
+    _unitsPerDusController.dispose();
     _initialStockController.dispose();
     _minStockController.dispose();
     super.dispose();
-  }
-
-  void _showScanNotAvailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pemindaian barcode belum tersedia, silakan ketik manual')),
-    );
   }
 
   Future<void> _pickPhoto() async {
@@ -178,13 +211,44 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
+  /// `null` when the field is left blank (pcs-only, valid). Sets
+  /// [_unitsPerPackError] and returns `false` when the text is non-blank
+  /// but not a valid integer >= 2 — checked locally, before the repository
+  /// call, so 0/1/negative/non-numeric all get the same inline error
+  /// immediately rather than round-tripping through a thrown exception.
+  (int?, bool) _parseUnitsPerPack() {
+    final text = _unitsPerPackController.text.trim();
+    if (text.isEmpty) return (null, true);
+    final value = int.tryParse(text);
+    if (value == null || value < 2) return (null, false);
+    return (value, true);
+  }
+
+  /// Same shape as [_parseUnitsPerPack] — `null`/`true` when left blank,
+  /// `null`/`false` when non-blank but not a valid integer >= 2.
+  (int?, bool) _parseUnitsPerDus() {
+    final text = _unitsPerDusController.text.trim();
+    if (text.isEmpty) return (null, true);
+    final value = int.tryParse(text);
+    if (value == null || value < 2) return (null, false);
+    return (value, true);
+  }
+
   Future<void> _submit() async {
+    // See the matching guard in CatatMutasiScreen._submit() — blocks a
+    // second tap that lands before the disabled-button rebuild takes
+    // effect, so a rapid double-tap can't record/update the product twice
+    // or pop the route twice.
+    if (_saving) return;
+
     setState(() {
       _nameError = null;
       _codeError = null;
       _categoryError = null;
       _priceError = null;
       _unitError = null;
+      _unitsPerPackError = null;
+      _unitsPerDusError = null;
     });
 
     final categoryId = _categoryId;
@@ -192,6 +256,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     final sellPrice = double.tryParse(_sellPriceController.text.replaceAll(',', '.')) ?? -1;
     final minThreshold = double.tryParse(_minStockController.text.replaceAll(',', '.'));
     final initialStock = double.tryParse(_initialStockController.text.replaceAll(',', '.')) ?? 0;
+
+    final (unitsPerPack, unitsPerPackValid) = _parseUnitsPerPack();
+    if (!unitsPerPackValid) {
+      setState(() {
+        _unitsPerPackError = 'Isi per pack harus angka bulat >= 2 (kosongkan jika hanya per pcs)';
+      });
+      return;
+    }
+
+    final (unitsPerDus, unitsPerDusValid) = _parseUnitsPerDus();
+    if (!unitsPerDusValid) {
+      setState(() {
+        _unitsPerDusError = 'Isi per dus harus angka bulat >= 2';
+      });
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -210,6 +290,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           sellPrice: sellPrice,
           unit: _unitController.text,
           minStockThreshold: minThreshold,
+          unitsPerPack: unitsPerPack,
+          // Same "null can't distinguish leave-unchanged from clear"
+          // situation as clearCategory above.
+          clearUnitsPerPack: unitsPerPack == null,
+          unitsPerDus: unitsPerDus,
+          clearUnitsPerDus: unitsPerDus == null,
+          allowsFractionalQuantity: _allowsFractionalQuantity,
         );
 
         // Manual HPP correction: only write an adjustment (and only touch
@@ -234,6 +321,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           minStockThreshold: minThreshold,
           initialStock: initialStock,
           averageCostPrice: _liveCostPrice(),
+          unitsPerPack: unitsPerPack,
+          unitsPerDus: unitsPerDus,
+          allowsFractionalQuantity: _allowsFractionalQuantity,
         );
       }
       if (!mounted) return;
@@ -254,6 +344,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           _unitError = 'Satuan tidak boleh kosong';
         } else if (message.contains('sellPrice')) {
           _priceError = 'Harga jual harus >= 0';
+        } else if (message.contains('unitsPerDus')) {
+          _unitsPerDusError = 'Isi per dus harus angka bulat >= 2';
+        } else if (message.contains('unitsPerPack')) {
+          _unitsPerPackError = 'Isi per pack harus angka bulat >= 2 (kosongkan jika hanya per pcs)';
         }
       });
     } on DuplicateProductCodeException {
@@ -268,7 +362,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.isEditing ? 'Edit Produk' : 'Tambah Produk')),
+      appBar: AppHeader.withBack(
+        title: widget.isEditing ? 'Edit Produk' : 'Tambah Produk',
+        onBack: () => Navigator.of(context).pop(),
+      ),
       body: _initializing
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -281,7 +378,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   TextField(
                     key: const Key('product_form_name'),
                     controller: _nameController,
-                    style: const TextStyle(fontSize: 16),
+                    style: AppTextStyles.body,
                     decoration: InputDecoration(
                       labelText: 'Nama produk',
                       hintText: 'contoh: Sendal jepit ukuran 39',
@@ -289,30 +386,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          key: const Key('product_form_code'),
-                          controller: _codeController,
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            labelText: 'Kode barang (opsional)',
-                            errorText: _codeError,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: IconButton.filledTonal(
-                          onPressed: _showScanNotAvailable,
-                          icon: const Icon(Icons.qr_code_scanner),
-                          tooltip: 'Pindai barcode',
-                        ),
-                      ),
-                    ],
+                  TextField(
+                    key: const Key('product_form_code'),
+                    controller: _codeController,
+                    style: AppTextStyles.body,
+                    decoration: InputDecoration(
+                      labelText: 'Kode barang (opsional)',
+                      errorText: _codeError,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   CategoryPickerField(
@@ -333,7 +414,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     key: const Key('product_form_cost_price'),
                     controller: _costPriceController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(fontSize: 16),
+                    style: AppTextStyles.body,
                     decoration: InputDecoration(
                       labelText:
                           widget.isEditing ? 'Harga modal (koreksi)' : 'Harga modal (opsional)',
@@ -348,7 +429,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     key: const Key('product_form_price'),
                     controller: _sellPriceController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(fontSize: 16),
+                    style: AppTextStyles.body,
                     decoration: InputDecoration(
                       labelText: 'Harga jual',
                       prefixText: 'Rp ',
@@ -360,20 +441,63 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   TextField(
                     key: const Key('product_form_unit'),
                     controller: _unitController,
-                    style: const TextStyle(fontSize: 16),
+                    style: AppTextStyles.body,
                     decoration: InputDecoration(
                       labelText: 'Satuan',
                       hintText: 'contoh: pcs, kg, dus',
                       errorText: _unitError,
                     ),
                   ),
+                  SwitchListTile(
+                    key: const Key('product_form_allows_fractional_quantity'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Boleh jumlah pecahan', style: AppTextStyles.body),
+                    subtitle: const Text(
+                      'Aktifkan untuk barang timbang/ukur (kg, liter, dll) yang boleh '
+                      'jumlahnya pecahan. Biarkan mati untuk barang satuan (pcs/pack/dus).',
+                    ),
+                    value: _allowsFractionalQuantity,
+                    onChanged: (value) => setState(() => _allowsFractionalQuantity = value),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    key: const Key('product_form_units_per_pack'),
+                    controller: _unitsPerPackController,
+                    keyboardType: TextInputType.number,
+                    style: AppTextStyles.body,
+                    decoration: InputDecoration(
+                      labelText: 'Isi per pack (opsional)',
+                      hintText: 'Berapa pcs dalam 1 pack? cth: 6',
+                      errorText: _unitsPerPackError,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const Key('product_form_units_per_dus'),
+                    controller: _unitsPerDusController,
+                    keyboardType: TextInputType.number,
+                    style: AppTextStyles.body,
+                    decoration: InputDecoration(
+                      labelText: 'Isi per dus (opsional)',
+                      // A dus can be defined either relative to a pack
+                      // (once "Isi per pack" is filled) or directly in pcs
+                      // (a dus that skips the pack tier entirely) — see
+                      // UnitConversion's class doc comment for the same
+                      // rule applied everywhere else in the app.
+                      hintText: _packagingHasValidPack
+                          ? 'Berapa pack dalam 1 dus? cth: 6'
+                          : 'Berapa pcs dalam 1 dus (tanpa pack)? cth: 12',
+                      errorText: _unitsPerDusError,
+                    ),
+                  ),
+                  _buildKemasanSummary(),
                   if (!widget.isEditing) ...[
                     const SizedBox(height: 16),
                     TextField(
                       key: const Key('product_form_initial_stock'),
                       controller: _initialStockController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(fontSize: 16),
+                      style: AppTextStyles.body,
                       decoration: const InputDecoration(labelText: 'Stok awal'),
                     ),
                   ],
@@ -386,9 +510,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     key: const Key('product_form_min_stock'),
                     controller: _minStockController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(fontSize: 16),
+                    style: AppTextStyles.body,
                     decoration: const InputDecoration(labelText: 'Batas minimum stok'),
                   ),
+                  if (_minStockConversionCaption() case final caption?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      child: Text(
+                        caption,
+                        key: const Key('product_form_min_stock_conversion'),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
@@ -404,7 +537,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             )
                           : Text(
                               widget.isEditing ? 'Simpan Perubahan' : 'Simpan',
-                              style: const TextStyle(fontSize: 16),
+                              style: AppTextStyles.body,
                             ),
                     ),
                   ),
@@ -479,6 +612,122 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         ),
       ),
     );
+  }
+
+  /// Live "Ringkasan kemasan" card below the pack/dus fields — hidden
+  /// entirely until at least one of pack/dus is validly filled.
+  /// Recalculates on every keystroke in pack/dus (see
+  /// [_onPackagingFieldsChanged]) using the in-progress, unsaved
+  /// controller values, not the committed product.
+  Widget _buildKemasanSummary() {
+    final (unitsPerPack, packValid) = _parseUnitsPerPack();
+    final (unitsPerDus, dusValid) = _parseUnitsPerDus();
+    final effectivePack = packValid ? unitsPerPack : null;
+    final effectiveDus = dusValid ? unitsPerDus : null;
+    if (effectivePack == null && effectiveDus == null) return const SizedBox.shrink();
+
+    final lines = <String>[];
+    if (effectivePack != null) {
+      lines.add('1 pack = ${_formatGrouped(effectivePack.toDouble())} pcs');
+    }
+    if (effectiveDus != null) {
+      if (effectivePack != null) {
+        final pcsPerDus = effectiveDus * effectivePack;
+        lines.add(
+          '1 dus = ${_formatGrouped(effectiveDus.toDouble())} pack = '
+          '${_formatGrouped(pcsPerDus.toDouble())} pcs',
+        );
+      } else {
+        // Dus defined directly in pcs, skipping the pack tier entirely.
+        lines.add('1 dus = ${_formatGrouped(effectiveDus.toDouble())} pcs');
+      }
+    }
+
+    // Current stock is only known once the product exists — the "add"
+    // form's "Stok awal" hasn't been recorded as a mutation yet, so
+    // there's no committed currentStock to convert.
+    String? stockLine;
+    String? stockConversion;
+    if (widget.isEditing) {
+      final currentStock = widget.existing!.currentStock;
+      stockLine = 'Stok saat ini: ${_formatGrouped(currentStock)} pcs';
+      stockConversion = _stockConversionLine(currentStock, effectivePack, effectiveDus);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        key: const Key('product_form_kemasan_summary'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.teal.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.inventory_2, size: 18, color: Colors.teal[700]),
+                const SizedBox(width: 6),
+                Text(
+                  'Ringkasan kemasan',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal[800]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final line in lines) Text(line, style: const TextStyle(fontSize: 14)),
+            if (stockLine != null) ...[
+              const Divider(height: 16),
+              Text(stockLine, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              if (stockConversion != null)
+                Text(stockConversion, style: const TextStyle(fontSize: 14)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// "≈ 6 pack, 1 dus" read-only hint below "Batas minimum stok",
+  /// computed from the in-progress pack/dus/min-stock controller values —
+  /// `null` (no caption) when neither pack nor dus is validly filled,
+  /// min-stock isn't a parseable number, or the min-stock value doesn't
+  /// divide evenly into any configured tier.
+  String? _minStockConversionCaption() {
+    final (unitsPerPack, packValid) = _parseUnitsPerPack();
+    final (unitsPerDus, dusValid) = _parseUnitsPerDus();
+    final effectivePack = packValid ? unitsPerPack : null;
+    final effectiveDus = dusValid ? unitsPerDus : null;
+    if (effectivePack == null && effectiveDus == null) return null;
+
+    final minStock = double.tryParse(_minStockController.text.trim().replaceAll(',', '.'));
+    if (minStock == null) return null;
+
+    final parts = <String>[];
+    if (effectivePack != null) {
+      final packs = UnitConversion.fromPcs(
+        qtyInPcs: minStock,
+        unit: EnteredUnit.pack,
+        unitsPerPack: effectivePack,
+        unitsPerDus: effectiveDus,
+      );
+      if (_isWholeNumber(packs)) parts.add('${_formatGrouped(packs)} pack');
+    }
+    if (effectiveDus != null) {
+      final dus = UnitConversion.fromPcs(
+        qtyInPcs: minStock,
+        unit: EnteredUnit.dus,
+        unitsPerPack: effectivePack,
+        unitsPerDus: effectiveDus,
+      );
+      if (_isWholeNumber(dus)) parts.add('${_formatGrouped(dus)} dus');
+    }
+    if (parts.isEmpty) return null;
+    return '≈ ${parts.join(', ')}';
   }
 
   Widget _buildReadOnlyCurrentStock() {
@@ -559,4 +808,44 @@ String _formatCurrency(double value) {
     }
   }
   return 'Rp ${isNegative ? '-' : ''}$buffer';
+}
+
+/// "= 6 pack = 1 dus" breakdown of a pcs quantity — each tier shown only
+/// when it independently divides evenly (epsilon 0.001), `null` when
+/// neither tier is configured or neither divides evenly.
+String? _stockConversionLine(double currentStock, int? unitsPerPack, int? unitsPerDus) {
+  final parts = <String>[];
+  if (unitsPerPack != null) {
+    final packs = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.pack,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(packs)) parts.add('${_formatGrouped(packs)} pack');
+  }
+  if (unitsPerDus != null) {
+    final dus = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.dus,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(dus)) parts.add('${_formatGrouped(dus)} dus');
+  }
+  if (parts.isEmpty) return null;
+  return '= ${parts.join(' = ')}';
+}
+
+bool _isWholeNumber(double value) => (value - value.roundToDouble()).abs() < 0.001;
+
+String _formatGrouped(double value) {
+  final digits = value.round().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    final positionFromEnd = digits.length - i;
+    buffer.write(digits[i]);
+    if (positionFromEnd > 1 && positionFromEnd % 3 == 1) buffer.write('.');
+  }
+  return buffer.toString();
 }

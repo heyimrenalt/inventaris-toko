@@ -25,6 +25,8 @@ class StockMutationRepository {
     required double quantity,
     String? note,
     double? costPricePerUnit,
+    EnteredUnit? enteredUnit,
+    double? enteredQuantity,
   }) async {
     if (quantity <= 0) {
       throw ValidationException('quantity must be > 0');
@@ -34,6 +36,10 @@ class StockMutationRepository {
       final product = await _isar.products.get(productId);
       if (product == null) {
         throw NotFoundException('Product $productId not found');
+      }
+
+      if (!product.allowsFractionalQuantity && quantity != quantity.roundToDouble()) {
+        throw ValidationException('quantity must be a whole number for this product');
       }
 
       final double newStock;
@@ -85,6 +91,8 @@ class StockMutationRepository {
         ..quantity = quantity
         ..note = note
         ..stockAfter = newStock
+        ..enteredUnit = enteredUnit
+        ..enteredQuantity = enteredQuantity
         ..createdAt = DateTime.now();
 
       await _isar.products.put(product);
@@ -141,6 +149,11 @@ class StockMutationRepository {
     final baseNote =
         original.note?.replaceFirst(RegExp(r'^Dibatalkan:\s*'), '') ?? product?.name ?? 'mutasi';
 
+    // Deliberately doesn't forward original.enteredUnit/enteredQuantity:
+    // an undo is a new, system-generated event, not a re-entry of the
+    // same user input, so it carries no entered-unit provenance of its
+    // own — same reasoning as why its note is reworded rather than
+    // copied verbatim.
     await recordMutation(
       productId: original.productId,
       type: compensatingType,

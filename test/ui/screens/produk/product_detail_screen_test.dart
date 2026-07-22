@@ -86,6 +86,86 @@ void main() {
     });
   });
 
+  testWidgets('pack=6, stock=12 shows a "= 2 pack" conversion line, no Kemasan dus line',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 12,
+        unitsPerPack: 6,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.byKey(const Key('product_detail_stock_conversion')), findsOneWidget);
+      expect(find.text('= 2 pack'), findsOneWidget);
+      expect(find.byKey(const Key('product_detail_kemasan_section')), findsOneWidget);
+      expect(find.text('1 pack = 6 pcs'), findsOneWidget);
+    });
+  });
+
+  testWidgets('pack=6, stock=15 shows no conversion line (15 not divisible by 6)', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 15,
+        unitsPerPack: 6,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.byKey(const Key('product_detail_stock_conversion')), findsNothing);
+    });
+  });
+
+  testWidgets('no unitsPerPack shows no Kemasan section', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 12,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.byKey(const Key('product_detail_kemasan_section')), findsNothing);
+      expect(find.byKey(const Key('product_detail_stock_conversion')), findsNothing);
+    });
+  });
+
+  testWidgets('pack=6, dus=6, stock=36 shows Kemasan section with both lines and full conversion',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: category.id,
+        sellPrice: 5000,
+        unit: 'pcs',
+        initialStock: 36,
+        unitsPerPack: 6,
+        unitsPerDus: 6,
+      );
+
+      await pumpDetailWithBackStack(tester, product.id);
+
+      expect(find.text('= 6 pack = 1 dus'), findsOneWidget);
+      expect(find.text('1 pack = 6 pcs'), findsOneWidget);
+      expect(find.text('1 dus = 6 pack = 36 pcs'), findsOneWidget);
+    });
+  });
+
   testWidgets(
     'tapping Stok masuk navigates to Catat Mutasi pre-selected, and returning refreshes stock + history',
     (tester) async {
@@ -123,7 +203,7 @@ void main() {
           findsOneWidget,
         );
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '8');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '8');
         final submitFinder = find.byKey(const Key('catat_mutasi_submit'));
         await tester.ensureVisible(submitFinder);
         await tester.tap(submitFinder);

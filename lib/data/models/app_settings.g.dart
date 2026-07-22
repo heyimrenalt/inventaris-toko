@@ -17,65 +17,80 @@ const AppSettingsSchema = CollectionSchema(
   name: r'AppSettings',
   id: -5633561779022347008,
   properties: {
-    r'criticalStockAlertEnabled': PropertySchema(
+    r'batteryOptimizationDialogDismissed': PropertySchema(
       id: 0,
+      name: r'batteryOptimizationDialogDismissed',
+      type: IsarType.bool,
+    ),
+    r'criticalStockAlertEnabled': PropertySchema(
+      id: 1,
       name: r'criticalStockAlertEnabled',
       type: IsarType.bool,
     ),
     r'criticalStockAlertHour1': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'criticalStockAlertHour1',
       type: IsarType.long,
     ),
     r'criticalStockAlertHour2': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'criticalStockAlertHour2',
       type: IsarType.long,
     ),
     r'criticalStockAlertHour3': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'criticalStockAlertHour3',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute1': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'criticalStockAlertMinute1',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute2': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'criticalStockAlertMinute2',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute3': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'criticalStockAlertMinute3',
       type: IsarType.long,
     ),
     r'dailySummaryEnabled': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'dailySummaryEnabled',
       type: IsarType.bool,
     ),
     r'dailySummaryHour': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'dailySummaryHour',
       type: IsarType.long,
     ),
     r'dailySummaryMinute': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'dailySummaryMinute',
       type: IsarType.long,
     ),
     r'defaultMinStockThreshold': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'defaultMinStockThreshold',
       type: IsarType.double,
     ),
     r'lastBackupAt': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'lastBackupAt',
       type: IsarType.dateTime,
+    ),
+    r'restockCoverDays': PropertySchema(
+      id: 13,
+      name: r'restockCoverDays',
+      type: IsarType.long,
+    ),
+    r'restockLeadTimeDays': PropertySchema(
+      id: 14,
+      name: r'restockLeadTimeDays',
+      type: IsarType.long,
     ),
   },
 
@@ -109,18 +124,21 @@ void _appSettingsSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.criticalStockAlertEnabled);
-  writer.writeLong(offsets[1], object.criticalStockAlertHour1);
-  writer.writeLong(offsets[2], object.criticalStockAlertHour2);
-  writer.writeLong(offsets[3], object.criticalStockAlertHour3);
-  writer.writeLong(offsets[4], object.criticalStockAlertMinute1);
-  writer.writeLong(offsets[5], object.criticalStockAlertMinute2);
-  writer.writeLong(offsets[6], object.criticalStockAlertMinute3);
-  writer.writeBool(offsets[7], object.dailySummaryEnabled);
-  writer.writeLong(offsets[8], object.dailySummaryHour);
-  writer.writeLong(offsets[9], object.dailySummaryMinute);
-  writer.writeDouble(offsets[10], object.defaultMinStockThreshold);
-  writer.writeDateTime(offsets[11], object.lastBackupAt);
+  writer.writeBool(offsets[0], object.batteryOptimizationDialogDismissed);
+  writer.writeBool(offsets[1], object.criticalStockAlertEnabled);
+  writer.writeLong(offsets[2], object.criticalStockAlertHour1);
+  writer.writeLong(offsets[3], object.criticalStockAlertHour2);
+  writer.writeLong(offsets[4], object.criticalStockAlertHour3);
+  writer.writeLong(offsets[5], object.criticalStockAlertMinute1);
+  writer.writeLong(offsets[6], object.criticalStockAlertMinute2);
+  writer.writeLong(offsets[7], object.criticalStockAlertMinute3);
+  writer.writeBool(offsets[8], object.dailySummaryEnabled);
+  writer.writeLong(offsets[9], object.dailySummaryHour);
+  writer.writeLong(offsets[10], object.dailySummaryMinute);
+  writer.writeDouble(offsets[11], object.defaultMinStockThreshold);
+  writer.writeDateTime(offsets[12], object.lastBackupAt);
+  writer.writeLong(offsets[13], object.restockCoverDays);
+  writer.writeLong(offsets[14], object.restockLeadTimeDays);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -130,19 +148,22 @@ AppSettings _appSettingsDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = AppSettings();
-  object.criticalStockAlertEnabled = reader.readBool(offsets[0]);
-  object.criticalStockAlertHour1 = reader.readLong(offsets[1]);
-  object.criticalStockAlertHour2 = reader.readLongOrNull(offsets[2]);
-  object.criticalStockAlertHour3 = reader.readLongOrNull(offsets[3]);
-  object.criticalStockAlertMinute1 = reader.readLong(offsets[4]);
-  object.criticalStockAlertMinute2 = reader.readLongOrNull(offsets[5]);
-  object.criticalStockAlertMinute3 = reader.readLongOrNull(offsets[6]);
-  object.dailySummaryEnabled = reader.readBool(offsets[7]);
-  object.dailySummaryHour = reader.readLong(offsets[8]);
-  object.dailySummaryMinute = reader.readLong(offsets[9]);
-  object.defaultMinStockThreshold = reader.readDouble(offsets[10]);
+  object.batteryOptimizationDialogDismissed = reader.readBool(offsets[0]);
+  object.criticalStockAlertEnabled = reader.readBool(offsets[1]);
+  object.criticalStockAlertHour1 = reader.readLong(offsets[2]);
+  object.criticalStockAlertHour2 = reader.readLongOrNull(offsets[3]);
+  object.criticalStockAlertHour3 = reader.readLongOrNull(offsets[4]);
+  object.criticalStockAlertMinute1 = reader.readLong(offsets[5]);
+  object.criticalStockAlertMinute2 = reader.readLongOrNull(offsets[6]);
+  object.criticalStockAlertMinute3 = reader.readLongOrNull(offsets[7]);
+  object.dailySummaryEnabled = reader.readBool(offsets[8]);
+  object.dailySummaryHour = reader.readLong(offsets[9]);
+  object.dailySummaryMinute = reader.readLong(offsets[10]);
+  object.defaultMinStockThreshold = reader.readDouble(offsets[11]);
   object.id = id;
-  object.lastBackupAt = reader.readDateTimeOrNull(offsets[11]);
+  object.lastBackupAt = reader.readDateTimeOrNull(offsets[12]);
+  object.restockCoverDays = reader.readLong(offsets[13]);
+  object.restockLeadTimeDays = reader.readLong(offsets[14]);
   return object;
 }
 
@@ -156,27 +177,33 @@ P _appSettingsDeserializeProp<P>(
     case 0:
       return (reader.readBool(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 2:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
       return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
-    case 5:
       return (reader.readLongOrNull(offset)) as P;
+    case 5:
+      return (reader.readLong(offset)) as P;
     case 6:
       return (reader.readLongOrNull(offset)) as P;
     case 7:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 9:
       return (reader.readLong(offset)) as P;
     case 10:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 11:
+      return (reader.readDouble(offset)) as P;
+    case 12:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 13:
+      return (reader.readLong(offset)) as P;
+    case 14:
+      return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -282,6 +309,18 @@ extension AppSettingsQueryWhere
 
 extension AppSettingsQueryFilter
     on QueryBuilder<AppSettings, AppSettings, QFilterCondition> {
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  batteryOptimizationDialogDismissedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'batteryOptimizationDialogDismissed',
+          value: value,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   criticalStockAlertEnabledEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
@@ -1042,6 +1081,116 @@ extension AppSettingsQueryFilter
       );
     });
   }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockCoverDaysEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'restockCoverDays', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockCoverDaysGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'restockCoverDays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockCoverDaysLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'restockCoverDays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockCoverDaysBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'restockCoverDays',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockLeadTimeDaysEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'restockLeadTimeDays', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockLeadTimeDaysGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'restockLeadTimeDays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockLeadTimeDaysLessThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'restockLeadTimeDays',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  restockLeadTimeDaysBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'restockLeadTimeDays',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
 }
 
 extension AppSettingsQueryObject
@@ -1052,6 +1201,20 @@ extension AppSettingsQueryLinks
 
 extension AppSettingsQuerySortBy
     on QueryBuilder<AppSettings, AppSettings, QSortBy> {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByBatteryOptimizationDialogDismissed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'batteryOptimizationDialogDismissed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByBatteryOptimizationDialogDismissedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'batteryOptimizationDialogDismissed', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   sortByCriticalStockAlertEnabled() {
     return QueryBuilder.apply(this, (query) {
@@ -1218,10 +1381,52 @@ extension AppSettingsQuerySortBy
       return query.addSortBy(r'lastBackupAt', Sort.desc);
     });
   }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByRestockCoverDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockCoverDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByRestockCoverDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockCoverDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByRestockLeadTimeDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockLeadTimeDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByRestockLeadTimeDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockLeadTimeDays', Sort.desc);
+    });
+  }
 }
 
 extension AppSettingsQuerySortThenBy
     on QueryBuilder<AppSettings, AppSettings, QSortThenBy> {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByBatteryOptimizationDialogDismissed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'batteryOptimizationDialogDismissed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByBatteryOptimizationDialogDismissedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'batteryOptimizationDialogDismissed', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   thenByCriticalStockAlertEnabled() {
     return QueryBuilder.apply(this, (query) {
@@ -1400,10 +1605,45 @@ extension AppSettingsQuerySortThenBy
       return query.addSortBy(r'lastBackupAt', Sort.desc);
     });
   }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByRestockCoverDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockCoverDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByRestockCoverDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockCoverDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByRestockLeadTimeDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockLeadTimeDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByRestockLeadTimeDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'restockLeadTimeDays', Sort.desc);
+    });
+  }
 }
 
 extension AppSettingsQueryWhereDistinct
     on QueryBuilder<AppSettings, AppSettings, QDistinct> {
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByBatteryOptimizationDialogDismissed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'batteryOptimizationDialogDismissed');
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QDistinct>
   distinctByCriticalStockAlertEnabled() {
     return QueryBuilder.apply(this, (query) {
@@ -1486,6 +1726,20 @@ extension AppSettingsQueryWhereDistinct
       return query.addDistinctBy(r'lastBackupAt');
     });
   }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByRestockCoverDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'restockCoverDays');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByRestockLeadTimeDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'restockLeadTimeDays');
+    });
+  }
 }
 
 extension AppSettingsQueryProperty
@@ -1493,6 +1747,13 @@ extension AppSettingsQueryProperty
   QueryBuilder<AppSettings, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<AppSettings, bool, QQueryOperations>
+  batteryOptimizationDialogDismissedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'batteryOptimizationDialogDismissed');
     });
   }
 
@@ -1576,6 +1837,19 @@ extension AppSettingsQueryProperty
   lastBackupAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastBackupAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations> restockCoverDaysProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'restockCoverDays');
+    });
+  }
+
+  QueryBuilder<AppSettings, int, QQueryOperations>
+  restockLeadTimeDaysProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'restockLeadTimeDays');
     });
   }
 }

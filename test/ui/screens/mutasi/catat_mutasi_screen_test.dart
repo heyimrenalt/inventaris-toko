@@ -29,6 +29,9 @@ class _FakeNotificationSender implements NotificationSender {
   }) async {
     bodies.add(body);
   }
+
+  @override
+  Future<void> cancelAllNotifications() async {}
 }
 
 void main() {
@@ -99,7 +102,7 @@ void main() {
   testWidgets('search mode: searching and selecting a product reveals the form', (tester) async {
     await tester.runAsync(() async {
       final category = await categoryRepository.create('Snacks');
-      await productRepository.create(
+      final product = await productRepository.create(
         name: 'Indomie Goreng',
         categoryId: category.id,
         sellPrice: 3000,
@@ -109,7 +112,9 @@ void main() {
 
       await pumpWithBackStack(tester);
 
-      expect(find.byKey(const Key('catat_mutasi_quantity')), findsNothing);
+      expect(find.byKey(Key('unit_qty_field_${product.id}')), findsNothing);
+      // Barcode scanning was dropped from this app — no QR icon anywhere.
+      expect(find.byIcon(Icons.qr_code_scanner), findsNothing);
 
       await tester.enterText(find.byKey(const Key('catat_mutasi_search')), 'goreng');
       await settleAfterAsyncWork(tester);
@@ -118,7 +123,7 @@ void main() {
       await tester.tap(find.text('Indomie Goreng'));
       await settleAfterAsyncWork(tester);
 
-      expect(find.byKey(const Key('catat_mutasi_quantity')), findsOneWidget);
+      expect(find.byKey(Key('unit_qty_field_${product.id}')), findsOneWidget);
       expect(
         find.textContaining('Indomie Goreng — stok saat ini: 12 pcs'),
         findsOneWidget,
@@ -140,7 +145,7 @@ void main() {
       await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
       expect(find.byKey(const Key('catat_mutasi_search')), findsNothing);
-      expect(find.byKey(const Key('catat_mutasi_quantity')), findsOneWidget);
+      expect(find.byKey(Key('unit_qty_field_${product.id}')), findsOneWidget);
       expect(
         find.textContaining('Indomie Goreng — stok saat ini: 12 pcs'),
         findsOneWidget,
@@ -182,7 +187,7 @@ void main() {
       expect(find.text('Jumlah harus lebih dari 0'), findsOneWidget);
       expect(await stockMutationRepository.getHistoryForProduct(product.id), isEmpty);
 
-      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '0');
+      await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '0');
       await tapSubmit(tester);
 
       expect(find.text('Jumlah harus lebih dari 0'), findsOneWidget);
@@ -203,7 +208,7 @@ void main() {
 
       await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
 
-      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '10');
+      await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '10');
       await tapSubmit(tester);
 
       expect(find.text('Mutasi List Marker'), findsOneWidget);
@@ -227,7 +232,7 @@ void main() {
 
       await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+      await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
       await tapSubmit(tester);
 
       expect(find.byType(AlertDialog), findsNothing);
@@ -258,7 +263,7 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '20');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '20');
         await tapSubmit(tester);
 
         // Blocked with an inline error, no dialog, no navigation, no
@@ -272,7 +277,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Catat Mutasi'), findsOneWidget);
-        expect(find.byKey(const Key('catat_mutasi_quantity')), findsOneWidget);
+        expect(find.byKey(Key('unit_qty_field_${product.id}')), findsOneWidget);
         expect(
           await stockMutationRepository.getHistoryForProduct(product.id),
           hasLength(historyBeforeSubmit.length),
@@ -308,7 +313,7 @@ void main() {
 
         // Retrying with a submittable quantity still works after the
         // inline error is showing.
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
         await tapSubmit(tester);
 
         expect(find.text('Stok keluar dicatat: -4 Indomie Goreng'), findsOneWidget);
@@ -333,7 +338,7 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
         await tapSubmit(tester);
 
         expect(find.text('Stok keluar dicatat: -4 Indomie Goreng'), findsOneWidget);
@@ -367,7 +372,7 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
         await tapSubmit(tester);
 
         final historyBeforeUndo = await stockMutationRepository.getHistoryForProduct(product.id);
@@ -438,7 +443,7 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '5');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '5');
         await tester.enterText(find.byKey(const Key('catat_mutasi_cost_price')), '6000');
         await tapSubmit(tester);
 
@@ -464,7 +469,7 @@ void main() {
 
       await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
 
-      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '5');
+      await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '5');
       await tapSubmit(tester);
 
       final updated = await productRepository.getById(product.id);
@@ -541,7 +546,7 @@ void main() {
       await settleAfterAsyncWork(tester);
 
       expect(find.byKey(const Key('catat_mutasi_frequently_sold_chips')), findsNothing);
-      expect(find.byKey(const Key('catat_mutasi_quantity')), findsOneWidget);
+      expect(find.byKey(Key('unit_qty_field_${product.id}')), findsOneWidget);
       expect(find.textContaining('Indomie Goreng — stok saat ini: 15 pcs'), findsOneWidget);
     });
   });
@@ -598,7 +603,7 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-        await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
         await tapSubmit(tester);
 
         final updated = await productRepository.getById(product.id);
@@ -623,7 +628,7 @@ void main() {
 
       await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
 
-      await tester.enterText(find.byKey(const Key('catat_mutasi_quantity')), '4');
+      await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '4');
       await tapSubmit(tester);
 
       final updated = await productRepository.getById(product.id);
@@ -631,5 +636,139 @@ void main() {
       expect(updated.criticalStockAlertState, isNull);
       expect(fakeSender.bodies, isEmpty);
     });
+  });
+
+  group('unit toggle (pcs/pack/dus)', () {
+    testWidgets('entering "1" in dus mode records a mutation with the correct pcs quantity '
+        'and entered-unit history', (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          unitsPerPack: 12,
+          unitsPerDus: 6,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+
+        await tester.tap(find.descendant(
+          of: find.byKey(Key('unit_qty_toggle_${product.id}')),
+          matching: find.text('dus'),
+        ));
+        await tester.pump();
+
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '1');
+        await tapSubmit(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.currentStock, 72);
+
+        final history = await stockMutationRepository.getHistoryForProduct(product.id);
+        final saved = history.first;
+        expect(saved.quantity, 72);
+        expect(saved.enteredUnit, EnteredUnit.dus);
+        expect(saved.enteredQuantity, 1);
+      });
+    });
+
+    testWidgets('a product with allowsFractionalQuantity: false rejects a fractional pcs entry',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie Goreng',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '2.5');
+        await tester.pump();
+
+        expect(find.byKey(Key('unit_qty_error_${product.id}')), findsOneWidget);
+
+        await tapSubmit(tester);
+        // The invalid entry never reached _quantityInPcs, so submit falls
+        // back to the "must be > 0" validation, not a silently-accepted
+        // fractional mutation.
+        expect(find.text('Jumlah harus lebih dari 0'), findsOneWidget);
+        final unchanged = await productRepository.getById(product.id);
+        expect(unchanged!.currentStock, 10);
+      });
+    });
+
+    testWidgets('a product with allowsFractionalQuantity: true accepts a fractional pcs entry',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Sembako');
+        final product = await productRepository.create(
+          name: 'Beras',
+          categoryId: category.id,
+          sellPrice: 15000,
+          unit: 'kg',
+          allowsFractionalQuantity: true,
+        );
+
+        await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
+
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '2.5');
+        await tapSubmit(tester);
+
+        final updated = await productRepository.getById(product.id);
+        expect(updated!.currentStock, 2.5);
+      });
+    });
+
+    testWidgets(
+      'stock-out of 1 dus (36 pcs) against a currentStock of 20 pcs is rejected with the pcs-based '
+      'stock error, using the converted quantity',
+      (tester) async {
+        await tester.runAsync(() async {
+          final category = await categoryRepository.create('Snacks');
+          final product = await productRepository.create(
+            name: 'Indomie Goreng',
+            categoryId: category.id,
+            sellPrice: 3000,
+            unit: 'pcs',
+            unitsPerPack: 6,
+            unitsPerDus: 6,
+            initialStock: 20,
+          );
+          final historyBeforeSubmit =
+              await stockMutationRepository.getHistoryForProduct(product.id);
+
+          await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockOut);
+
+          await tester.tap(find.descendant(
+            of: find.byKey(Key('unit_qty_toggle_${product.id}')),
+            matching: find.text('dus'),
+          ));
+          await tester.pump();
+
+          await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '1');
+          await tapSubmit(tester);
+
+          expect(
+            find.text(
+              'Stok tidak mencukupi. Stok saat ini: 20 pcs, jumlah yang dimasukkan: 36 pcs.',
+              findRichText: true,
+            ),
+            findsOneWidget,
+          );
+          final unchanged = await productRepository.getById(product.id);
+          expect(unchanged!.currentStock, 20);
+          expect(
+            await stockMutationRepository.getHistoryForProduct(product.id),
+            hasLength(historyBeforeSubmit.length),
+          );
+        });
+      },
+    );
   });
 }

@@ -20,59 +20,105 @@ Future<Category?> showCategoryFormDialog({
   Category? existing,
   int? parentId,
 }) {
-  final controller = TextEditingController(text: existing?.name ?? '');
-  String? errorText;
-
   return showDialog<Category>(
     context: context,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          Future<void> submit() async {
-            try {
-              final Category result;
-              if (existing == null) {
-                result = await repository.create(controller.text, parentId: parentId);
-              } else {
-                result = await repository.rename(existing.id, controller.text);
-              }
-              if (!dialogContext.mounted) return;
-              Navigator.of(dialogContext).pop(result);
-            } on ValidationException {
-              setDialogState(() => errorText = 'Nama kategori tidak boleh kosong');
-            } on DuplicateCategoryNameException {
-              setDialogState(() => errorText = 'Kategori dengan nama ini sudah ada');
-            }
-          }
-
-          return AlertDialog(
-            title: Text(
-              existing == null ? 'Tambah Kategori' : 'Ubah Kategori',
-              style: const TextStyle(fontSize: 18),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(fontSize: 16),
-              decoration: InputDecoration(
-                labelText: 'Nama kategori',
-                errorText: errorText,
-              ),
-              onSubmitted: (_) => submit(),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Batal', style: TextStyle(fontSize: 16)),
-              ),
-              ElevatedButton(
-                onPressed: submit,
-                child: const Text('Simpan', style: TextStyle(fontSize: 16)),
-              ),
-            ],
-          );
-        },
-      );
-    },
+    builder: (dialogContext) => _CategoryFormDialog(
+      repository: repository,
+      existing: existing,
+      parentId: parentId,
+    ),
   );
+}
+
+/// A dedicated [StatefulWidget] (rather than a bare [TextEditingController]
+/// captured by the enclosing function + a `StatefulBuilder`) so its
+/// controller is created in `initState` and disposed only in `dispose` —
+/// disposing it right after `showDialog`'s Future resolves (as this used
+/// to do) races the dialog's own exit-transition animation: the
+/// `AlertDialog`/`TextField` stay mounted and the field's `EditableText`
+/// stays listening on the controller for the duration of that animation,
+/// so an immediate dispose there is a real "disposed while still
+/// listened" bug, not just a leak. Owning the controller through the
+/// normal State lifecycle instead means Flutter itself only calls
+/// `dispose()` once the widget is actually gone.
+class _CategoryFormDialog extends StatefulWidget {
+  const _CategoryFormDialog({
+    required this.repository,
+    required this.existing,
+    required this.parentId,
+  });
+
+  final CategoryRepository repository;
+  final Category? existing;
+  final int? parentId;
+
+  @override
+  State<_CategoryFormDialog> createState() => _CategoryFormDialogState();
+}
+
+class _CategoryFormDialogState extends State<_CategoryFormDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.existing?.name ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    try {
+      final Category result;
+      final existing = widget.existing;
+      if (existing == null) {
+        result = await widget.repository.create(_controller.text, parentId: widget.parentId);
+      } else {
+        result = await widget.repository.rename(existing.id, _controller.text);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(result);
+    } on ValidationException {
+      if (!mounted) return;
+      setState(() => _errorText = 'Nama kategori tidak boleh kosong');
+    } on DuplicateCategoryNameException {
+      if (!mounted) return;
+      setState(() => _errorText = 'Kategori dengan nama ini sudah ada');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.existing == null ? 'Tambah Kategori' : 'Ubah Kategori',
+        style: const TextStyle(fontSize: 18),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        style: const TextStyle(fontSize: 16),
+        decoration: InputDecoration(
+          labelText: 'Nama kategori',
+          errorText: _errorText,
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal', style: TextStyle(fontSize: 16)),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: const Text('Simpan', style: TextStyle(fontSize: 16)),
+        ),
+      ],
+    );
+  }
 }

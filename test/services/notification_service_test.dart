@@ -12,6 +12,7 @@ import '../data/repositories/test_isar.dart';
 
 class _FakeNotificationSender implements NotificationSender {
   final List<_SentNotification> calls = [];
+  int cancelAllCallCount = 0;
 
   @override
   Future<void> showNotification({
@@ -32,6 +33,11 @@ class _FakeNotificationSender implements NotificationSender {
       highImportance: highImportance,
       payload: payload,
     ));
+  }
+
+  @override
+  Future<void> cancelAllNotifications() async {
+    cancelAllCallCount++;
   }
 }
 
@@ -74,6 +80,34 @@ class _FakeWorkScheduler implements WorkScheduler {
   }
 }
 
+class _FakeAlarmScheduler implements AlarmScheduler {
+  final List<({int slotIndex, DateTime time})> scheduled = [];
+  final List<int> cancelled = [];
+
+  @override
+  Future<void> scheduleExact(int slotIndex, DateTime time) async {
+    scheduled.add((slotIndex: slotIndex, time: time));
+  }
+
+  @override
+  Future<void> cancel(int slotIndex) async {
+    cancelled.add(slotIndex);
+  }
+}
+
+class _FakeExactAlarmPermission implements ExactAlarmPermission {
+  bool canSchedule = true;
+  int requestCount = 0;
+
+  @override
+  Future<bool> canScheduleExactAlarms() async => canSchedule;
+
+  @override
+  Future<void> requestExactAlarmsPermission() async {
+    requestCount++;
+  }
+}
+
 Product _buildProduct({required int id, required String name}) {
   final now = DateTime.now();
   return Product()
@@ -90,12 +124,18 @@ Product _buildProduct({required int id, required String name}) {
 void main() {
   late _FakeNotificationSender fakeSender;
   late _FakeWorkScheduler fakeScheduler;
+  late _FakeAlarmScheduler fakeAlarmScheduler;
+  late _FakeExactAlarmPermission fakeExactAlarmPermission;
 
   setUp(() {
     fakeSender = _FakeNotificationSender();
     fakeScheduler = _FakeWorkScheduler();
+    fakeAlarmScheduler = _FakeAlarmScheduler();
+    fakeExactAlarmPermission = _FakeExactAlarmPermission();
     NotificationService.sender = fakeSender;
     NotificationService.scheduler = fakeScheduler;
+    NotificationService.alarmScheduler = fakeAlarmScheduler;
+    NotificationService.exactAlarmPermission = fakeExactAlarmPermission;
   });
 
   group('isWithinNotificationWindow', () {
@@ -162,7 +202,122 @@ void main() {
     });
   });
 
-  group('executeCriticalStockAlertTask', () {
+  group('criticalStockAlertNotificationId', () {
+    test('is deterministic and distinct per slot', () {
+      final ids = [for (var slot = 0; slot < 3; slot++) criticalStockAlertNotificationId(slot)];
+
+      expect(ids.toSet(), hasLength(3), reason: 'each slot must get its own notification ID');
+      expect(criticalStockAlertNotificationId(0), criticalStockAlertNotificationId(0));
+    });
+  });
+
+  group('scheduleCriticalStockAlerts', () {
+    late Isar isar;
+    late AppSettingsRepository settingsRepository;
+
+    setUp(() async {
+      isar = await openTestIsar();
+      settingsRepository = AppSettingsRepository(isar);
+    });
+
+    tearDown(() async {
+      await closeTestIsar(isar);
+    });
+
+    test('cancels every slot before scheduling, so a shrunk slot list leaves no stale alarm', () async {
+      var settings = await settingsRepository.updateCriticalStockAlertSlots([
+        (hour: 9, minute: 0),
+        (hour: 13, minute: 0),
+        (hour: 18, minute: 0),
+      ]);
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: DateTime(2026, 1, 1, 8));
+      expect(fakeAlarmScheduler.scheduled, hasLength(3));
+
+      fakeAlarmScheduler.scheduled.clear();
+      fakeAlarmScheduler.cancelled.clear();
+      settings = await settingsRepository.updateCriticalStockAlertSlots([(hour: 9, minute: 0)]);
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: DateTime(2026, 1, 1, 8));
+
+      // All 3 possible slots are canceled up front (no leaked stale IDs)...
+      expect(fakeAlarmScheduler.cancelled, containsAll([0, 1, 2]));
+      // ...and only the one remaining slot is re-armed.
+      expect(fakeAlarmScheduler.scheduled, hasLength(1));
+      expect(fakeAlarmScheduler.scheduled.single.slotIndex, 0);
+    });
+
+    test('canceling one slot does not remove another (fake scheduler cancels by slot index)', () async {
+      await fakeAlarmScheduler.cancel(1);
+
+      expect(fakeAlarmScheduler.cancelled, [1]);
+      expect(fakeAlarmScheduler.cancelled, isNot(contains(0)));
+      expect(fakeAlarmScheduler.cancelled, isNot(contains(2)));
+    });
+
+    test('3 configured slots produce 3 distinct alarm schedule calls', () async {
+      final settings = await settingsRepository.updateCriticalStockAlertSlots([
+        (hour: 9, minute: 0),
+        (hour: 13, minute: 0),
+        (hour: 18, minute: 0),
+      ]);
+
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: DateTime(2026, 1, 1, 8));
+
+      expect(fakeAlarmScheduler.scheduled.map((s) => s.slotIndex).toSet(), {0, 1, 2});
+    });
+
+    test('a slot time already past today is scheduled for tomorrow, not immediately or skipped', () async {
+      final settings = await settingsRepository.updateCriticalStockAlertSlots([(hour: 8, minute: 0)]);
+      final now = DateTime(2026, 1, 1, 9, 0); // 09:00, slot is 08:00 -> already passed
+
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: now);
+
+      expect(fakeAlarmScheduler.scheduled, hasLength(1));
+      final scheduledTime = fakeAlarmScheduler.scheduled.single.time;
+      expect(scheduledTime, DateTime(2026, 1, 2, 8, 0));
+    });
+
+    test('a slot time still ahead today is scheduled for today', () async {
+      final settings = await settingsRepository.updateCriticalStockAlertSlots([(hour: 20, minute: 0)]);
+      final now = DateTime(2026, 1, 1, 9, 0);
+
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: now);
+
+      expect(fakeAlarmScheduler.scheduled.single.time, DateTime(2026, 1, 1, 20, 0));
+    });
+
+    test('disabling the feature cancels every slot and schedules nothing', () async {
+      var settings = await settingsRepository.updateCriticalStockAlertSlots([(hour: 9, minute: 0)]);
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: DateTime(2026, 1, 1, 8));
+      fakeAlarmScheduler.scheduled.clear();
+
+      settings = await settingsRepository.updateCriticalStockAlertEnabled(false);
+      await NotificationService.scheduleCriticalStockAlerts(settings, now: DateTime(2026, 1, 1, 8));
+
+      expect(fakeAlarmScheduler.scheduled, isEmpty);
+      expect(fakeAlarmScheduler.cancelled, containsAll([0, 1, 2]));
+    });
+  });
+
+  group('cancelAll', () {
+    test('cancels the daily-summary task, every critical-stock alarm slot, and the notification tray', () async {
+      await NotificationService.cancelAll();
+
+      expect(fakeScheduler.cancelled, contains('dailySummaryTask'));
+      expect(fakeAlarmScheduler.cancelled, containsAll([0, 1, 2]));
+      expect(fakeSender.cancelAllCallCount, 1);
+    });
+  });
+
+  group('exact-alarm scheduling mode', () {
+    test('every critical-stock slot alarm uses exact + allowWhileIdle (fixes the Doze-deferral delay)', () {
+      expect(criticalStockAlarmExact, isTrue);
+      expect(criticalStockAlarmAllowWhileIdle, isTrue);
+      expect(criticalStockAlarmWakeup, isTrue);
+      expect(criticalStockAlarmRescheduleOnReboot, isTrue);
+    });
+  });
+
+  group('executeCriticalStockAlertSlot', () {
     late Isar isar;
     late AppSettingsRepository settingsRepository;
     late StockMutationRepository mutationRepository;
@@ -195,93 +350,95 @@ void main() {
       return product;
     }
 
-    test('returns early without sending anything when criticalStockAlertEnabled is false', () async {
+    test('sends nothing when criticalStockAlertEnabled is false', () async {
       await createCriticalProduct('Indomie Goreng');
       await settingsRepository.updateCriticalStockAlertEnabled(false);
 
-      await NotificationService.executeCriticalStockAlertTask(isar, now: DateTime.now());
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
 
       expect(fakeSender.calls, isEmpty);
     });
 
-    test('sends nothing when no configured slot is due', () async {
+    test('sends nothing when no product is currently critical', () async {
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
+
+      expect(fakeSender.calls, isEmpty);
+    });
+
+    test('sends one combined alert for every currently-critical product, using the slot\'s own ID', () async {
       await createCriticalProduct('Indomie Goreng');
-      final now = DateTime.now();
-      final farHour = (now.hour + 6) % 24;
-      await settingsRepository.updateCriticalStockAlertSlots([(hour: farHour, minute: 0)]);
 
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
-
-      expect(fakeSender.calls, isEmpty);
-    });
-
-    test('sends nothing when a slot is due but the queue is empty', () async {
-      final now = DateTime.now();
-      await settingsRepository.updateCriticalStockAlertSlots([(hour: now.hour, minute: now.minute)]);
-
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
-
-      expect(fakeSender.calls, isEmpty);
-    });
-
-    test('a due slot sends one combined alert for every queued product and marks them notified',
-        () async {
-      final now = DateTime.now();
-      await settingsRepository.updateCriticalStockAlertSlots([(hour: now.hour, minute: now.minute)]);
-      final product = await createCriticalProduct('Indomie Goreng');
-
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
+      await NotificationService.executeCriticalStockAlertSlot(isar, 1);
 
       expect(fakeSender.calls, hasLength(1));
       final sent = fakeSender.calls.single;
+      expect(sent.id, criticalStockAlertNotificationId(1));
       expect(sent.body, '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan');
       expect(sent.channelId, stockCriticalChannelId);
       expect(sent.highImportance, isTrue);
-
-      final updated = await isar.products.get(product.id);
-      expect(updated!.criticalStockAlertState, criticalStockAlertStateNotified);
     });
 
-    test('a second due slot the same day does not re-notify an already-notified product',
-        () async {
-      final now = DateTime.now();
-      await settingsRepository.updateCriticalStockAlertSlots([(hour: now.hour, minute: now.minute)]);
+    test('a different slot firing afterward re-alerts on the same still-critical product', () async {
       await createCriticalProduct('Indomie Goreng');
 
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
-      expect(fakeSender.calls, hasLength(1));
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
+      await NotificationService.executeCriticalStockAlertSlot(isar, 1);
 
-      // Same window fires again (e.g. two periodic ticks land in it) —
-      // nothing new is queued, so nothing new is sent.
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
-      expect(fakeSender.calls, hasLength(1));
+      expect(fakeSender.calls, hasLength(2));
+      expect(fakeSender.calls[0].id, criticalStockAlertNotificationId(0));
+      expect(fakeSender.calls[1].id, criticalStockAlertNotificationId(1));
+      expect(fakeSender.calls[0].body, fakeSender.calls[1].body);
     });
 
-    test('a product that recovers above the threshold and drops again is treated as a new episode',
+    test('the same slot firing twice in a row (e.g. the daily re-arm landing early) sends again while still critical',
         () async {
-      final now = DateTime.now();
-      await settingsRepository.updateCriticalStockAlertSlots([(hour: now.hour, minute: now.minute)]);
-      final product = await createCriticalProduct('Indomie Goreng');
+      await createCriticalProduct('Indomie Goreng');
 
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
+
+      expect(fakeSender.calls, hasLength(2));
+    });
+
+    test('a product that recovers above the threshold is excluded from the next slot', () async {
+      final product = await createCriticalProduct('Indomie Goreng');
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
       expect(fakeSender.calls, hasLength(1));
 
-      // Recovers above the threshold, then drops critical again.
       await mutationRepository.recordMutation(
         productId: product.id,
         type: StockMutationType.stockIn,
         quantity: 10,
       );
-      await mutationRepository.recordMutation(
-        productId: product.id,
-        type: StockMutationType.stockOut,
-        quantity: 10,
-      );
 
-      await NotificationService.executeCriticalStockAlertTask(isar, now: now);
+      await NotificationService.executeCriticalStockAlertSlot(isar, 1);
 
-      expect(fakeSender.calls, hasLength(2));
-      expect(fakeSender.calls.last.body, '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan');
+      expect(fakeSender.calls, hasLength(1), reason: 'no longer critical, so slot 1 has nothing to send');
+    });
+
+    test('an archived product is excluded even if still under threshold', () async {
+      final product = await createCriticalProduct('Indomie Goreng');
+      await productRepository.archive(product.id);
+
+      await NotificationService.executeCriticalStockAlertSlot(isar, 0);
+
+      expect(fakeSender.calls, isEmpty);
+    });
+  });
+
+  group('exact-alarm permission', () {
+    test('canScheduleExactAlarms reflects the injected permission state', () async {
+      fakeExactAlarmPermission.canSchedule = false;
+      expect(await NotificationService.canScheduleExactAlarms(), isFalse);
+
+      fakeExactAlarmPermission.canSchedule = true;
+      expect(await NotificationService.canScheduleExactAlarms(), isTrue);
+    });
+
+    test('requestExactAlarmsPermission delegates to the injected permission seam', () async {
+      await NotificationService.requestExactAlarmsPermission();
+
+      expect(fakeExactAlarmPermission.requestCount, 1);
     });
   });
 
@@ -327,7 +484,10 @@ void main() {
         type: StockMutationType.stockOut,
         quantity: 5,
       );
-
+      // That single mutation already leaves dailyVelocity high enough
+      // relative to the remaining currentStock (5) that estimatedDays
+      // lands within the yellow/red band, i.e. urgency != neutral — so
+      // this product counts toward "perlu dikulak" with no further setup.
       await NotificationService.executeDailySummaryTask(isar, now: now);
 
       expect(fakeSender.calls, hasLength(1));

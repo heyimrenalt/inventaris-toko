@@ -7,6 +7,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/app_header.dart';
 
 class ArchivedProductsScreen extends StatefulWidget {
   const ArchivedProductsScreen({super.key, required this.isar});
@@ -58,7 +59,10 @@ class _ArchivedProductsScreenState extends State<ArchivedProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Produk Diarsipkan')),
+      appBar: AppHeader.withBack(
+        title: 'Produk Diarsipkan',
+        onBack: () => Navigator.of(context).pop(),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _products.isEmpty

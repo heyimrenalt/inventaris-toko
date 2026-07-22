@@ -8,6 +8,7 @@ import 'package:inventaris_toko/ui/screens/pengaturan/kelola_kategori_screen.dar
 import 'package:isar_community/isar.dart';
 
 import '../../../data/repositories/test_isar.dart';
+import '../../widget_test_helpers.dart' show expectNoFlutterErrors;
 
 // NOTE on tester.runAsync() + the extra real delay below: KelolaKategoriScreen
 // triggers real Isar FFI calls reactively (from initState and button
@@ -327,6 +328,34 @@ void main() {
           find.textContaining('masih dipakai oleh 1 produk (termasuk sub-kategori)'),
           findsOneWidget,
         );
+      });
+    },
+  );
+
+  // Regression coverage for the category add/rename dialog's controller
+  // lifecycle: the dialog used to dispose its TextEditingController
+  // immediately after showDialog's Future resolved, which raced the
+  // dialog's own exit-transition animation (the AlertDialog/TextField
+  // stay mounted, and the field's EditableText stays listening on the
+  // controller, for the duration of that animation) — a real
+  // disposed-while-still-listened bug, not just a leak. Fixed by owning
+  // the controller through a proper StatefulWidget's initState/dispose
+  // instead (see _CategoryFormDialog in category_form_dialog.dart).
+  testWidgets(
+    'opening, saving, and reopening the add-category dialog 5 times in a row: no exception',
+    (tester) async {
+      await tester.runAsync(() async {
+        await expectNoFlutterErrors(tester, () async {
+          await pumpScreen(tester);
+
+          for (var i = 0; i < 5; i++) {
+            await openAddDialog(tester);
+            await tester.enterText(find.byType(TextField), 'Kategori $i');
+            await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
+            await settleAfterAsyncWork(tester);
+            expect(find.text('Kategori $i'), findsOneWidget);
+          }
+        });
       });
     },
   );

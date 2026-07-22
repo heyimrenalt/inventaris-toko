@@ -109,3 +109,67 @@ class ProductHasHistoryException implements Exception {
       'ProductHasHistoryException: product $productId has $mutationCount '
       'stock mutation(s) and cannot be deleted';
 }
+
+/// Thrown by `DataWipeService.wipeAll` ("Hapus semua data" in Pengaturan)
+/// when one or more Isar collections still couldn't be cleared after the
+/// best-effort per-collection fallback pass. [failedCollections] names
+/// which ones are still unresolved — the UI surfaces this as a "coba
+/// install ulang aplikasi" message, since a collection clear failing even
+/// on retry points at something more fundamental than a transient error.
+class DataWipeException implements Exception {
+  DataWipeException(this.failedCollections);
+
+  final List<String> failedCollections;
+
+  @override
+  String toString() =>
+      'DataWipeException: failed to clear ${failedCollections.join(', ')}';
+}
+
+/// Why `BackupService.validateAndParse` rejected a candidate backup file.
+enum BackupValidationFailureReason {
+  /// The file's contents aren't parseable JSON at all (corrupted/truncated
+  /// download, or not a JSON file to begin with).
+  invalidJson,
+
+  /// Parsed fine, but there's no top-level `"version"` field — not a
+  /// backup file produced by this app at all.
+  missingVersion,
+
+  /// Has a `"version"` field, but not one this app version knows how to
+  /// import (only version 1 is supported today).
+  unsupportedVersion,
+}
+
+/// Thrown by `BackupService.validateAndParse` when the selected file isn't
+/// a usable backup. Callers map [reason] to a specific Indonesian message
+/// (see `PengaturanScreen`) rather than a generic "invalid file" string.
+class BackupValidationException implements Exception {
+  BackupValidationException(this.reason, {this.foundVersion});
+
+  final BackupValidationFailureReason reason;
+
+  /// The `"version"` value actually found in the file, when [reason] is
+  /// [BackupValidationFailureReason.unsupportedVersion].
+  final Object? foundVersion;
+
+  @override
+  String toString() => 'BackupValidationException: $reason (foundVersion: $foundVersion)';
+}
+
+/// Thrown by `BackupService.importBackup` when the import itself fails
+/// after the file has already passed validation — the dangerous case,
+/// since the current data has already been wiped by this point.
+/// [rollbackSucceeded] tells the caller whether the pre-restore snapshot
+/// could be re-applied, so the UI can show either "your previous data is
+/// safe" or "please reinstall" accordingly.
+class BackupRestoreException implements Exception {
+  BackupRestoreException({required this.rollbackSucceeded, this.cause});
+
+  final bool rollbackSucceeded;
+  final Object? cause;
+
+  @override
+  String toString() =>
+      'BackupRestoreException: import failed (rollbackSucceeded: $rollbackSucceeded, cause: $cause)';
+}

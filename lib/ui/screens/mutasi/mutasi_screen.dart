@@ -161,17 +161,12 @@ class _MutasiScreenState extends State<MutasiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          const AppHeader(title: 'Mutasi stok'),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(onRefresh: _handleRefresh, child: _buildBody()),
-          ),
-        ],
-      ),
+      appBar: const AppHeader(title: 'Mutasi stok'),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(onRefresh: _handleRefresh, child: _buildBody()),
       bottomNavigationBar: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(

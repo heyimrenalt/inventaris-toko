@@ -91,6 +91,287 @@ void main() {
 
       expect(product.categoryId, isNull);
     });
+
+    test('creates successfully with unitsPerPack: null (pcs-only product)', () async {
+      final product = await productRepository.create(
+        name: 'Chips',
+        categoryId: categoryId,
+        sellPrice: 1000,
+        unit: 'pcs',
+      );
+
+      expect(product.unitsPerPack, isNull);
+    });
+
+    for (final invalid in [0, 1, -1]) {
+      test('rejects unitsPerPack: $invalid', () async {
+        expect(
+          () => productRepository.create(
+            name: 'Chips',
+            categoryId: categoryId,
+            sellPrice: 1000,
+            unit: 'pcs',
+            unitsPerPack: invalid,
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+      });
+    }
+
+    test('accepts unitsPerPack >= 2', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      expect(product.unitsPerPack, 12);
+    });
+  });
+
+  group('ProductRepository.update unitsPerPack', () {
+    test('leaves unitsPerPack unchanged when not passed', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      final updated = await productRepository.update(id: product.id, name: 'Indomie Goreng');
+
+      expect(updated.unitsPerPack, 12);
+    });
+
+    test('clearUnitsPerPack: true clears it back to pcs-only', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      final updated = await productRepository.update(id: product.id, clearUnitsPerPack: true);
+
+      expect(updated.unitsPerPack, isNull);
+    });
+
+    test('rejects unitsPerPack < 2 on update', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+      );
+
+      expect(
+        () => productRepository.update(id: product.id, unitsPerPack: 1),
+        throwsA(isA<ValidationException>()),
+      );
+    });
+  });
+
+  group('ProductRepository unitsPerDus', () {
+    test('creates successfully with unitsPerDus: null', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      expect(product.unitsPerDus, isNull);
+    });
+
+    for (final invalid in [0, 1, -1]) {
+      test('rejects unitsPerDus: $invalid on create', () async {
+        expect(
+          () => productRepository.create(
+            name: 'Indomie',
+            categoryId: categoryId,
+            sellPrice: 3000,
+            unit: 'pcs',
+            unitsPerPack: 12,
+            unitsPerDus: invalid,
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+      });
+    }
+
+    test(
+      'accepts unitsPerDus without unitsPerPack on create (a dus that skips the pack tier)',
+      () async {
+        final product = await productRepository.create(
+          name: 'Teh Kotak',
+          categoryId: categoryId,
+          sellPrice: 3000,
+          unit: 'pcs',
+          unitsPerDus: 12,
+        );
+
+        expect(product.unitsPerPack, isNull);
+        expect(product.unitsPerDus, 12);
+      },
+    );
+
+    test('accepts unitsPerPack + unitsPerDus together on create', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+        unitsPerDus: 6,
+      );
+
+      expect(product.unitsPerPack, 12);
+      expect(product.unitsPerDus, 6);
+    });
+
+    test('rejects unitsPerDus < 2 on update', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      expect(
+        () => productRepository.update(id: product.id, unitsPerDus: 1),
+        throwsA(isA<ValidationException>()),
+      );
+    });
+
+    test('accepts unitsPerDus on update when unitsPerPack is currently null', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+      );
+
+      final updated = await productRepository.update(id: product.id, unitsPerDus: 6);
+
+      expect(updated.unitsPerPack, isNull);
+      expect(updated.unitsPerDus, 6);
+    });
+
+    test(
+      'clearing unitsPerPack while unitsPerDus is still set leaves the dus tier standing alone',
+      () async {
+        final product = await productRepository.create(
+          name: 'Indomie',
+          categoryId: categoryId,
+          sellPrice: 3000,
+          unit: 'pcs',
+          unitsPerPack: 12,
+          unitsPerDus: 6,
+        );
+
+        final updated = await productRepository.update(id: product.id, clearUnitsPerPack: true);
+
+        expect(updated.unitsPerPack, isNull);
+        expect(updated.unitsPerDus, 6);
+      },
+    );
+
+    test('clearing both unitsPerPack and unitsPerDus together succeeds', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+        unitsPerDus: 6,
+      );
+
+      final updated = await productRepository.update(
+        id: product.id,
+        clearUnitsPerPack: true,
+        clearUnitsPerDus: true,
+      );
+
+      expect(updated.unitsPerPack, isNull);
+      expect(updated.unitsPerDus, isNull);
+    });
+
+    test('clearUnitsPerDus: true clears it while leaving unitsPerPack intact', () async {
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+        unitsPerDus: 6,
+      );
+
+      final updated = await productRepository.update(id: product.id, clearUnitsPerDus: true);
+
+      expect(updated.unitsPerPack, 12);
+      expect(updated.unitsPerDus, isNull);
+    });
+  });
+
+  group('ProductRepository allowsFractionalQuantity', () {
+    test('defaults to false when not passed on create', () async {
+      final product = await productRepository.create(
+        name: 'Beras',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'kg',
+      );
+
+      expect(product.allowsFractionalQuantity, isFalse);
+    });
+
+    test('persists true when passed on create', () async {
+      final product = await productRepository.create(
+        name: 'Beras',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'kg',
+        allowsFractionalQuantity: true,
+      );
+
+      expect(product.allowsFractionalQuantity, isTrue);
+    });
+
+    test('update changes it when passed', () async {
+      final product = await productRepository.create(
+        name: 'Beras',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'kg',
+      );
+
+      final updated = await productRepository.update(
+        id: product.id,
+        allowsFractionalQuantity: true,
+      );
+
+      expect(updated.allowsFractionalQuantity, isTrue);
+    });
+
+    test('update leaves it unchanged when omitted', () async {
+      final product = await productRepository.create(
+        name: 'Beras',
+        categoryId: categoryId,
+        sellPrice: 3000,
+        unit: 'kg',
+        allowsFractionalQuantity: true,
+      );
+
+      final updated = await productRepository.update(id: product.id, name: 'Beras Premium');
+
+      expect(updated.allowsFractionalQuantity, isTrue);
+    });
   });
 
   group('Product.code uniqueness', () {

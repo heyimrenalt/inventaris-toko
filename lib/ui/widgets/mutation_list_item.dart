@@ -35,6 +35,34 @@ class MutationListItem extends StatelessWidget {
 
   bool get _isIn => mutation.type == StockMutationType.stockIn;
 
+  /// "(dicatat: 1 dus)" — a reminder of what unit the user actually
+  /// typed, shown only when that unit is something other than plain pcs
+  /// (the primary quantity above is already the canonical pcs amount, so
+  /// pcs would just repeat it). `null` for mutations recorded before
+  /// this field existed (legacy rows), where there's nothing to show.
+  /// Deliberately doesn't re-derive a full pack/pcs breakdown — that
+  /// would need this widget to also carry the product's
+  /// unitsPerPack/unitsPerDus, which none of its 3 call sites pass today.
+  String? get _enteredUnitCaption {
+    final enteredUnit = mutation.enteredUnit;
+    final enteredQuantity = mutation.enteredQuantity;
+    if (enteredUnit == null || enteredUnit == EnteredUnit.pcs || enteredQuantity == null) {
+      return null;
+    }
+    return '(dicatat: ${formatMutationQuantity(enteredQuantity)} ${_unitLabel(enteredUnit)})';
+  }
+
+  String _unitLabel(EnteredUnit unit) {
+    switch (unit) {
+      case EnteredUnit.pcs:
+        return 'pcs';
+      case EnteredUnit.pack:
+        return 'pack';
+      case EnteredUnit.dus:
+        return 'dus';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = _isIn ? Colors.green[700]! : Colors.red[700]!;
@@ -81,9 +109,21 @@ class MutationListItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '$sign${formatMutationQuantity(mutation.quantity)} $unit',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$sign${formatMutationQuantity(mutation.quantity)} $unit',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+              ),
+              if (_enteredUnitCaption != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _enteredUnitCaption!,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ],
           ),
           if (canCancel) ...[
             const SizedBox(width: 4),

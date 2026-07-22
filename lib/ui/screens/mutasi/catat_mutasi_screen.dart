@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/models/product.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_text_styles.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/mutation_list_item.dart';
+import '../../widgets/unit_qty_field.dart';
 
 /// Quick-entry form for recording a stock mutation. Two entry modes:
 /// - [product] null: starts in product-search mode (reached from the
@@ -44,7 +48,6 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   static const _calculator = PrioritasKulakanCalculator();
 
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _costPriceController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
 
@@ -52,6 +55,13 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   StockMutationType _type = StockMutationType.stockIn;
   List<Product> _searchResults = [];
   List<PrioritasKulakanResult> _frequentlySold = [];
+
+  /// Kept in canonical pcs regardless of which unit [UnitQtyField] is
+  /// currently displaying — see [_enteredUnit]/[_enteredValue] for the
+  /// raw as-typed value, kept only for [StockMutation] history display.
+  double _quantityInPcs = 0;
+  EnteredUnit _enteredUnit = EnteredUnit.pcs;
+  double _enteredValue = 0;
   String? _quantityErrorText;
   _InsufficientStockError? _insufficientStockError;
   bool _saving = false;
@@ -73,6 +83,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   }
 
   Future<void> _loadFrequentlySold() async {
+    final settings = await _appSettingsRepository.get();
     final products = await _productRepository.getAll();
 
     final stockOutByProduct = <int, List<StockMutation>>{};
@@ -84,6 +95,8 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     final results = _calculator.calculateAll(
       products: products,
       stockOutMutationsByProductId: stockOutByProduct,
+      restockLeadTimeDays: settings.restockLeadTimeDays,
+      restockCoverDays: settings.restockCoverDays,
     )..sort((a, b) => b.dailyVelocity.compareTo(a.dailyVelocity));
 
     if (!mounted) return;
@@ -93,7 +106,6 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _quantityController.dispose();
     _costPriceController.dispose();
     _noteController.dispose();
     super.dispose();
@@ -117,13 +129,16 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     });
   }
 
-  void _showScanNotAvailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Pemindaian barcode belum tersedia, silakan ketik manual')),
-    );
-  }
-
   Future<void> _submit() async {
+    // Guards against a second tap slipping through before the button's
+    // `onPressed: _saving ? null : _submit` binding is rebuilt — that
+    // rebuild only happens on the next frame, so two taps dispatched
+    // before then both still hit the old (non-null) callback. Reading
+    // the field directly here (rather than relying on the widget
+    // rebuild) blocks the re-entrant call synchronously, before it can
+    // record a second mutation or pop the route a second time.
+    if (_saving) return;
+
     final product = _selectedProduct;
     if (product == null) return;
 
@@ -132,17 +147,16 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       _insufficientStockError = null;
     });
 
-    final quantity = double.tryParse(_quantityController.text.trim().replaceAll(',', '.'));
-    if (quantity == null || quantity <= 0) {
+    if (_quantityInPcs <= 0) {
       setState(() => _quantityErrorText = 'Jumlah harus lebih dari 0');
       return;
     }
 
-    if (_type == StockMutationType.stockOut && quantity > product.currentStock) {
+    if (_type == StockMutationType.stockOut && _quantityInPcs > product.currentStock) {
       setState(() {
         _insufficientStockError = _InsufficientStockError(
           currentStock: product.currentStock,
-          requestedQuantity: quantity,
+          requestedQuantity: _quantityInPcs,
           unit: product.unit,
         );
       });
@@ -162,9 +176,11 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       final mutation = await _mutationRepository.recordMutation(
         productId: product.id,
         type: _type,
-        quantity: quantity,
+        quantity: _quantityInPcs,
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
         costPricePerUnit: costPricePerUnit,
+        enteredUnit: _enteredUnit,
+        enteredQuantity: _enteredValue,
       );
 
       if (!mounted) return;
@@ -175,7 +191,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '$verb dicatat: $sign${formatMutationQuantity(quantity)} ${product.name}',
+            '$verb dicatat: $sign${formatMutationQuantity(_quantityInPcs)} ${product.name}',
           ),
           duration: const Duration(seconds: 5),
           // SnackBar.persist defaults to true whenever action is non-null
@@ -220,7 +236,10 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   Widget build(BuildContext context) {
     final product = _selectedProduct;
     return Scaffold(
-      appBar: AppBar(title: const Text('Catat Mutasi')),
+      appBar: AppHeader.withBack(
+        title: 'Catat Mutasi',
+        onBack: () => Navigator.of(context).pop(),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: product == null ? _buildSearch() : _buildForm(product),
@@ -235,7 +254,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
         if (_frequentlySold.isNotEmpty) ...[
           const Text(
             'Sering keluar',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: AppTextStyles.bodyMedium,
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -257,29 +276,16 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
           ),
           const SizedBox(height: 16),
         ],
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('catat_mutasi_search'),
-                controller: _searchController,
-                autofocus: true,
-                style: const TextStyle(fontSize: 16),
-                decoration: const InputDecoration(
-                  labelText: 'Cari produk',
-                  hintText: 'Ketik nama produk',
-                ),
-                onChanged: _search,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filledTonal(
-              onPressed: _showScanNotAvailable,
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: 'Pindai barcode',
-            ),
-          ],
+        TextField(
+          key: const Key('catat_mutasi_search'),
+          controller: _searchController,
+          autofocus: true,
+          style: AppTextStyles.body,
+          decoration: const InputDecoration(
+            labelText: 'Cari produk',
+            hintText: 'Ketik nama produk',
+          ),
+          onChanged: _search,
         ),
         const SizedBox(height: 16),
         Expanded(
@@ -289,7 +295,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                     _searchController.text.trim().isEmpty
                         ? 'Ketik nama produk untuk mencari.'
                         : 'Produk tidak ditemukan.',
-                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    style: AppTextStyles.body.copyWith(color: AppColors.gray500),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -300,10 +306,10 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                     final product = _searchResults[index];
                     return ListTile(
                       minVerticalPadding: 16,
-                      title: Text(product.name, style: const TextStyle(fontSize: 16)),
+                      title: Text(product.name, style: AppTextStyles.body),
                       subtitle: Text(
                         'Stok saat ini: ${formatMutationQuantity(product.currentStock)} ${product.unit}',
-                        style: const TextStyle(fontSize: 14),
+                        style: AppTextStyles.caption,
                       ),
                       onTap: () => _selectProduct(product),
                     );
@@ -323,11 +329,11 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
             key: const Key('catat_mutasi_product_context'),
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(8)),
             child: Text(
               '${product.name} — stok saat ini: ${formatMutationQuantity(product.currentStock)} '
               '${product.unit}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: AppTextStyles.bodyMedium,
             ),
           ),
           const SizedBox(height: 20),
@@ -338,7 +344,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                   key: const Key('catat_mutasi_type_in'),
                   label: 'Stok masuk',
                   icon: Icons.arrow_upward,
-                  color: Colors.green[700]!,
+                  color: AppColors.primary,
                   selected: _type == StockMutationType.stockIn,
                   onTap: () => setState(() => _type = StockMutationType.stockIn),
                 ),
@@ -349,7 +355,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                   key: const Key('catat_mutasi_type_out'),
                   label: 'Stok keluar',
                   icon: Icons.arrow_downward,
-                  color: Colors.red[700]!,
+                  color: AppColors.redPrimary,
                   selected: _type == StockMutationType.stockOut,
                   onTap: () => setState(() => _type = StockMutationType.stockOut),
                 ),
@@ -357,32 +363,40 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          TextField(
-            key: const Key('catat_mutasi_quantity'),
-            controller: _quantityController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 16),
-            decoration: InputDecoration(
-              labelText: 'Jumlah',
-              errorText: _quantityErrorText,
-              // Built as a widget (not `errorText`) so the current-stock
-              // figure can be bolded and the message is never line-capped
-              // or ellipsized — `errorText` internally renders with
-              // maxLines/TextOverflow.ellipsis, which risks clipping this
-              // message since it's longer than the app's other inline
-              // errors.
-              error: _insufficientStockError == null
-                  ? null
-                  : _InsufficientStockErrorText(error: _insufficientStockError!),
-            ),
+          UnitQtyField(
+            product: product,
+            initialQtyInPcs: _quantityInPcs,
+            initialEnteredUnit: _enteredUnit,
+            label: 'Jumlah',
+            onChanged: (qtyInPcs, enteredUnit, enteredValue) {
+              _quantityInPcs = qtyInPcs;
+              _enteredUnit = enteredUnit;
+              _enteredValue = enteredValue;
+            },
           ),
+          if (_quantityErrorText != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 12),
+              child: Text(
+                _quantityErrorText!,
+                style: AppTextStyles.caption.copyWith(color: AppColors.redPrimary),
+              ),
+            ),
+          // A separate widget (not folded into UnitQtyField's own error
+          // slot) so the current-stock figure can be bolded and the
+          // message is never line-capped or ellipsized.
+          if (_insufficientStockError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 12),
+              child: _InsufficientStockErrorText(error: _insufficientStockError!),
+            ),
           if (_type == StockMutationType.stockIn) ...[
             const SizedBox(height: 16),
             TextField(
               key: const Key('catat_mutasi_cost_price'),
               controller: _costPriceController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(fontSize: 16),
+              style: AppTextStyles.body,
               decoration: const InputDecoration(
                 labelText: 'Harga modal per unit (opsional)',
                 hintText: 'Kosongkan jika sama dengan sebelumnya',
@@ -394,7 +408,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
           TextField(
             key: const Key('catat_mutasi_note'),
             controller: _noteController,
-            style: const TextStyle(fontSize: 16),
+            style: AppTextStyles.body,
             decoration: const InputDecoration(
               labelText: 'Catatan (opsional)',
               hintText: 'contoh: dari supplier A, terjual',
@@ -413,7 +427,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Simpan', style: TextStyle(fontSize: 16)),
+                  : const Text('Simpan', style: AppTextStyles.body),
             ),
           ),
         ],
@@ -445,15 +459,15 @@ class _TypeButton extends StatelessWidget {
       child: selected
           ? ElevatedButton.icon(
               onPressed: onTap,
-              style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: AppColors.white),
               icon: Icon(icon),
-              label: Text(label, style: const TextStyle(fontSize: 16)),
+              label: Text(label, style: AppTextStyles.body),
             )
           : OutlinedButton.icon(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(foregroundColor: color, side: BorderSide(color: color)),
               icon: Icon(icon),
-              label: Text(label, style: const TextStyle(fontSize: 16)),
+              label: Text(label, style: AppTextStyles.body),
             ),
     );
   }

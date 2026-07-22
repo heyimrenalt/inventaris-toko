@@ -29,6 +29,9 @@ class _FakeNotificationSender implements NotificationSender {
   }) async {
     bodies.add(body);
   }
+
+  @override
+  Future<void> cancelAllNotifications() async {}
 }
 
 void main() {
@@ -118,74 +121,90 @@ void main() {
     });
   });
 
-  testWidgets('adding a product shows it in the cart with a stepper at quantity 1', (tester) async {
+  testWidgets('adding a product shows it in the cart with a unit qty field at quantity 1', (tester) async {
     await tester.runAsync(() async {
-      await createProduct(name: 'Gula Pasir', initialStock: 12);
+      final product = await createProduct(name: 'Gula Pasir', initialStock: 12);
 
       await pumpWithBackStack(tester);
       await searchAndAdd(tester, 'gula', 'Gula Pasir');
 
       expect(find.textContaining('Gula Pasir — stok: 12 pcs'), findsOneWidget);
-      expect(find.byKey(const Key('quantity_stepper_display')), findsOneWidget);
       expect(
-        find.descendant(
-          of: find.byKey(const Key('quantity_stepper_display')),
-          matching: find.text('1'),
-        ),
-        findsOneWidget,
+        tester.widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}'))).controller!.text,
+        '1',
       );
       expect(find.text('Simpan semua (1 barang)'), findsOneWidget);
     });
   });
 
-  testWidgets('stepper + increments quantity, - decrements, cannot go below 1', (tester) async {
+  testWidgets('stepper + increments quantity, - decrements down to 0', (tester) async {
     await tester.runAsync(() async {
-      await createProduct(name: 'Gula Pasir', initialStock: 12);
+      final product = await createProduct(name: 'Gula Pasir', initialStock: 12);
 
       await pumpWithBackStack(tester);
       await searchAndAdd(tester, 'gula', 'Gula Pasir');
 
-      await tester.tap(find.byKey(const Key('quantity_stepper_increment')));
+      await tester.tap(find.byKey(Key('unit_qty_stepper_plus_${product.id}')));
       await tester.pump();
       expect(
-        find.descendant(
-          of: find.byKey(const Key('quantity_stepper_display')),
-          matching: find.text('2'),
-        ),
-        findsOneWidget,
+        tester.widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}')))
+            .controller!
+            .text,
+        '2',
       );
 
-      await tester.tap(find.byKey(const Key('quantity_stepper_decrement')));
+      await tester.tap(find.byKey(Key('unit_qty_stepper_minus_${product.id}')));
       await tester.pump();
-      await tester.tap(find.byKey(const Key('quantity_stepper_decrement')));
+      await tester.tap(find.byKey(Key('unit_qty_stepper_minus_${product.id}')));
       await tester.pump();
 
       expect(
-        find.descendant(
-          of: find.byKey(const Key('quantity_stepper_display')),
-          matching: find.text('1'),
-        ),
-        findsOneWidget,
+        tester.widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}')))
+            .controller!
+            .text,
+        '0',
       );
       final decrementButton = tester.widget<IconButton>(
-        find.byKey(const Key('quantity_stepper_decrement')),
+        find.byKey(Key('unit_qty_stepper_minus_${product.id}')),
       );
       expect(decrementButton.onPressed, isNull);
     });
   });
 
   testWidgets(
-    'pre-flight validation: quantity above currentStock shows an inline error and disables save',
+    'pre-flight validation: quantity of 0 shows an inline error and disables save',
     (tester) async {
       await tester.runAsync(() async {
-        await createProduct(name: 'Gula Pasir', initialStock: 2);
+        final product = await createProduct(name: 'Gula Pasir', initialStock: 12);
 
         await pumpWithBackStack(tester);
         await searchAndAdd(tester, 'gula', 'Gula Pasir');
 
-        await tester.tap(find.byKey(const Key('quantity_stepper_increment')));
+        await tester.tap(find.byKey(Key('unit_qty_stepper_minus_${product.id}')));
         await tester.pump();
-        await tester.tap(find.byKey(const Key('quantity_stepper_increment')));
+
+        expect(find.textContaining('Jumlah harus lebih dari 0'), findsOneWidget);
+
+        final saveButton = tester.widget<ElevatedButton>(
+          find.byKey(const Key('batch_save_button')),
+        );
+        expect(saveButton.onPressed, isNull);
+      });
+    },
+  );
+
+  testWidgets(
+    'pre-flight validation: quantity above currentStock shows an inline error and disables save',
+    (tester) async {
+      await tester.runAsync(() async {
+        final product = await createProduct(name: 'Gula Pasir', initialStock: 2);
+
+        await pumpWithBackStack(tester);
+        await searchAndAdd(tester, 'gula', 'Gula Pasir');
+
+        await tester.tap(find.byKey(Key('unit_qty_stepper_plus_${product.id}')));
+        await tester.pump();
+        await tester.tap(find.byKey(Key('unit_qty_stepper_plus_${product.id}')));
         await tester.pump();
         // Quantity is now 3, exceeding the stock of 2.
 
@@ -338,4 +357,84 @@ void main() {
       });
     },
   );
+
+  group('unit toggle (pcs/pack/dus)', () {
+    testWidgets(
+      'switching a row to dus and entering "1" saves the correct pcs quantity and entered-unit history',
+      (tester) async {
+        await tester.runAsync(() async {
+          final category = await categoryRepository.create('Snacks');
+          final product = await productRepository.create(
+            name: 'Indomie',
+            categoryId: category.id,
+            sellPrice: 3000,
+            unit: 'pcs',
+            initialStock: 100,
+            unitsPerPack: 12,
+            unitsPerDus: 6,
+          );
+
+          await pumpWithBackStack(tester);
+          await searchAndAdd(tester, 'indomie', 'Indomie');
+
+          await tester.tap(find.descendant(
+            of: find.byKey(Key('unit_qty_toggle_${product.id}')),
+            matching: find.text('dus'),
+          ));
+          await tester.pump();
+          await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '1');
+          await tester.pump();
+
+          await tester.tap(find.byKey(const Key('batch_save_button')));
+          await settleAfterAsyncWork(tester);
+
+          final updated = await productRepository.getById(product.id);
+          expect(updated!.currentStock, 28); // 100 - 72.
+
+          final history = await stockMutationRepository.getHistoryForProduct(product.id);
+          final saved = history.first;
+          expect(saved.quantity, 72);
+          expect(saved.enteredUnit, EnteredUnit.dus);
+          expect(saved.enteredQuantity, 1);
+        });
+      },
+    );
+
+    testWidgets('re-adding an in-cart product via search bumps it by 1 in its current unit',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          initialStock: 100,
+          unitsPerPack: 12,
+        );
+
+        await pumpWithBackStack(tester);
+        await searchAndAdd(tester, 'indomie', 'Indomie');
+
+        await tester.tap(find.descendant(
+          of: find.byKey(Key('unit_qty_toggle_${product.id}')),
+          matching: find.text('pack'),
+        ));
+        await tester.pump();
+        await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '2');
+        await tester.pump();
+
+        // Re-selecting the same product from search bumps by 1 pack
+        // (24 pcs), not 1 pcs.
+        await searchAndAdd(tester, 'indomie', 'Indomie');
+
+        expect(
+          tester.widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}')))
+              .controller!
+              .text,
+          '3',
+        );
+      });
+    });
+  });
 }

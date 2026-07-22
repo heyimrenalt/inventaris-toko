@@ -30,6 +30,13 @@ abstract class PhotoStorageService {
   /// Deletes a previously saved photo file. Safe to call even if the
   /// file no longer exists.
   Future<void> deletePhoto(String path);
+
+  /// Writes [bytes] as a new permanent photo file (same photos directory
+  /// [pickAndSavePhoto] uses) and returns its path. Used by backup
+  /// restore to recreate a product's photo from the base64 payload
+  /// embedded in the backup file — there is no picker interaction here,
+  /// just persisting already-decoded bytes.
+  Future<String> writePhotoBytes(List<int> bytes, {required String extension});
 }
 
 class ImagePickerPhotoStorageService implements PhotoStorageService {
@@ -77,5 +84,19 @@ class ImagePickerPhotoStorageService implements PhotoStorageService {
       // Best-effort cleanup; an already-missing or locked file isn't
       // worth surfacing to the user.
     }
+  }
+
+  @override
+  Future<String> writePhotoBytes(List<int> bytes, {required String extension}) async {
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final photosDir = Directory(p.join(documentsDir.path, _photosDirName));
+    if (!await photosDir.exists()) {
+      await photosDir.create(recursive: true);
+    }
+
+    final fileName = '${DateTime.now().microsecondsSinceEpoch}$extension';
+    final destination = p.join(photosDir.path, fileName);
+    await File(destination).writeAsBytes(bytes);
+    return destination;
   }
 }

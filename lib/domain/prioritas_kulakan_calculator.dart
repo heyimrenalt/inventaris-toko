@@ -1,5 +1,6 @@
 import '../data/models/product.dart';
 import '../data/models/stock_mutation.dart';
+import 'velocity_calculator.dart';
 
 enum PriorityUrgency { red, yellow, neutral }
 
@@ -7,6 +8,7 @@ class PrioritasKulakanResult {
   const PrioritasKulakanResult({
     required this.product,
     required this.dailyVelocity,
+    required this.dataAgeDays,
     required this.estimatedDaysRemaining,
     required this.isOutOfStock,
     required this.urgency,
@@ -16,28 +18,23 @@ class PrioritasKulakanResult {
   final Product product;
   final double dailyVelocity;
 
-  /// currentStock ÷ dailyVelocity. Still populated (as 0) when
-  /// [isOutOfStock] is true, so callers can sort on this field
-  /// uniformly — but it must never be displayed literally as a fractional
-  /// day count; see [isBelowOneDay].
-  final double estimatedDaysRemaining;
+  /// `min(30, days since the earliest counted stockOut mutation)` — for a
+  /// UI caption like "berdasarkan rata-rata {dataAgeDays} hari terakhir".
+  final int dataAgeDays;
+
+  /// currentStock ÷ dailyVelocity, or `null` when there's nothing
+  /// meaningful to show: the product is out of stock (a fact, not a
+  /// prediction — see [isOutOfStock]) or [dailyVelocity] is zero.
+  final double? estimatedDaysRemaining;
 
   final bool isOutOfStock;
 
   final PriorityUrgency urgency;
 
-  /// Suggested quantity to buy so currentStock covers 7 more days at the
-  /// current sell rate: `ceil(dailyVelocity × 7) − currentStock`, never
-  /// less than 1 — a product that already has 7+ days of cover still gets
-  /// a token restock suggestion rather than 0, since this number only
-  /// feeds a shopping-list line the user can edit after sharing anyway.
+  /// Suggested quantity to buy so currentStock covers
+  /// `AppSettings.restockCoverDays` more days at the current sell rate:
+  /// `max(1, ceil(dailyVelocity × restockCoverDays) − currentStock)`.
   final int suggestedRestockQty;
-
-  /// True when there's less than a full day of stock left, including the
-  /// [isOutOfStock] case. Display code should show a "Waktunya kulakan!"
-  /// label instead of "X hari lagi" (or a "0"/fractional day count) when
-  /// this is true.
-  bool get isBelowOneDay => isOutOfStock || estimatedDaysRemaining < 1;
 }
 
 /// Pure velocity/priority calculation for "prioritas kulakan" (purchase
@@ -48,59 +45,89 @@ class PrioritasKulakanResult {
 /// data-loading logic) is responsible for fetching the real data from
 /// Isar and feeding it in.
 ///
-/// v1 is intentionally a simple all-time-average velocity model — no
-/// weighting of recent sales, no seasonality. Refining that is deferred
-/// until there's real usage data to tune it against.
+/// Velocity itself is computed by [VelocityCalculator] (a 70/30 blend of
+/// recent and all-time sell rate); this class turns that number into the
+/// restock-priority fields the "Prioritas Kulakan" screens need.
+///
+/// Urgency rules, in priority order:
+/// 1. `currentStock <= 0` → red — an empty shelf is a fact, not a
+///    prediction.
+/// 2. `dailyVelocity == 0` → neutral, no estimated-days number shown.
+/// 3. Otherwise, `estimatedDays = currentStock ÷ dailyVelocity` compared
+///    against `restockLeadTimeDays` / `2 × restockLeadTimeDays`.
 class PrioritasKulakanCalculator {
   const PrioritasKulakanCalculator();
 
-  static const int redThresholdDays = 2;
-  static const int yellowThresholdDays = 7;
+  static const VelocityCalculator _velocityCalculator = VelocityCalculator();
 
-  /// Returns null when [stockOutMutations] is empty: a product with no
-  /// stockOut history ever has no velocity to estimate from, so it isn't
-  /// eligible to appear in "Prioritas Kulakan" at all.
+  /// Returns null when [stockOutMutations] has no real (non-undo) stockOut
+  /// entries: a product with no sales history ever has no velocity to
+  /// estimate from, so it isn't eligible to appear in "Prioritas Kulakan"
+  /// at all.
   PrioritasKulakanResult? calculate({
     required Product product,
     required List<StockMutation> stockOutMutations,
+    required int restockLeadTimeDays,
+    required int restockCoverDays,
     DateTime? now,
   }) {
-    if (stockOutMutations.isEmpty) return null;
+    final velocity = _velocityCalculator.calculate(
+      stockOutMutations: stockOutMutations,
+      now: now,
+    );
+    if (velocity.stockOutCount == 0) return null;
 
-    final totalQuantity =
-        stockOutMutations.fold<double>(0, (sum, mutation) => sum + mutation.quantity);
-    final earliestDate = stockOutMutations
-        .map((mutation) => mutation.createdAt)
-        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final dailyVelocity = velocity.dailyVelocity;
+    final currentStock = product.currentStock;
+    final isOutOfStock = currentStock <= 0;
 
-    final dailyVelocity = totalQuantity / _daysSince(earliestDate, now ?? DateTime.now());
+    double? estimatedDaysRemaining;
+    final PriorityUrgency urgency;
 
-    final isOutOfStock = product.currentStock <= 0;
-    final estimatedDaysRemaining = isOutOfStock ? 0.0 : product.currentStock / dailyVelocity;
+    if (isOutOfStock) {
+      urgency = PriorityUrgency.red;
+    } else if (dailyVelocity == 0) {
+      urgency = PriorityUrgency.neutral;
+    } else {
+      final days = currentStock / dailyVelocity;
+      estimatedDaysRemaining = days;
+      if (days < restockLeadTimeDays) {
+        urgency = PriorityUrgency.red;
+      } else if (days <= restockLeadTimeDays * 2) {
+        urgency = PriorityUrgency.yellow;
+      } else {
+        urgency = PriorityUrgency.neutral;
+      }
+    }
 
     return PrioritasKulakanResult(
       product: product,
       dailyVelocity: dailyVelocity,
+      dataAgeDays: velocity.dataAgeDays,
       estimatedDaysRemaining: estimatedDaysRemaining,
       isOutOfStock: isOutOfStock,
-      urgency: _urgencyFor(estimatedDaysRemaining, isOutOfStock),
-      suggestedRestockQty: _suggestedRestockQty(dailyVelocity, product.currentStock),
+      urgency: urgency,
+      suggestedRestockQty: _suggestedRestockQty(dailyVelocity, currentStock, restockCoverDays),
     );
   }
 
-  int _suggestedRestockQty(double dailyVelocity, double currentStock) {
-    final needed = (dailyVelocity * 7).ceil() - currentStock;
+  int _suggestedRestockQty(double dailyVelocity, double currentStock, int restockCoverDays) {
+    final needed = (dailyVelocity * restockCoverDays).ceil() - currentStock;
     return needed.ceil() < 1 ? 1 : needed.ceil();
   }
 
   /// Convenience for what the Beranda and Prioritas Kulakan screens
-  /// actually need: every eligible product's result, sorted ascending by
-  /// estimated days remaining (most urgent first). Products with no
-  /// stockOut history (i.e. [calculate] would return null) are silently
-  /// excluded.
+  /// actually need: every eligible product's result, sorted most-urgent
+  /// first (red, then yellow, then neutral; ties broken by
+  /// [PrioritasKulakanResult.estimatedDaysRemaining] ascending, out-of-
+  /// stock products sorting first within red since they have no
+  /// estimate). Products with no stockOut history (i.e. [calculate]
+  /// would return null) are silently excluded.
   List<PrioritasKulakanResult> calculateAll({
     required List<Product> products,
     required Map<int, List<StockMutation>> stockOutMutationsByProductId,
+    required int restockLeadTimeDays,
+    required int restockCoverDays,
     DateTime? now,
   }) {
     final results = <PrioritasKulakanResult>[];
@@ -108,27 +135,54 @@ class PrioritasKulakanCalculator {
       final result = calculate(
         product: product,
         stockOutMutations: stockOutMutationsByProductId[product.id] ?? const [],
+        restockLeadTimeDays: restockLeadTimeDays,
+        restockCoverDays: restockCoverDays,
         now: now,
       );
       if (result != null) results.add(result);
     }
-    results.sort((a, b) => a.estimatedDaysRemaining.compareTo(b.estimatedDaysRemaining));
+    results.sort(_compareUrgency);
     return results;
   }
 
-  /// Whole calendar days between [earliest] and [now], minimum 1 — a
-  /// single stockOut mutation recorded today would otherwise divide by
-  /// zero.
-  int _daysSince(DateTime earliest, DateTime now) {
-    final earliestDate = DateTime(earliest.year, earliest.month, earliest.day);
-    final nowDate = DateTime(now.year, now.month, now.day);
-    final days = nowDate.difference(earliestDate).inDays;
-    return days < 1 ? 1 : days;
+  int _compareUrgency(PrioritasKulakanResult a, PrioritasKulakanResult b) {
+    final rankCompare = _urgencyRank(a.urgency).compareTo(_urgencyRank(b.urgency));
+    if (rankCompare != 0) return rankCompare;
+
+    final aDays = a.estimatedDaysRemaining ?? (a.isOutOfStock ? -1 : double.infinity);
+    final bDays = b.estimatedDaysRemaining ?? (b.isOutOfStock ? -1 : double.infinity);
+    return aDays.compareTo(bDays);
   }
 
-  PriorityUrgency _urgencyFor(double estimatedDaysRemaining, bool isOutOfStock) {
-    if (isOutOfStock || estimatedDaysRemaining <= redThresholdDays) return PriorityUrgency.red;
-    if (estimatedDaysRemaining <= yellowThresholdDays) return PriorityUrgency.yellow;
-    return PriorityUrgency.neutral;
+  int _urgencyRank(PriorityUrgency urgency) {
+    switch (urgency) {
+      case PriorityUrgency.red:
+        return 0;
+      case PriorityUrgency.yellow:
+        return 1;
+      case PriorityUrgency.neutral:
+        return 2;
+    }
   }
+}
+
+/// Formats a positive day count for display, per "Prioritas Kulakan"'s
+/// UI copy rules: sub-day estimates and multi-month tails are both
+/// misleading as raw numbers (a "0 hari" or "847 hari" reads as false
+/// precision), so both ends are clamped to a phrase instead.
+String formatEstimatedDaysLabel(double days) {
+  if (days < 1) return 'kurang dari 1 hari';
+  if (days > 30) return 'lebih dari 30 hari';
+  return '${days.round()} hari lagi';
+}
+
+/// Formats [velocity] to 1 decimal place, stripping a trailing ".0" (so
+/// `9.0` reads as `9`, while `1.5` stays `1.5`) — used anywhere a daily
+/// sell rate is shown in the UI.
+String formatVelocity(double velocity) {
+  final rounded = (velocity * 10).round() / 10;
+  if (rounded == rounded.roundToDouble()) {
+    return rounded.toInt().toString();
+  }
+  return rounded.toStringAsFixed(1);
 }

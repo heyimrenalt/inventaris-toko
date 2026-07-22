@@ -22,4 +22,12 @@ class FakePhotoStorageService implements PhotoStorageService {
   Future<void> deletePhoto(String path) async {
     deletedPaths.add(path);
   }
+
+  final List<List<int>> writtenBytes = [];
+
+  @override
+  Future<String> writePhotoBytes(List<int> bytes, {required String extension}) async {
+    writtenBytes.add(bytes);
+    return '/fake/photos/restored_${writtenBytes.length}$extension';
+  }
 }

@@ -36,6 +36,22 @@ class AppSettings {
 
   int? criticalStockAlertMinute3;
 
+  /// How many days ahead of running out "Prioritas Kulakan" starts
+  /// warning — drives urgency (see `PrioritasKulakanCalculator`). 1-90.
+  int restockLeadTimeDays = 3;
+
+  /// How many days of stock a suggested restock quantity should cover —
+  /// drives the suggested quantity (see `PrioritasKulakanCalculator`).
+  /// 1-90.
+  int restockCoverDays = 7;
+
+  /// Whether the one-time "Notifikasi tidak muncul?" OEM battery info
+  /// dialog (see `PengaturanScreen`) has already been dismissed. Defaults
+  /// to `false` for both fresh installs and legacy rows written before
+  /// this field existed (Isar zero-fills a missing bool field to
+  /// `false`), so the dialog still shows exactly once for either case.
+  bool batteryOptimizationDialogDismissed = false;
+
   /// The 1-3 configured "Alert stok kritis" times, derived from the slot
   /// fields above. Never empty: slot 1 always contributes.
   @ignore

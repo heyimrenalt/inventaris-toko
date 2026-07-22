@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../data/models/product.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
+import 'stock_badge.dart';
 
-/// A single row in the Produk list: a left-edge color bar (green/red by
-/// stock level — an actual visible strip, not a small dot, per the "color
-/// used meaningfully" design principle), a thumbnail, name/category, and
-/// current stock.
+/// A single row in the Produk list: thumbnail, product name/category info,
+/// and stock badge (colored with quantity and unit).
 class ProductListItem extends StatelessWidget {
   const ProductListItem({
     super.key,
@@ -20,59 +21,57 @@ class ProductListItem extends StatelessWidget {
   final String categoryName;
   final VoidCallback onTap;
 
-  bool get _isLowStock => product.currentStock < product.minStockThreshold;
+  StockLevel get _stockLevel {
+    if (product.currentStock <= 0) return StockLevel.danger;
+    if (product.currentStock < product.minStockThreshold) return StockLevel.warning;
+    return StockLevel.safe;
+  }
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: SizedBox(
-        height: 76,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              key: Key('stock_indicator_${product.id}'),
-              width: 6,
-              color: _isLowStock ? Colors.red : Colors.green,
-            ),
-            const SizedBox(width: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: _Thumbnail(photoPath: product.photoPath),
-            ),
+            _Thumbnail(photoPath: product.photoPath),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     product.name,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: AppTextStyles.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
-                    categoryName,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    '$categoryName · Rp ${_formatPrice(product.sellPrice)}',
+                    style: AppTextStyles.caption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Text(
-                '${_formatQuantity(product.currentStock)} ${product.unit}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _isLowStock ? Colors.red[700] : Colors.green[700],
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                StockBadge(
+                  text: _formatQuantity(product.currentStock),
+                  level: _stockLevel,
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  product.unit,
+                  style: AppTextStyles.caption.copyWith(fontSize: 10),
+                ),
+              ],
             ),
           ],
         ),
@@ -88,6 +87,13 @@ String _formatQuantity(double value) {
   return value.toStringAsFixed(1);
 }
 
+String _formatPrice(double price) {
+  return price.toInt().toString().replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (m) => '.',
+  );
+}
+
 class _Thumbnail extends StatelessWidget {
   const _Thumbnail({required this.photoPath});
 
@@ -97,7 +103,7 @@ class _Thumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = photoPath;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: SizedBox(
         width: 52,
         height: 52,
@@ -114,8 +120,8 @@ class _Thumbnail extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      color: Colors.grey[300],
-      child: Icon(Icons.inventory_2_outlined, color: Colors.grey[600]),
+      color: AppColors.gray100,
+      child: const Icon(Icons.inventory_2_outlined, color: AppColors.gray500),
     );
   }
 }

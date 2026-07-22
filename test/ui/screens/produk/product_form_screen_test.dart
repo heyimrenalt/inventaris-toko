@@ -73,6 +73,9 @@ void main() {
       final category = await categoryRepository.create('Snacks');
       await pumpForm(tester);
 
+      // Barcode scanning was dropped from this app — no QR icon anywhere.
+      expect(find.byIcon(Icons.qr_code_scanner), findsNothing);
+
       await tester.enterText(find.byKey(const Key('product_form_name')), 'Chips');
       await selectCategory(tester, 'Snacks');
       await tester.enterText(find.byKey(const Key('product_form_price')), '5000');
@@ -474,4 +477,446 @@ void main() {
       });
     },
   );
+
+  testWidgets('add flow: leaving "Isi per pack" blank creates a pcs-only product', (tester) async {
+    await tester.runAsync(() async {
+      await pumpForm(tester);
+
+      await tester.enterText(find.byKey(const Key('product_form_name')), 'Chips');
+      await tester.enterText(find.byKey(const Key('product_form_price')), '5000');
+      await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+
+      await tapSubmit(tester);
+
+      final products = await productRepository.getAll();
+      expect(products.first.unitsPerPack, isNull);
+    });
+  });
+
+  testWidgets('add flow: a valid "Isi per pack" is saved on the product', (tester) async {
+    await tester.runAsync(() async {
+      await pumpForm(tester);
+
+      await tester.enterText(find.byKey(const Key('product_form_name')), 'Indomie');
+      await tester.enterText(find.byKey(const Key('product_form_price')), '3000');
+      await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+      await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '12');
+
+      await tapSubmit(tester);
+
+      final products = await productRepository.getAll();
+      expect(products.first.unitsPerPack, 12);
+    });
+  });
+
+  for (final invalid in ['0', '1', '-1', 'abc']) {
+    testWidgets(
+      'add flow: "Isi per pack" of "$invalid" shows an inline error and does not submit',
+      (tester) async {
+        await tester.runAsync(() async {
+          await pumpForm(tester);
+
+          await tester.enterText(find.byKey(const Key('product_form_name')), 'Indomie');
+          await tester.enterText(find.byKey(const Key('product_form_price')), '3000');
+          await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+          await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), invalid);
+
+          await tapSubmit(tester);
+
+          expect(
+            find.text('Isi per pack harus angka bulat >= 2 (kosongkan jika hanya per pcs)'),
+            findsOneWidget,
+          );
+          expect(await productRepository.getAll(), isEmpty);
+        });
+      },
+    );
+  }
+
+  testWidgets('edit flow: "Isi per pack" is pre-filled from the existing product', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      await pumpForm(tester, existing: product);
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('product_form_units_per_pack')))
+            .controller!
+            .text,
+        '12',
+      );
+    });
+  });
+
+  testWidgets('edit flow: clearing "Isi per pack" saves the product back to pcs-only', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+      );
+
+      await pumpForm(tester, existing: product);
+
+      await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '');
+      await tapSubmit(tester);
+
+      final updated = await productRepository.getById(product.id);
+      expect(updated!.unitsPerPack, isNull);
+    });
+  });
+
+  testWidgets(
+    'add flow: "Isi per dus" can be filled without "Isi per pack" (a dus that skips the pack '
+    'tier — e.g. "1 dus = 12 pcs" directly)',
+    (tester) async {
+      await tester.runAsync(() async {
+        await categoryRepository.create('Snacks');
+        await pumpForm(tester);
+        await tester.enterText(find.byKey(const Key('product_form_name')), 'Teh Kotak');
+        await selectCategory(tester, 'Snacks');
+        await tester.enterText(find.byKey(const Key('product_form_price')), '3000');
+        await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+        await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '12');
+
+        await tapSubmit(tester);
+
+        final products = await productRepository.getAll();
+        expect(products.first.unitsPerPack, isNull);
+        expect(products.first.unitsPerDus, 12);
+      });
+    },
+  );
+
+  testWidgets('add flow: a valid "Isi per pack" + "Isi per dus" is saved on the product',
+      (tester) async {
+    await tester.runAsync(() async {
+      await categoryRepository.create('Snacks');
+      await pumpForm(tester);
+      await tester.enterText(find.byKey(const Key('product_form_name')), 'Indomie');
+      await selectCategory(tester, 'Snacks');
+      await tester.enterText(find.byKey(const Key('product_form_price')), '3000');
+      await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+      await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '12');
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '6');
+
+      await tapSubmit(tester);
+
+      final products = await productRepository.getAll();
+      expect(products.first.unitsPerPack, 12);
+      expect(products.first.unitsPerDus, 6);
+    });
+  });
+
+  for (final invalid in ['0', '1', '-1', 'abc']) {
+    testWidgets(
+      'add flow: "Isi per dus" of "$invalid" shows an inline error and does not submit',
+      (tester) async {
+        await tester.runAsync(() async {
+          await pumpForm(tester);
+          await tester.enterText(find.byKey(const Key('product_form_name')), 'Indomie');
+          await tester.enterText(find.byKey(const Key('product_form_price')), '3000');
+          await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+          await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '12');
+          await tester.pump();
+          await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), invalid);
+
+          await tapSubmit(tester);
+
+          expect(find.text('Isi per dus harus angka bulat >= 2'), findsOneWidget);
+          expect(await productRepository.getAll(), isEmpty);
+        });
+      },
+    );
+  }
+
+  testWidgets('edit flow: "Isi per dus" is pre-filled from the existing product', (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+        unitsPerDus: 6,
+      );
+      await pumpForm(tester, existing: product);
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('product_form_units_per_dus')))
+            .controller!
+            .text,
+        '6',
+      );
+    });
+  });
+
+  testWidgets('edit flow: clearing "Isi per dus" saves it back to null, leaving "Isi per pack" intact',
+      (tester) async {
+    await tester.runAsync(() async {
+      final category = await categoryRepository.create('Snacks');
+      final product = await productRepository.create(
+        name: 'Indomie',
+        categoryId: category.id,
+        sellPrice: 3000,
+        unit: 'pcs',
+        unitsPerPack: 12,
+        unitsPerDus: 6,
+      );
+      await pumpForm(tester, existing: product);
+
+      await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '');
+      await tapSubmit(tester);
+
+      final updated = await productRepository.getById(product.id);
+      expect(updated!.unitsPerPack, 12);
+      expect(updated.unitsPerDus, isNull);
+    });
+  });
+
+  group('Ringkasan kemasan summary box', () {
+    testWidgets('no pack/dus filled shows no summary box', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        expect(find.byKey(const Key('product_form_kemasan_summary')), findsNothing);
+      });
+    });
+
+    testWidgets('pack=6 shows "1 pack = 6 pcs"', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.pump();
+
+        expect(find.byKey(const Key('product_form_kemasan_summary')), findsOneWidget);
+        expect(find.text('1 pack = 6 pcs'), findsOneWidget);
+      });
+    });
+
+    testWidgets('pack=6, dus=6 shows both lines', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '6');
+        await tester.pump();
+
+        expect(find.text('1 pack = 6 pcs'), findsOneWidget);
+        expect(find.text('1 dus = 6 pack = 36 pcs'), findsOneWidget);
+      });
+    });
+
+    testWidgets(
+      'clearing pack removes the pack line but preserves a dus-without-pack value (no cascade '
+      'clear, since dus can stand alone)',
+      (tester) async {
+        await tester.runAsync(() async {
+          await pumpForm(tester);
+
+          await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+          await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '6');
+          await tester.pump();
+          expect(find.text('1 dus = 6 pack = 36 pcs'), findsOneWidget);
+
+          await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '');
+          await tester.pump();
+
+          expect(find.text('1 pack = 6 pcs'), findsNothing);
+          // Dus value is untouched — now shown relative to pcs directly.
+          expect(
+            tester
+                .widget<TextField>(find.byKey(const Key('product_form_units_per_dus')))
+                .controller!
+                .text,
+            '6',
+          );
+          expect(find.text('1 dus = 6 pcs'), findsOneWidget);
+        });
+      },
+    );
+
+    testWidgets('edit mode, pack=6, dus=6, stock=36 shows the stock conversion in the summary box',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Indomie',
+          categoryId: category.id,
+          sellPrice: 3000,
+          unit: 'pcs',
+          unitsPerPack: 6,
+          unitsPerDus: 6,
+          initialStock: 36,
+        );
+        await pumpForm(tester, existing: product);
+
+        expect(find.text('Stok saat ini: 36 pcs'), findsOneWidget);
+        expect(find.text('= 6 pack = 1 dus'), findsOneWidget);
+      });
+    });
+  });
+
+  group('min-stock pack/dus caption', () {
+    testWidgets('pack=6, minStock=36 (dus=6) shows "≈ 6 pack, 1 dus"', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.enterText(find.byKey(const Key('product_form_units_per_dus')), '6');
+        await tester.enterText(find.byKey(const Key('product_form_min_stock')), '36');
+        await tester.pump();
+
+        expect(find.byKey(const Key('product_form_min_stock_conversion')), findsOneWidget);
+        expect(find.text('≈ 6 pack, 1 dus'), findsOneWidget);
+      });
+    });
+
+    testWidgets('pack=6, minStock=15 shows no caption', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.enterText(find.byKey(const Key('product_form_min_stock')), '15');
+        await tester.pump();
+
+        expect(find.byKey(const Key('product_form_min_stock_conversion')), findsNothing);
+      });
+    });
+
+    testWidgets('no pack set shows no caption regardless of minStock value', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_min_stock')), '36');
+        await tester.pump();
+
+        expect(find.byKey(const Key('product_form_min_stock_conversion')), findsNothing);
+      });
+    });
+
+    testWidgets('typing pack=6 after minStock=36 was already entered shows the caption live',
+        (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_min_stock')), '36');
+        await tester.pump();
+        expect(find.byKey(const Key('product_form_min_stock_conversion')), findsNothing);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.pump();
+
+        expect(find.text('≈ 6 pack'), findsOneWidget);
+      });
+    });
+
+    testWidgets('minStock=0, pack=6 shows "≈ 0 pack"', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_units_per_pack')), '6');
+        await tester.enterText(find.byKey(const Key('product_form_min_stock')), '0');
+        await tester.pump();
+
+        expect(find.text('≈ 0 pack'), findsOneWidget);
+      });
+    });
+  });
+
+  group('allowsFractionalQuantity', () {
+    testWidgets('defaults to off for a new product', (tester) async {
+      await tester.runAsync(() async {
+        await pumpForm(tester);
+
+        final switchTile = tester.widget<SwitchListTile>(
+          find.byKey(const Key('product_form_allows_fractional_quantity')),
+        );
+        expect(switchTile.value, isFalse);
+      });
+    });
+
+    testWidgets('toggling it on and submitting persists true', (tester) async {
+      await tester.runAsync(() async {
+        await categoryRepository.create('Sembako');
+        await pumpForm(tester);
+        await tester.enterText(find.byKey(const Key('product_form_name')), 'Beras');
+        await selectCategory(tester, 'Sembako');
+        await tester.enterText(find.byKey(const Key('product_form_price')), '15000');
+        await tester.enterText(find.byKey(const Key('product_form_unit')), 'kg');
+
+        await tester.tap(find.byKey(const Key('product_form_allows_fractional_quantity')));
+        await tester.pump();
+
+        await tapSubmit(tester);
+
+        final products = await productRepository.getAll();
+        expect(products.first.allowsFractionalQuantity, isTrue);
+      });
+    });
+
+    testWidgets('edit flow: pre-fills from the existing product', (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Sembako');
+        final product = await productRepository.create(
+          name: 'Beras',
+          categoryId: category.id,
+          sellPrice: 15000,
+          unit: 'kg',
+          allowsFractionalQuantity: true,
+        );
+        await pumpForm(tester, existing: product);
+
+        final switchTile = tester.widget<SwitchListTile>(
+          find.byKey(const Key('product_form_allows_fractional_quantity')),
+        );
+        expect(switchTile.value, isTrue);
+      });
+    });
+  });
+
+  // Regression coverage matching the Mutasi form fix (see
+  // catat_mutasi_lifecycle_test.dart): _submit() previously had no guard
+  // against re-entrant calls before the disabled-button rebuild lands,
+  // so a rapid double-tap could create the product twice / pop the
+  // route twice.
+  testWidgets('rapid double-tap on submit creates exactly one product, no exception', (tester) async {
+    await tester.runAsync(() async {
+      await expectNoFlutterErrors(tester, () async {
+        await categoryRepository.create('Snacks');
+        await pumpForm(tester);
+
+        await tester.enterText(find.byKey(const Key('product_form_name')), 'Chips');
+        await selectCategory(tester, 'Snacks');
+        await tester.enterText(find.byKey(const Key('product_form_price')), '5000');
+        await tester.enterText(find.byKey(const Key('product_form_unit')), 'pcs');
+
+        final submitFinder = find.byKey(const Key('product_form_submit'));
+        await tester.ensureVisible(submitFinder);
+        await tester.tap(submitFinder);
+        await tester.tap(submitFinder);
+        await tester.pump();
+        await tester.tap(submitFinder);
+        await settleAfterAsyncWork(tester);
+
+        final all = await productRepository.getAll();
+        expect(all.where((p) => p.name == 'Chips'), hasLength(1));
+      });
+    });
+  });
 }

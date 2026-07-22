@@ -35,10 +35,15 @@ class ProductRepository {
     double? minStockThreshold,
     double initialStock = 0,
     double? averageCostPrice,
+    int? unitsPerPack,
+    int? unitsPerDus,
+    bool? allowsFractionalQuantity,
   }) async {
     final trimmedName = _validateName(name);
     final trimmedUnit = _validateUnit(unit);
     _validateSellPrice(sellPrice);
+    _validateUnitsPerPack(unitsPerPack);
+    _validateUnitsPerDus(unitsPerDus);
     final normalizedCode = _normalizeCode(code);
 
     if (categoryId != null) {
@@ -66,6 +71,9 @@ class ProductRepository {
       ..currentStock = 0
       ..minStockThreshold = threshold
       ..averageCostPrice = averageCostPrice
+      ..unitsPerPack = unitsPerPack
+      ..unitsPerDus = unitsPerDus
+      ..allowsFractionalQuantity = allowsFractionalQuantity ?? false
       ..createdAt = now
       ..updatedAt = now;
 
@@ -108,6 +116,11 @@ class ProductRepository {
     double? sellPrice,
     String? unit,
     double? minStockThreshold,
+    int? unitsPerPack,
+    bool clearUnitsPerPack = false,
+    int? unitsPerDus,
+    bool clearUnitsPerDus = false,
+    bool? allowsFractionalQuantity,
   }) async {
     final product = await getById(id);
     if (product == null) {
@@ -153,6 +166,32 @@ class ProductRepository {
 
     if (minStockThreshold != null) {
       product.minStockThreshold = minStockThreshold;
+    }
+
+    // Same "null means leave unchanged" convention as categoryId/
+    // clearCategory above: unitsPerPack can't distinguish "leave
+    // unchanged" from "clear to pcs-only" once null is itself a valid
+    // value, so clearUnitsPerPack is the explicit signal for the latter.
+    if (clearUnitsPerPack) {
+      product.unitsPerPack = null;
+    } else if (unitsPerPack != null) {
+      _validateUnitsPerPack(unitsPerPack);
+      product.unitsPerPack = unitsPerPack;
+    }
+
+    // Same "null means leave unchanged" convention as unitsPerPack above.
+    // Independent of unitsPerPack — a dus doesn't require a pack tier
+    // underneath it (real kulakan goods aren't always 3 tiers deep; see
+    // Product.unitsPerDus).
+    if (clearUnitsPerDus) {
+      product.unitsPerDus = null;
+    } else if (unitsPerDus != null) {
+      _validateUnitsPerDus(unitsPerDus);
+      product.unitsPerDus = unitsPerDus;
+    }
+
+    if (allowsFractionalQuantity != null) {
+      product.allowsFractionalQuantity = allowsFractionalQuantity;
     }
 
     product.updatedAt = DateTime.now();
@@ -298,6 +337,18 @@ class ProductRepository {
   void _validateSellPrice(double sellPrice) {
     if (sellPrice < 0) {
       throw ValidationException('sellPrice must be >= 0');
+    }
+  }
+
+  void _validateUnitsPerPack(int? unitsPerPack) {
+    if (unitsPerPack != null && unitsPerPack < 2) {
+      throw ValidationException('unitsPerPack must be >= 2');
+    }
+  }
+
+  void _validateUnitsPerDus(int? unitsPerDus) {
+    if (unitsPerDus != null && unitsPerDus < 2) {
+      throw ValidationException('unitsPerDus must be >= 2');
     }
   }
 

@@ -45,9 +45,23 @@ dependencies:
   share_plus: ^11.0.0
   flutter_local_notifications: ^18.0.0
   workmanager: ^0.9.0+3
-
+  android_alarm_manager_plus: ^4.0.7
+  android_intent_plus: ^6.0.0
+  sliver_tools: ^0.2.12
+  # Pinned below 11.x: file_picker's Android build.gradle from 11.0.0
+  # onward skips applying the Kotlin Gradle plugin whenever AGP is 9+
+  # (assuming AGP 9's own built-in Kotlin support covers it), but that
+  # assumption doesn't hold for this project's AGP 9.0.1 — its
+  # FilePickerPlugin.kt never gets compiled, so the app fails to build
+  # with "cannot find symbol: class FilePickerPlugin". 10.3.10 (the
+  # newest non-retracted 10.x) still applies the Kotlin plugin
+  # unconditionally, like every other native plugin this app depends on.
+  file_picker: ^10.3.10
+  package_info_plus: ^9.0.1
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -72,9 +86,8 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - assets/icon/app_icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -101,3 +114,22 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  # Plus Jakarta Sans ships from Google Fonts as a single OFL-licensed
+  # variable font (one file, a `wght` axis spanning ExtraLight..ExtraBold).
+  # Flutter's documented pattern for variable fonts is to declare the same
+  # asset multiple times under different `weight:` values; the engine then
+  # renders each declared weight at the matching point on the font's own
+  # axis instead of needing five separate static files.
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-VariableFont_wght.ttf
+          weight: 800

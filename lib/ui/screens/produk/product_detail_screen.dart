@@ -12,7 +12,10 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/hpp_calculator.dart';
+import '../../../domain/unit_conversion.dart';
 import '../../../services/photo_storage_service.dart';
+import '../../theme/app_text_styles.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../mutasi/catat_mutasi_screen.dart';
@@ -251,49 +254,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final product = _product;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detail Produk'),
-        actions: product == null
+      appBar: AppHeader.withBack(
+        title: 'Detail Produk',
+        onBack: () => Navigator.of(context).pop(),
+        trailing: product == null
             ? null
-            : [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Edit',
-                  onPressed: _editProduct,
-                ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'delete':
-                        _confirmDelete();
-                      case 'archive':
-                        _archiveProduct(product);
-                      case 'unarchive':
-                        _unarchiveProduct(product);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    if (product.isArchived)
-                      const PopupMenuItem(
-                        value: 'unarchive',
-                        child: Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
-                      )
-                    else ...[
-                      const PopupMenuItem(
-                        value: 'archive',
-                        child: Text('Arsipkan produk', style: TextStyle(fontSize: 16)),
+            : PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'edit':
+                      _editProduct();
+                    case 'delete':
+                      _confirmDelete();
+                    case 'archive':
+                      _archiveProduct(product);
+                    case 'unarchive':
+                      _unarchiveProduct(product);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Edit produk', style: TextStyle(fontSize: 16)),
+                  ),
+                  if (product.isArchived)
+                    const PopupMenuItem(
+                      value: 'unarchive',
+                      child: Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
+                    )
+                  else ...[
+                    const PopupMenuItem(
+                      value: 'archive',
+                      child: Text('Arsipkan produk', style: TextStyle(fontSize: 16)),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Hapus produk',
+                        style: TextStyle(color: Colors.red, fontSize: 16),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Hapus produk',
-                          style: TextStyle(color: Colors.red, fontSize: 16),
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
-                ),
-              ],
+                ],
+              ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -316,61 +319,75 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 16),
           if (product.isArchived) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 'Diarsipkan pada ${_formatDate(product.archivedAt)}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[700]),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
           ],
           Text(
             product.name,
             key: const Key('product_detail_name'),
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: AppTextStyles.heading,
           ),
           if (product.code != null && product.code!.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Kode: ${product.code}',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              style: AppTextStyles.body.copyWith(color: Colors.grey[700]),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           _infoRow('Kategori', _categoryBreadcrumb ?? 'Lainnya'),
           _infoRow('Harga jual', _formatCurrency(product.sellPrice)),
           _infoRow('Satuan', product.unit),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: stockColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: stockColor),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: stockColor, width: 1.5),
             ),
             child: Text(
               'Stok saat ini: ${_formatQuantity(product.currentStock)} ${product.unit}'
               '${isLow ? ' (di bawah batas minimum)' : ''}',
-              style: TextStyle(fontSize: 16, color: stockColor, fontWeight: FontWeight.bold),
+              style: AppTextStyles.bodyMedium.copyWith(color: stockColor),
             ),
           ),
-          const SizedBox(height: 8),
+          if (_stockConversionLine(product.currentStock, product.unitsPerPack, product.unitsPerDus)
+              case final conversion?)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                conversion,
+                key: const Key('product_detail_stock_conversion'),
+                style: AppTextStyles.caption.copyWith(color: Colors.grey[600]),
+              ),
+            ),
+          const SizedBox(height: 12),
           _infoRow('Batas minimum', '${_formatQuantity(product.minStockThreshold)} ${product.unit}'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _buildHppSection(product),
-          const SizedBox(height: 20),
+          _buildKemasanSection(product),
+          const SizedBox(height: 12),
           if (product.isArchived)
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: () => _unarchiveProduct(product),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00AA0D),
+                ),
                 icon: const Icon(Icons.unarchive_outlined),
-                label: const Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
+                label: const Text('Pulihkan produk', style: TextStyle(fontSize: 14)),
               ),
             )
           else
@@ -379,27 +396,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _openCatatMutasi(StockMutationType.stockIn),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00AA0D),
+                    ),
                     icon: const Icon(Icons.add_box_outlined),
-                    label: const Text('Stok masuk', style: TextStyle(fontSize: 16)),
+                    label: const Text('Stok masuk', style: TextStyle(fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _openBatchStokKeluar,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD32F2F),
+                    ),
                     icon: const Icon(Icons.remove_circle_outline),
-                    label: const Text('Stok keluar', style: TextStyle(fontSize: 16)),
+                    label: const Text('Stok keluar', style: TextStyle(fontSize: 14)),
                   ),
                 ),
               ],
             ),
           const SizedBox(height: 24),
-          const Text('Riwayat Mutasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Text('Riwayat Mutasi', style: AppTextStyles.subheading),
+          const SizedBox(height: 12),
           if (_recentMutations.isEmpty)
             Text(
               'Belum ada riwayat mutasi.',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: AppTextStyles.body.copyWith(color: Colors.grey[600]),
             )
           else ...[
             for (final mutation in _recentMutations)
@@ -408,7 +431,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => _openFullHistory(product),
-                child: const Text('Lihat semua', style: TextStyle(fontSize: 14)),
+                child: Text(
+                  'Lihat semua',
+                  style: AppTextStyles.body.copyWith(
+                    color: const Color(0xFF00AA0D),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
@@ -451,8 +480,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Container(
       key: const Key('product_detail_hpp_section'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -464,18 +496,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  /// Only shown when [Product.unitsPerPack] is set — a plain pcs-only
+  /// product has no packaging hierarchy worth explaining.
+  Widget _buildKemasanSection(Product product) {
+    final unitsPerPack = product.unitsPerPack;
+    if (unitsPerPack == null) return const SizedBox.shrink();
+    final unitsPerDus = product.unitsPerDus;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        key: const Key('product_detail_kemasan_section'),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Kemasan', style: AppTextStyles.bodyMedium),
+            const SizedBox(height: 8),
+            Text(
+              '1 pack = ${_formatGrouped(unitsPerPack.toDouble())} pcs',
+              style: AppTextStyles.body,
+            ),
+            if (unitsPerDus != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '1 dus = ${_formatGrouped(unitsPerDus.toDouble())} pack = '
+                '${_formatGrouped((unitsPerDus * unitsPerPack).toDouble())} pcs',
+                style: AppTextStyles.body,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _infoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 130,
-            child: Text(label, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+            child: Text(label, style: AppTextStyles.body.copyWith(color: Colors.grey[700])),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            child: Text(value, style: AppTextStyles.bodyMedium),
           ),
         ],
       ),
@@ -512,4 +584,44 @@ String _formatCurrency(double value) {
     }
   }
   return 'Rp ${isNegative ? '-' : ''}$buffer';
+}
+
+/// "= 6 pack = 1 dus" breakdown of [currentStock] — each tier shown only
+/// when it independently divides evenly (epsilon 0.001), `null` when
+/// neither tier is configured or neither divides evenly.
+String? _stockConversionLine(double currentStock, int? unitsPerPack, int? unitsPerDus) {
+  final parts = <String>[];
+  if (unitsPerPack != null) {
+    final packs = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.pack,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(packs)) parts.add('${_formatGrouped(packs)} pack');
+  }
+  if (unitsPerDus != null) {
+    final dus = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.dus,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(dus)) parts.add('${_formatGrouped(dus)} dus');
+  }
+  if (parts.isEmpty) return null;
+  return '= ${parts.join(' = ')}';
+}
+
+bool _isWholeNumber(double value) => (value - value.roundToDouble()).abs() < 0.001;
+
+String _formatGrouped(double value) {
+  final digits = value.round().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    final positionFromEnd = digits.length - i;
+    buffer.write(digits[i]);
+    if (positionFromEnd > 1 && positionFromEnd % 3 == 1) buffer.write('.');
+  }
+  return buffer.toString();
 }

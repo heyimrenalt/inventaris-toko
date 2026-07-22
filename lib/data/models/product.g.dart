@@ -17,61 +17,81 @@ const ProductSchema = CollectionSchema(
   name: r'Product',
   id: -6222113721139403729,
   properties: {
-    r'archivedAt': PropertySchema(
+    r'allowsFractionalQuantity': PropertySchema(
       id: 0,
+      name: r'allowsFractionalQuantity',
+      type: IsarType.bool,
+    ),
+    r'archivedAt': PropertySchema(
+      id: 1,
       name: r'archivedAt',
       type: IsarType.dateTime,
     ),
     r'averageCostPrice': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'averageCostPrice',
       type: IsarType.double,
     ),
     r'categoryId': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'categoryId',
       type: IsarType.long,
     ),
-    r'code': PropertySchema(id: 3, name: r'code', type: IsarType.string),
+    r'code': PropertySchema(id: 4, name: r'code', type: IsarType.string),
     r'createdAt': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'criticalStockAlertState': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'criticalStockAlertState',
       type: IsarType.long,
     ),
     r'currentStock': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'currentStock',
       type: IsarType.double,
     ),
     r'isArchived': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isArchived',
       type: IsarType.bool,
     ),
+    r'lastRestockQty': PropertySchema(
+      id: 9,
+      name: r'lastRestockQty',
+      type: IsarType.double,
+    ),
     r'minStockThreshold': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'minStockThreshold',
       type: IsarType.double,
     ),
-    r'name': PropertySchema(id: 9, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 11, name: r'name', type: IsarType.string),
     r'photoPath': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'photoPath',
       type: IsarType.string,
     ),
     r'sellPrice': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'sellPrice',
       type: IsarType.double,
     ),
-    r'unit': PropertySchema(id: 12, name: r'unit', type: IsarType.string),
+    r'unit': PropertySchema(id: 14, name: r'unit', type: IsarType.string),
+    r'unitsPerDus': PropertySchema(
+      id: 15,
+      name: r'unitsPerDus',
+      type: IsarType.long,
+    ),
+    r'unitsPerPack': PropertySchema(
+      id: 16,
+      name: r'unitsPerPack',
+      type: IsarType.long,
+    ),
     r'updatedAt': PropertySchema(
-      id: 13,
+      id: 17,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
@@ -161,20 +181,24 @@ void _productSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.archivedAt);
-  writer.writeDouble(offsets[1], object.averageCostPrice);
-  writer.writeLong(offsets[2], object.categoryId);
-  writer.writeString(offsets[3], object.code);
-  writer.writeDateTime(offsets[4], object.createdAt);
-  writer.writeLong(offsets[5], object.criticalStockAlertState);
-  writer.writeDouble(offsets[6], object.currentStock);
-  writer.writeBool(offsets[7], object.isArchived);
-  writer.writeDouble(offsets[8], object.minStockThreshold);
-  writer.writeString(offsets[9], object.name);
-  writer.writeString(offsets[10], object.photoPath);
-  writer.writeDouble(offsets[11], object.sellPrice);
-  writer.writeString(offsets[12], object.unit);
-  writer.writeDateTime(offsets[13], object.updatedAt);
+  writer.writeBool(offsets[0], object.allowsFractionalQuantity);
+  writer.writeDateTime(offsets[1], object.archivedAt);
+  writer.writeDouble(offsets[2], object.averageCostPrice);
+  writer.writeLong(offsets[3], object.categoryId);
+  writer.writeString(offsets[4], object.code);
+  writer.writeDateTime(offsets[5], object.createdAt);
+  writer.writeLong(offsets[6], object.criticalStockAlertState);
+  writer.writeDouble(offsets[7], object.currentStock);
+  writer.writeBool(offsets[8], object.isArchived);
+  writer.writeDouble(offsets[9], object.lastRestockQty);
+  writer.writeDouble(offsets[10], object.minStockThreshold);
+  writer.writeString(offsets[11], object.name);
+  writer.writeString(offsets[12], object.photoPath);
+  writer.writeDouble(offsets[13], object.sellPrice);
+  writer.writeString(offsets[14], object.unit);
+  writer.writeLong(offsets[15], object.unitsPerDus);
+  writer.writeLong(offsets[16], object.unitsPerPack);
+  writer.writeDateTime(offsets[17], object.updatedAt);
 }
 
 Product _productDeserialize(
@@ -184,21 +208,25 @@ Product _productDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Product();
-  object.archivedAt = reader.readDateTimeOrNull(offsets[0]);
-  object.averageCostPrice = reader.readDoubleOrNull(offsets[1]);
-  object.categoryId = reader.readLongOrNull(offsets[2]);
-  object.code = reader.readStringOrNull(offsets[3]);
-  object.createdAt = reader.readDateTime(offsets[4]);
-  object.criticalStockAlertState = reader.readLongOrNull(offsets[5]);
-  object.currentStock = reader.readDouble(offsets[6]);
+  object.allowsFractionalQuantity = reader.readBool(offsets[0]);
+  object.archivedAt = reader.readDateTimeOrNull(offsets[1]);
+  object.averageCostPrice = reader.readDoubleOrNull(offsets[2]);
+  object.categoryId = reader.readLongOrNull(offsets[3]);
+  object.code = reader.readStringOrNull(offsets[4]);
+  object.createdAt = reader.readDateTime(offsets[5]);
+  object.criticalStockAlertState = reader.readLongOrNull(offsets[6]);
+  object.currentStock = reader.readDouble(offsets[7]);
   object.id = id;
-  object.isArchived = reader.readBool(offsets[7]);
-  object.minStockThreshold = reader.readDouble(offsets[8]);
-  object.name = reader.readString(offsets[9]);
-  object.photoPath = reader.readStringOrNull(offsets[10]);
-  object.sellPrice = reader.readDouble(offsets[11]);
-  object.unit = reader.readString(offsets[12]);
-  object.updatedAt = reader.readDateTime(offsets[13]);
+  object.isArchived = reader.readBool(offsets[8]);
+  object.lastRestockQty = reader.readDoubleOrNull(offsets[9]);
+  object.minStockThreshold = reader.readDouble(offsets[10]);
+  object.name = reader.readString(offsets[11]);
+  object.photoPath = reader.readStringOrNull(offsets[12]);
+  object.sellPrice = reader.readDouble(offsets[13]);
+  object.unit = reader.readString(offsets[14]);
+  object.unitsPerDus = reader.readLongOrNull(offsets[15]);
+  object.unitsPerPack = reader.readLongOrNull(offsets[16]);
+  object.updatedAt = reader.readDateTime(offsets[17]);
   return object;
 }
 
@@ -210,32 +238,40 @@ P _productDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 1:
-      return (reader.readDoubleOrNull(offset)) as P;
-    case 2:
-      return (reader.readLongOrNull(offset)) as P;
-    case 3:
-      return (reader.readStringOrNull(offset)) as P;
-    case 4:
-      return (reader.readDateTime(offset)) as P;
-    case 5:
-      return (reader.readLongOrNull(offset)) as P;
-    case 6:
-      return (reader.readDouble(offset)) as P;
-    case 7:
       return (reader.readBool(offset)) as P;
-    case 8:
-      return (reader.readDouble(offset)) as P;
-    case 9:
-      return (reader.readString(offset)) as P;
-    case 10:
+    case 1:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 2:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 3:
+      return (reader.readLongOrNull(offset)) as P;
+    case 4:
       return (reader.readStringOrNull(offset)) as P;
-    case 11:
+    case 5:
+      return (reader.readDateTime(offset)) as P;
+    case 6:
+      return (reader.readLongOrNull(offset)) as P;
+    case 7:
       return (reader.readDouble(offset)) as P;
-    case 12:
+    case 8:
+      return (reader.readBool(offset)) as P;
+    case 9:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 10:
+      return (reader.readDouble(offset)) as P;
+    case 11:
       return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
     case 13:
+      return (reader.readDouble(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readLongOrNull(offset)) as P;
+    case 16:
+      return (reader.readLongOrNull(offset)) as P;
+    case 17:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -593,6 +629,18 @@ extension ProductQueryWhere on QueryBuilder<Product, Product, QWhereClause> {
 
 extension ProductQueryFilter
     on QueryBuilder<Product, Product, QFilterCondition> {
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  allowsFractionalQuantityEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'allowsFractionalQuantity',
+          value: value,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterFilterCondition> archivedAtIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1275,6 +1323,98 @@ extension ProductQueryFilter
     });
   }
 
+  QueryBuilder<Product, Product, QAfterFilterCondition> lastRestockQtyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastRestockQty'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  lastRestockQtyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastRestockQty'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> lastRestockQtyEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastRestockQty',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  lastRestockQtyGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastRestockQty',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> lastRestockQtyLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastRestockQty',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> lastRestockQtyBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastRestockQty',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterFilterCondition>
   minStockThresholdEqualTo(double value, {double epsilon = Query.epsilon}) {
     return QueryBuilder.apply(this, (query) {
@@ -1878,6 +2018,157 @@ extension ProductQueryFilter
     });
   }
 
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'unitsPerDus'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'unitsPerDus'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'unitsPerDus', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'unitsPerDus',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'unitsPerDus',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerDusBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'unitsPerDus',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerPackIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'unitsPerPack'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition>
+  unitsPerPackIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'unitsPerPack'),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerPackEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'unitsPerPack', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerPackGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'unitsPerPack',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerPackLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'unitsPerPack',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterFilterCondition> unitsPerPackBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'unitsPerPack',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterFilterCondition> updatedAtEqualTo(
     DateTime value,
   ) {
@@ -1945,6 +2236,20 @@ extension ProductQueryLinks
     on QueryBuilder<Product, Product, QFilterCondition> {}
 
 extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
+  QueryBuilder<Product, Product, QAfterSortBy>
+  sortByAllowsFractionalQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'allowsFractionalQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy>
+  sortByAllowsFractionalQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'allowsFractionalQuantity', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByArchivedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'archivedAt', Sort.asc);
@@ -2042,6 +2347,18 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> sortByLastRestockQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRestockQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByLastRestockQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRestockQty', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'minStockThreshold', Sort.asc);
@@ -2102,6 +2419,30 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> sortByUnitsPerDus() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerDus', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByUnitsPerDusDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerDus', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByUnitsPerPack() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerPack', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> sortByUnitsPerPackDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerPack', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> sortByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -2117,6 +2458,20 @@ extension ProductQuerySortBy on QueryBuilder<Product, Product, QSortBy> {
 
 extension ProductQuerySortThenBy
     on QueryBuilder<Product, Product, QSortThenBy> {
+  QueryBuilder<Product, Product, QAfterSortBy>
+  thenByAllowsFractionalQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'allowsFractionalQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy>
+  thenByAllowsFractionalQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'allowsFractionalQuantity', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> thenByArchivedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'archivedAt', Sort.asc);
@@ -2226,6 +2581,18 @@ extension ProductQuerySortThenBy
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> thenByLastRestockQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRestockQty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByLastRestockQtyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRestockQty', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> thenByMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'minStockThreshold', Sort.asc);
@@ -2286,6 +2653,30 @@ extension ProductQuerySortThenBy
     });
   }
 
+  QueryBuilder<Product, Product, QAfterSortBy> thenByUnitsPerDus() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerDus', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByUnitsPerDusDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerDus', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByUnitsPerPack() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerPack', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Product, Product, QAfterSortBy> thenByUnitsPerPackDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'unitsPerPack', Sort.desc);
+    });
+  }
+
   QueryBuilder<Product, Product, QAfterSortBy> thenByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -2301,6 +2692,13 @@ extension ProductQuerySortThenBy
 
 extension ProductQueryWhereDistinct
     on QueryBuilder<Product, Product, QDistinct> {
+  QueryBuilder<Product, Product, QDistinct>
+  distinctByAllowsFractionalQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'allowsFractionalQuantity');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByArchivedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'archivedAt');
@@ -2352,6 +2750,12 @@ extension ProductQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Product, Product, QDistinct> distinctByLastRestockQty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastRestockQty');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByMinStockThreshold() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'minStockThreshold');
@@ -2388,6 +2792,18 @@ extension ProductQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Product, Product, QDistinct> distinctByUnitsPerDus() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'unitsPerDus');
+    });
+  }
+
+  QueryBuilder<Product, Product, QDistinct> distinctByUnitsPerPack() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'unitsPerPack');
+    });
+  }
+
   QueryBuilder<Product, Product, QDistinct> distinctByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAt');
@@ -2400,6 +2816,13 @@ extension ProductQueryProperty
   QueryBuilder<Product, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<Product, bool, QQueryOperations>
+  allowsFractionalQuantityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'allowsFractionalQuantity');
     });
   }
 
@@ -2452,6 +2875,12 @@ extension ProductQueryProperty
     });
   }
 
+  QueryBuilder<Product, double?, QQueryOperations> lastRestockQtyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastRestockQty');
+    });
+  }
+
   QueryBuilder<Product, double, QQueryOperations> minStockThresholdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'minStockThreshold');
@@ -2479,6 +2908,18 @@ extension ProductQueryProperty
   QueryBuilder<Product, String, QQueryOperations> unitProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'unit');
+    });
+  }
+
+  QueryBuilder<Product, int?, QQueryOperations> unitsPerDusProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'unitsPerDus');
+    });
+  }
+
+  QueryBuilder<Product, int?, QQueryOperations> unitsPerPackProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'unitsPerPack');
     });
   }
 

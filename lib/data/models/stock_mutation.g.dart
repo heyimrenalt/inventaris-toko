@@ -22,24 +22,35 @@ const StockMutationSchema = CollectionSchema(
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
-    r'note': PropertySchema(id: 1, name: r'note', type: IsarType.string),
-    r'productId': PropertySchema(
+    r'enteredQuantity': PropertySchema(
+      id: 1,
+      name: r'enteredQuantity',
+      type: IsarType.double,
+    ),
+    r'enteredUnit': PropertySchema(
       id: 2,
+      name: r'enteredUnit',
+      type: IsarType.string,
+      enumMap: _StockMutationenteredUnitEnumValueMap,
+    ),
+    r'note': PropertySchema(id: 3, name: r'note', type: IsarType.string),
+    r'productId': PropertySchema(
+      id: 4,
       name: r'productId',
       type: IsarType.long,
     ),
     r'quantity': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'quantity',
       type: IsarType.double,
     ),
     r'stockAfter': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'stockAfter',
       type: IsarType.double,
     ),
     r'type': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'type',
       type: IsarType.string,
       enumMap: _StockMutationtypeEnumValueMap,
@@ -82,6 +93,12 @@ int _stockMutationEstimateSize(
 ) {
   var bytesCount = offsets.last;
   {
+    final value = object.enteredUnit;
+    if (value != null) {
+      bytesCount += 3 + value.name.length * 3;
+    }
+  }
+  {
     final value = object.note;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -98,11 +115,13 @@ void _stockMutationSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeString(offsets[1], object.note);
-  writer.writeLong(offsets[2], object.productId);
-  writer.writeDouble(offsets[3], object.quantity);
-  writer.writeDouble(offsets[4], object.stockAfter);
-  writer.writeString(offsets[5], object.type.name);
+  writer.writeDouble(offsets[1], object.enteredQuantity);
+  writer.writeString(offsets[2], object.enteredUnit?.name);
+  writer.writeString(offsets[3], object.note);
+  writer.writeLong(offsets[4], object.productId);
+  writer.writeDouble(offsets[5], object.quantity);
+  writer.writeDouble(offsets[6], object.stockAfter);
+  writer.writeString(offsets[7], object.type.name);
 }
 
 StockMutation _stockMutationDeserialize(
@@ -113,13 +132,18 @@ StockMutation _stockMutationDeserialize(
 ) {
   final object = StockMutation();
   object.createdAt = reader.readDateTime(offsets[0]);
+  object.enteredQuantity = reader.readDoubleOrNull(offsets[1]);
+  object.enteredUnit =
+      _StockMutationenteredUnitValueEnumMap[reader.readStringOrNull(
+        offsets[2],
+      )];
   object.id = id;
-  object.note = reader.readStringOrNull(offsets[1]);
-  object.productId = reader.readLong(offsets[2]);
-  object.quantity = reader.readDouble(offsets[3]);
-  object.stockAfter = reader.readDouble(offsets[4]);
+  object.note = reader.readStringOrNull(offsets[3]);
+  object.productId = reader.readLong(offsets[4]);
+  object.quantity = reader.readDouble(offsets[5]);
+  object.stockAfter = reader.readDouble(offsets[6]);
   object.type =
-      _StockMutationtypeValueEnumMap[reader.readStringOrNull(offsets[5])] ??
+      _StockMutationtypeValueEnumMap[reader.readStringOrNull(offsets[7])] ??
       StockMutationType.stockIn;
   return object;
 }
@@ -134,14 +158,21 @@ P _stockMutationDeserializeProp<P>(
     case 0:
       return (reader.readDateTime(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
+      return (_StockMutationenteredUnitValueEnumMap[reader.readStringOrNull(
+            offset,
+          )])
+          as P;
     case 3:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 5:
+      return (reader.readDouble(offset)) as P;
+    case 6:
+      return (reader.readDouble(offset)) as P;
+    case 7:
       return (_StockMutationtypeValueEnumMap[reader.readStringOrNull(offset)] ??
               StockMutationType.stockIn)
           as P;
@@ -150,6 +181,16 @@ P _stockMutationDeserializeProp<P>(
   }
 }
 
+const _StockMutationenteredUnitEnumValueMap = {
+  r'pcs': r'pcs',
+  r'pack': r'pack',
+  r'dus': r'dus',
+};
+const _StockMutationenteredUnitValueEnumMap = {
+  r'pcs': EnteredUnit.pcs,
+  r'pack': EnteredUnit.pack,
+  r'dus': EnteredUnit.dus,
+};
 const _StockMutationtypeEnumValueMap = {
   r'stockIn': r'stockIn',
   r'stockOut': r'stockOut',
@@ -420,6 +461,258 @@ extension StockMutationQueryFilter
           upper: upper,
           includeUpper: includeUpper,
         ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'enteredQuantity'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'enteredQuantity'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityEqualTo(double? value, {double epsilon = Query.epsilon}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'enteredQuantity',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'enteredQuantity',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'enteredQuantity',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredQuantityBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'enteredQuantity',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'enteredUnit'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'enteredUnit'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitEqualTo(EnteredUnit? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitGreaterThan(
+    EnteredUnit? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitLessThan(
+    EnteredUnit? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitBetween(
+    EnteredUnit? lower,
+    EnteredUnit? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'enteredUnit',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'enteredUnit',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'enteredUnit',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'enteredUnit', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  enteredUnitIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'enteredUnit', value: ''),
       );
     });
   }
@@ -1014,6 +1307,33 @@ extension StockMutationQuerySortBy
     });
   }
 
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortByEnteredQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortByEnteredQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy> sortByEnteredUnit() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredUnit', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortByEnteredUnitDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredUnit', Sort.desc);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterSortBy> sortByNote() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'note', Sort.asc);
@@ -1090,6 +1410,33 @@ extension StockMutationQuerySortThenBy
   thenByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenByEnteredQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenByEnteredQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy> thenByEnteredUnit() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredUnit', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenByEnteredUnitDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'enteredUnit', Sort.desc);
     });
   }
 
@@ -1177,6 +1524,21 @@ extension StockMutationQueryWhereDistinct
     });
   }
 
+  QueryBuilder<StockMutation, StockMutation, QDistinct>
+  distinctByEnteredQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'enteredQuantity');
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QDistinct> distinctByEnteredUnit({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'enteredUnit', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QDistinct> distinctByNote({
     bool caseSensitive = true,
   }) {
@@ -1223,6 +1585,20 @@ extension StockMutationQueryProperty
   QueryBuilder<StockMutation, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<StockMutation, double?, QQueryOperations>
+  enteredQuantityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'enteredQuantity');
+    });
+  }
+
+  QueryBuilder<StockMutation, EnteredUnit?, QQueryOperations>
+  enteredUnitProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'enteredUnit');
     });
   }
 

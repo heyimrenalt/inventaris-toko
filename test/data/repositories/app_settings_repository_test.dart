@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventaris_toko/data/models/app_settings.dart';
 import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
+import 'package:inventaris_toko/data/repositories/repository_exceptions.dart';
 import 'package:isar_community/isar.dart';
 
 import 'test_isar.dart';
@@ -34,6 +35,8 @@ void main() {
     expect(settings.criticalStockAlertHour3, isNull);
     expect(settings.criticalStockAlertMinute3, isNull);
     expect(settings.criticalStockAlertTimes, [(hour: 9, minute: 0)]);
+    expect(settings.restockLeadTimeDays, 3);
+    expect(settings.restockCoverDays, 7);
   });
 
   test('get() returns the same singleton on subsequent calls', () async {
@@ -115,6 +118,72 @@ void main() {
     expect(settings.criticalStockAlertMinute2, isNull);
     expect(settings.criticalStockAlertHour3, isNull);
     expect(settings.criticalStockAlertMinute3, isNull);
+  });
+
+  test('updateRestockLeadTimeDays persists a value within 1..90', () async {
+    await repository.updateRestockLeadTimeDays(5);
+    final settings = await repository.get();
+    expect(settings.restockLeadTimeDays, 5);
+  });
+
+  test('updateRestockCoverDays persists a value within 1..90', () async {
+    await repository.updateRestockCoverDays(14);
+    final settings = await repository.get();
+    expect(settings.restockCoverDays, 14);
+  });
+
+  test('updateRestockLeadTimeDays accepts the 1 and 90 boundaries', () async {
+    await repository.updateRestockLeadTimeDays(1);
+    expect((await repository.get()).restockLeadTimeDays, 1);
+
+    await repository.updateRestockLeadTimeDays(90);
+    expect((await repository.get()).restockLeadTimeDays, 90);
+  });
+
+  test('updateRestockLeadTimeDays rejects values outside 1..90', () async {
+    expect(() => repository.updateRestockLeadTimeDays(0), throwsA(isA<ValidationException>()));
+    expect(() => repository.updateRestockLeadTimeDays(91), throwsA(isA<ValidationException>()));
+
+    // Rejected values must not be persisted.
+    final settings = await repository.get();
+    expect(settings.restockLeadTimeDays, 3);
+  });
+
+  test('updateRestockCoverDays rejects values outside 1..90', () async {
+    expect(() => repository.updateRestockCoverDays(0), throwsA(isA<ValidationException>()));
+    expect(() => repository.updateRestockCoverDays(91), throwsA(isA<ValidationException>()));
+
+    final settings = await repository.get();
+    expect(settings.restockCoverDays, 7);
+  });
+
+  test('get() heals a legacy row predating the restock settings fields', () async {
+    // Same scenario as the notification-fields heal test, but for the
+    // restock fields added later: a row written before they existed has
+    // neither in its stored bytes, so Isar fills reads past its buffer
+    // with the raw `long.min` sentinel.
+    final legacyRow = AppSettings()
+      ..id = 0
+      ..defaultMinStockThreshold = 5
+      ..dailySummaryHour = 20
+      ..dailySummaryMinute = 0
+      ..dailySummaryEnabled = true
+      ..criticalStockAlertEnabled = true
+      ..criticalStockAlertHour1 = 9
+      ..criticalStockAlertMinute1 = 0
+      ..restockLeadTimeDays = -9223372036854775808
+      ..restockCoverDays = -9223372036854775808;
+    await isar.writeTxn(() async {
+      await isar.appSettings.put(legacyRow);
+    });
+
+    final healed = await repository.get();
+    expect(healed.restockLeadTimeDays, 3);
+    expect(healed.restockCoverDays, 7);
+
+    final reread = await isar.appSettings.get(0);
+    expect(reread!.restockLeadTimeDays, 3);
+    expect(reread.restockCoverDays, 7);
   });
 
   test('get() heals a legacy row predating the notification fields', () async {

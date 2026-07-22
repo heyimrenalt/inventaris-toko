@@ -157,12 +157,12 @@ class _FrequentlySoldScreenState extends State<FrequentlySoldScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          const AppHeader(title: 'Sering Keluar'),
-          Expanded(
-            child: CustomScrollView(
-              slivers: [
+      appBar: AppHeader.withBack(
+        title: 'Sering Keluar',
+        onBack: () => Navigator.of(context).pop(),
+      ),
+      body: CustomScrollView(
+        slivers: [
           SliverToBoxAdapter(child: _buildCaption()),
           // Search and category filter stay pinned to the top as
           // everything below scrolls — [SliverPinnedHeader] sizes itself
@@ -185,9 +185,6 @@ class _FrequentlySoldScreenState extends State<FrequentlySoldScreen> {
               SliverToBoxAdapter(child: caption),
             _buildList(),
           ],
-        ],
-            ),
-          ),
         ],
       ),
     );

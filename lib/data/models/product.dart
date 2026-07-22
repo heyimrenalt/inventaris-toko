@@ -72,4 +72,45 @@ class Product {
   /// critical. Reset to `null` when stock recovers above the threshold —
   /// a later drop back to critical is then treated as a new episode.
   int? criticalStockAlertState;
+
+  /// How many pcs are in one pack of this product. `null` means the
+  /// product is only ever bought/sold in pcs — no pack unit exists for
+  /// it. When set, must be >= 2 (validated in [ProductRepository]); 0/1
+  /// would make "pack" meaningless as a distinct unit.
+  int? unitsPerPack;
+
+  /// The quantity actually bought last time this product was restocked,
+  /// always stored in pcs regardless of [unitsPerPack]. `null` until the
+  /// first completed [RestockList] checks this product off. Never set
+  /// directly outside of [RestockListRepository.complete] — deliberately
+  /// not derived from stock-in mutations, since a kulakan list is a
+  /// shopping list, not a stock ledger (see [RestockListRepository]).
+  double? lastRestockQty;
+
+  /// How many of the next-smaller unit are in one dus. `null` means no
+  /// dus unit. Relative to [unitsPerPack] when that's also set (e.g.
+  /// `unitsPerPack: 2, unitsPerDus: 3` means 1 dus = 3 pack = 6 pcs) —
+  /// but real kulakan goods aren't always 3 tiers deep (e.g. "1 dus = 12
+  /// pcs" with no pack in between at all), so [unitsPerPack] being
+  /// `null` is a valid, independent state: [unitsPerDus] then means pcs
+  /// directly (1 dus = 12 pcs). When set, must be >= 2, same rationale
+  /// as [unitsPerPack]. See [UnitConversion] for the conversion math and
+  /// [ProductRepository] for validation.
+  int? unitsPerDus;
+
+  /// Whether this product's quantity may be entered as a fraction (e.g.
+  /// 2.5 kg). `false` (the default) for ordinary countable goods sold in
+  /// pcs/pack/dus, where a fractional amount is meaningless. Set `true`
+  /// only for goods measured/weighed in fractional units (kg, liter, m).
+  /// Enforced in [StockMutationRepository.recordMutation] for every stock
+  /// change, and client-side in the quantity-entry widgets.
+  ///
+  /// Deliberately phrased as an opt-in "allows" flag rather than a
+  /// "requires whole" flag: Isar's binary reader returns `false` — not
+  /// this field's own Dart default — for any property missing from an
+  /// already-stored record. Phrasing it this way means every
+  /// pre-existing product silently and correctly becomes "whole units
+  /// only" the moment this field ships, with no explicit backfill
+  /// needed.
+  bool allowsFractionalQuantity = false;
 }

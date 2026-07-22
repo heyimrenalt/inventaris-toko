@@ -180,38 +180,32 @@ class _BerandaScreenState extends State<BerandaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
-      body: Column(
-        children: [
-          const AppHeader(title: 'Beranda'),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _handleRefresh,
-                    child: ListView(
-                      controller: widget.scrollController,
-                      // AlwaysScrollable so the pull-to-refresh gesture still
-                      // works even when the content is short enough to not
-                      // otherwise need scrolling (e.g. no priority/frequently
-                      // sold sections yet).
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      children: [
-                        _buildSearchBar(),
-                        const SizedBox(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildSummaryCards(),
-                        ),
-                        _buildPrioritasKulakanSection(),
-                        if (_frequentlySoldResults.isNotEmpty) _buildFrequentlySoldSection(),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
+      appBar: const AppHeader(title: 'Beranda'),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: ListView(
+                controller: widget.scrollController,
+                // AlwaysScrollable so the pull-to-refresh gesture still
+                // works even when the content is short enough to not
+                // otherwise need scrolling (e.g. no priority/frequently
+                // sold sections yet).
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                children: [
+                  _buildSearchBar(),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildSummaryCards(),
                   ),
+                  _buildPrioritasKulakanSection(),
+                  if (_frequentlySoldResults.isNotEmpty) _buildFrequentlySoldSection(),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
-        ],
-      ),
     );
   }
 

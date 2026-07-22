@@ -172,6 +172,103 @@ void main() {
     expect(totals.stockOut, 2);
   });
 
+  group('whole-quantity enforcement', () {
+    test('rejects a fractional quantity for a product with allowsFractionalQuantity: false (default)',
+        () async {
+      expect(
+        () => stockMutationRepository.recordMutation(
+          productId: productId,
+          type: StockMutationType.stockIn,
+          quantity: 2.5,
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+      expect(
+        () => stockMutationRepository.recordMutation(
+          productId: productId,
+          type: StockMutationType.stockOut,
+          quantity: 2.5,
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+    });
+
+    test('accepts a fractional quantity for a product with allowsFractionalQuantity: true', () async {
+      final category = (await CategoryRepository(isar).create('Sembako')).id;
+      final beras = (await productRepository.create(
+        name: 'Beras',
+        categoryId: category,
+        sellPrice: 15000,
+        unit: 'kg',
+        allowsFractionalQuantity: true,
+      ))
+          .id;
+
+      await stockMutationRepository.recordMutation(
+        productId: beras,
+        type: StockMutationType.stockIn,
+        quantity: 2.5,
+      );
+
+      final product = await productRepository.getById(beras);
+      expect(product!.currentStock, 2.5);
+    });
+
+    test('accepts a whole quantity regardless of allowsFractionalQuantity', () async {
+      await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+
+      final product = await productRepository.getById(productId);
+      expect(product!.currentStock, 15);
+    });
+  });
+
+  group('enteredUnit / enteredQuantity', () {
+    test('persist when supplied', () async {
+      final mutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 60,
+        enteredUnit: EnteredUnit.dus,
+        enteredQuantity: 1,
+      );
+
+      expect(mutation.enteredUnit, EnteredUnit.dus);
+      expect(mutation.enteredQuantity, 1);
+    });
+
+    test('stay null when omitted', () async {
+      final mutation = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockIn,
+        quantity: 5,
+      );
+
+      expect(mutation.enteredUnit, isNull);
+      expect(mutation.enteredQuantity, isNull);
+    });
+
+    test('undoMutation does not forward them onto the compensating mutation', () async {
+      final original = await stockMutationRepository.recordMutation(
+        productId: productId,
+        type: StockMutationType.stockOut,
+        quantity: 4,
+        enteredUnit: EnteredUnit.pack,
+        enteredQuantity: 4,
+      );
+
+      await stockMutationRepository.undoMutation(original.id);
+
+      final history = await stockMutationRepository.getHistoryForProduct(productId);
+      final undoEntry = history.firstWhere((m) => m.id != original.id && m.type == StockMutationType.stockIn);
+      expect(undoEntry.enteredUnit, isNull);
+      expect(undoEntry.enteredQuantity, isNull);
+    });
+  });
+
   group('undoMutation', () {
     test('undoing a stockOut creates a compensating stockIn with the same quantity and a note', () async {
       final outMutation = await stockMutationRepository.recordMutation(

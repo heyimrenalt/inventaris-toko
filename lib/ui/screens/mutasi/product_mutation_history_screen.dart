@@ -4,6 +4,7 @@ import 'package:isar_community/isar.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
@@ -66,7 +67,10 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Riwayat ${widget.product.name}')),
+      appBar: AppHeader.withBack(
+        title: 'Riwayat ${widget.product.name}',
+        onBack: () => Navigator.of(context).pop(),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _mutations.isEmpty

@@ -10,6 +10,7 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/category_form_dialog.dart';
 import '../../widgets/confirm_dialog.dart';
 
@@ -181,13 +182,17 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kelola Kategori')),
+      appBar: AppHeader.withBack(
+        title: 'Kelola Kategori',
+        onBack: () => Navigator.of(context).pop(),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _categories.isEmpty
               ? _buildEmptyState()
               : _buildCategoryTree(),
       bottomNavigationBar: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: SizedBox(

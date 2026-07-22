@@ -7,22 +7,49 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../domain/unit_conversion.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../../widgets/product_search_bar.dart';
-import '../../widgets/quantity_stepper.dart';
+import '../../widgets/unit_qty_field.dart';
 
 class _CartItem {
-  _CartItem(this.product) : quantity = 1;
+  _CartItem(this.product)
+      : qtyInPcs = 1,
+        enteredUnit = EnteredUnit.pcs,
+        enteredValue = 1;
 
   final Product product;
-  int quantity;
 
-  bool get isValid => quantity <= product.currentStock;
+  /// Always canonical pcs, regardless of [enteredUnit] — see
+  /// [enteredUnit]/[enteredValue] for the raw as-typed value.
+  double qtyInPcs;
+  EnteredUnit enteredUnit;
+  double enteredValue;
 
-  String? get errorText => isValid
-      ? null
-      : 'Stok tidak mencukupi: tersedia ${formatMutationQuantity(product.currentStock)} ${product.unit}';
+  /// Bumped whenever the quantity is changed from outside the row's own
+  /// [UnitQtyField] (see [_addProduct]'s "already in cart" branch) — used
+  /// as part of that field's [Key] to force it to remount and pick up
+  /// the new value, since [UnitQtyField] otherwise only reads its
+  /// `initialQtyInPcs`/`initialEnteredUnit` once, in `initState`.
+  int revision = 0;
+
+  // Unlike the old QuantityStepper (default min: 1), UnitQtyField's own
+  // stepper only floors at 0, and its text field never blocks 0 outright
+  // — so this has to check it explicitly, or a 0-quantity item would
+  // sail past `isValid` and hit recordMutation's own
+  // "quantity must be > 0" ValidationException uncaught (only
+  // InsufficientStockException is caught in _save()).
+  bool get isValid => qtyInPcs > 0 && qtyInPcs <= product.currentStock;
+
+  String? get errorText {
+    if (qtyInPcs <= 0) return 'Jumlah harus lebih dari 0';
+    if (qtyInPcs > product.currentStock) {
+      return 'Stok tidak mencukupi: tersedia ${formatMutationQuantity(product.currentStock)} ${product.unit}';
+    }
+    return null;
+  }
 }
 
 /// Shopping-cart-style entry for recording stock-out on several products
@@ -71,7 +98,18 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
     final existingIndex = _cart.indexWhere((item) => item.product.id == product.id);
     setState(() {
       if (existingIndex >= 0) {
-        _cart[existingIndex].quantity += 1;
+        // Bumps by 1 in whatever unit the row is currently showing, not
+        // always 1 pcs — re-selecting a dus-entered row from search
+        // should add another dus, not silently switch it to pcs.
+        final item = _cart[existingIndex];
+        item.qtyInPcs += UnitConversion.toPcs(
+          value: 1,
+          unit: item.enteredUnit,
+          unitsPerPack: item.product.unitsPerPack,
+          unitsPerDus: item.product.unitsPerDus,
+        );
+        item.enteredValue += 1;
+        item.revision++;
       } else {
         _cart.add(_CartItem(product));
       }
@@ -82,8 +120,13 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
     setState(() => _cart.removeAt(index));
   }
 
-  void _updateQuantity(int index, int quantity) {
-    setState(() => _cart[index].quantity = quantity);
+  void _updateQuantity(int index, double qtyInPcs, EnteredUnit enteredUnit, double enteredValue) {
+    setState(() {
+      _cart[index]
+        ..qtyInPcs = qtyInPcs
+        ..enteredUnit = enteredUnit
+        ..enteredValue = enteredValue;
+    });
   }
 
   Future<bool> _confirmExit() async {
@@ -106,7 +149,12 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
   }
 
   Future<void> _save() async {
-    if (!_canSave) return;
+    // See the matching guard in CatatMutasiScreen._submit() — `_canSave`
+    // (used for `onPressed`) only reflects `_saving` after the next
+    // rebuild, so a rapid double-tap can still invoke `_save` a second
+    // time before that rebuild lands. Re-checking `_saving` directly
+    // here blocks the re-entrant call synchronously.
+    if (!_canSave || _saving) return;
 
     setState(() => _saving = true);
 
@@ -119,7 +167,9 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
         final mutation = await _mutationRepository.recordMutation(
           productId: item.product.id,
           type: StockMutationType.stockOut,
-          quantity: item.quantity.toDouble(),
+          quantity: item.qtyInPcs,
+          enteredUnit: item.enteredUnit,
+          enteredQuantity: item.enteredValue,
         );
         lastMutation = mutation;
         succeeded.add(item);
@@ -148,7 +198,7 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Tersimpan: ${item.product.name} -${formatMutationQuantity(item.quantity.toDouble())}',
+              'Tersimpan: ${item.product.name} -${formatMutationQuantity(item.qtyInPcs)}',
             ),
             duration: const Duration(seconds: 5),
             // SnackBar.persist defaults to true whenever action is
@@ -193,7 +243,10 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Catat stok keluar')),
+        appBar: AppHeader.withBack(
+          title: 'Catat stok keluar',
+          onBack: () => Navigator.maybePop(context),
+        ),
         body: Column(
           children: [
             Padding(
@@ -271,38 +324,47 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
       onDismissed: (_) => _removeItem(index),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${item.product.name} — stok: '
-                    '${formatMutationQuantity(item.product.currentStock)} ${item.product.unit}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.product.name} — stok: '
+                        '${formatMutationQuantity(item.product.currentStock)} ${item.product.unit}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      if (item.errorText != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          item.errorText!,
+                          key: Key('batch_item_error_$index'),
+                          style: const TextStyle(fontSize: 13, color: Colors.red),
+                        ),
+                      ],
+                    ],
                   ),
-                  if (item.errorText != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      item.errorText!,
-                      key: Key('batch_item_error_$index'),
-                      style: const TextStyle(fontSize: 13, color: Colors.red),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                IconButton(
+                  key: Key('batch_remove_$index'),
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Hapus dari daftar',
+                  onPressed: () => _removeItem(index),
+                ),
+              ],
             ),
-            QuantityStepper(
-              quantity: item.quantity,
-              onChanged: (value) => _updateQuantity(index, value),
-            ),
-            IconButton(
-              key: Key('batch_remove_$index'),
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Hapus dari daftar',
-              onPressed: () => _removeItem(index),
+            UnitQtyField(
+              key: ValueKey('${item.product.id}_${item.revision}'),
+              product: item.product,
+              initialQtyInPcs: item.qtyInPcs,
+              initialEnteredUnit: item.enteredUnit,
+              onChanged: (qtyInPcs, enteredUnit, enteredValue) =>
+                  _updateQuantity(index, qtyInPcs, enteredUnit, enteredValue),
             ),
           ],
         ),
