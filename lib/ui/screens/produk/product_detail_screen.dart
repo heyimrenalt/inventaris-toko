@@ -323,6 +323,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         trailing: product == null
             ? null
             : IconButton(
+                key: const Key('product_detail_menu_button'),
                 icon: const Icon(Icons.more_vert_rounded),
                 onPressed: () => _showProductMenu(product),
               ),

@@ -265,7 +265,7 @@ void main() {
 
       await pumpDetailWithBackStack(tester, product.id);
 
-      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.tap(find.byKey(const Key('product_detail_menu_button')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Hapus produk'));
       await tester.pumpAndSettle();
@@ -299,7 +299,7 @@ void main() {
 
         await pumpDetailWithBackStack(tester, product.id);
 
-        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.tap(find.byKey(const Key('product_detail_menu_button')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Hapus produk'));
         await tester.pumpAndSettle();
@@ -342,7 +342,7 @@ void main() {
 
         await pumpDetailWithBackStack(tester, product.id);
 
-        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.tap(find.byKey(const Key('product_detail_menu_button')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Hapus produk'));
         await tester.pumpAndSettle();
@@ -380,7 +380,7 @@ void main() {
 
       await pumpDetailWithBackStack(tester, product.id);
 
-      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.tap(find.byKey(const Key('product_detail_menu_button')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Arsipkan produk'));
       await tester.pumpAndSettle();

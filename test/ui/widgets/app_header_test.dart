@@ -49,7 +49,7 @@ void main() {
       expect(appBar.backgroundColor, AppColors.white);
     });
 
-    testWidgets('centerTitle is true', (WidgetTester tester) async {
+    testWidgets('title is left-aligned (centerTitle is false)', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -59,7 +59,7 @@ void main() {
       );
 
       final appBar = tester.widget<AppBar>(find.byType(AppBar));
-      expect(appBar.centerTitle, true);
+      expect(appBar.centerTitle, false);
     });
 
     testWidgets('elevation is 0', (WidgetTester tester) async {
