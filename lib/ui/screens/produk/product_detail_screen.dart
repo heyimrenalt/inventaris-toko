@@ -251,6 +251,68 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     await _load();
   }
 
+  void _showProductMenu(Product product) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Kelola Produk',
+                  style: AppTextStyles.heading,
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.edit_rounded, color: AppColors.primary),
+                title: const Text('Edit produk'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editProduct();
+                },
+              ),
+              if (product.isArchived)
+                ListTile(
+                  leading: const Icon(Icons.unarchive_rounded, color: AppColors.primary),
+                  title: const Text('Pulihkan produk'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _unarchiveProduct(product);
+                  },
+                )
+              else ...[
+                ListTile(
+                  leading: const Icon(Icons.archive_rounded, color: AppColors.primary),
+                  title: const Text('Arsipkan produk'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _archiveProduct(product);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_rounded, color: Colors.red),
+                  title: const Text('Hapus produk', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _confirmDelete();
+                  },
+                ),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = _product;
@@ -260,43 +322,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         onBack: () => Navigator.of(context).pop(),
         trailing: product == null
             ? null
-            : PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      _editProduct();
-                    case 'delete':
-                      _confirmDelete();
-                    case 'archive':
-                      _archiveProduct(product);
-                    case 'unarchive':
-                      _unarchiveProduct(product);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Edit produk', style: TextStyle(fontSize: 16)),
-                  ),
-                  if (product.isArchived)
-                    const PopupMenuItem(
-                      value: 'unarchive',
-                      child: Text('Pulihkan produk', style: TextStyle(fontSize: 16)),
-                    )
-                  else ...[
-                    const PopupMenuItem(
-                      value: 'archive',
-                      child: Text('Arsipkan produk', style: TextStyle(fontSize: 16)),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'Hapus produk',
-                        style: TextStyle(color: Colors.red, fontSize: 16),
-                      ),
-                    ),
-                  ],
-                ],
+            : IconButton(
+                icon: const Icon(Icons.more_vert_rounded),
+                onPressed: () => _showProductMenu(product),
               ),
       ),
       body: _loading

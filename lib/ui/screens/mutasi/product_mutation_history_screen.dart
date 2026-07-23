@@ -60,7 +60,11 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mutasi dibatalkan')),
+      SnackBar(
+        content: const Text('Mutasi dibatalkan'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
