@@ -5,7 +5,6 @@ import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../widgets/app_header.dart';
-import '../../widgets/confirm_dialog.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 
@@ -45,25 +44,27 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
     });
   }
 
+  /// Cancels immediately and offers an "Urungkan" action in the SnackBar
+  /// instead of a pre-confirm dialog — same reversible pattern as the
+  /// Mutasi tab. Stock re-adjusts on its own through the stockMutations
+  /// watch stream on the Produk/Detail pages.
   Future<void> _cancelMutation(StockMutation mutation) async {
-    final confirmed = await showConfirmDialog(
-      context: context,
-      title: 'Batalkan Mutasi',
-      message: 'Batalkan mutasi ini? Ini akan membuat entri pembalik di riwayat.',
-      confirmLabel: 'Ya, Batalkan',
-      isDestructive: true,
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    await _mutationRepository.undoMutation(mutation.id);
+    final reversal = await _mutationRepository.undoMutation(mutation.id);
     await _load();
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Mutasi dibatalkan'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Urungkan',
+          textColor: const Color(0xFF69F0AE),
+          onPressed: () async {
+            await _mutationRepository.undoMutation(reversal.id);
+            await _load();
+          },
+        ),
       ),
     );
   }

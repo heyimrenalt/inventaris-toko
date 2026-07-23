@@ -141,12 +141,13 @@ void main() {
         expect(find.byKey(Key('mutation_cancel_${latest.id}')), findsOneWidget);
         expect(find.byKey(Key('mutation_cancel_${older.id}')), findsNothing);
 
+        // No confirm dialog anymore — cancel undoes immediately and offers
+        // an "Urungkan" action in the SnackBar.
         await tester.tap(find.byKey(Key('mutation_cancel_${latest.id}')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(TextButton, 'Batalkan').last);
         await settleAfterAsyncWork(tester);
 
         expect(find.text('Mutasi dibatalkan'), findsOneWidget);
+        expect(find.widgetWithText(SnackBarAction, 'Urungkan'), findsOneWidget);
 
         final history = await stockMutationRepository.getHistoryForProduct(product.id);
         expect(

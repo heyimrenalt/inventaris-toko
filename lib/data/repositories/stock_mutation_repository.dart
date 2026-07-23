@@ -131,7 +131,11 @@ class StockMutationRepository {
   /// Whether [mutationId] is actually eligible to be undone (e.g. "only
   /// the most recent mutation for a product") is entirely the caller's
   /// concern — this method just executes the compensating write.
-  Future<void> undoMutation(int mutationId) async {
+  /// Cancels [mutationId] by writing a compensating (reversing) entry and
+  /// returns that new entry — the caller can pass its id straight back to
+  /// [undoMutation] again to "undo the undo" (e.g. a SnackBar's Urungkan
+  /// action), which re-applies the original quantity.
+  Future<StockMutation> undoMutation(int mutationId) async {
     final original = await _isar.stockMutations.get(mutationId);
     if (original == null) {
       throw NotFoundException('Mutation $mutationId not found');
@@ -154,7 +158,7 @@ class StockMutationRepository {
     // same user input, so it carries no entered-unit provenance of its
     // own — same reasoning as why its note is reworded rather than
     // copied verbatim.
-    await recordMutation(
+    return recordMutation(
       productId: original.productId,
       type: compensatingType,
       quantity: original.quantity,

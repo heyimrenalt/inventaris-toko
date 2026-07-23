@@ -11,7 +11,7 @@ import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_dimensions.dart';
 import '../../widgets/app_header.dart';
-import '../../widgets/confirm_dialog.dart';
+import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../../widgets/product_search_bar.dart';
@@ -143,25 +143,29 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
+  /// Cancels a mutation immediately (no confirm dialog) and surfaces an
+  /// "Urungkan" action in the SnackBar instead — the reversible,
+  /// undo-friendly pattern the user asked for. Stock on the Produk/Detail
+  /// pages re-adjusts on its own via their stockMutations watchLazy
+  /// streams, so no manual cross-screen refresh is needed here.
   Future<void> _cancelMutation(StockMutation mutation) async {
-    final confirmed = await showConfirmDialog(
-      context: context,
-      title: 'Batalkan Mutasi',
-      message: 'Batalkan mutasi ini? Ini akan membuat entri pembalik di riwayat.',
-      confirmLabel: 'Ya, Batalkan',
-      isDestructive: true,
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-
-    await _mutationRepository.undoMutation(mutation.id);
+    final reversal = await _mutationRepository.undoMutation(mutation.id);
     await _load();
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Mutasi dibatalkan'),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Urungkan',
+          textColor: const Color(0xFF69F0AE),
+          onPressed: () async {
+            // Reversing the reversal re-applies the original quantity.
+            await _mutationRepository.undoMutation(reversal.id);
+            await _load();
+          },
+        ),
       ),
     );
   }
@@ -251,59 +255,11 @@ class _MutasiScreenState extends State<MutasiScreen> {
 
   Widget _buildFilterBar() {
     final now = DateTime.now();
-    final start = _selectedRange?.start ?? now.subtract(const Duration(days: 7));
-    final end = _selectedRange?.end ?? now;
-    final dateLabel =
-        '${start.day} ${_monthName(start.month)} — ${end.day} ${_monthName(end.month)} ${end.year}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () {
-                showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(now.year - 2),
-                  lastDate: now,
-                  initialDateRange: _selectedRange,
-                ).then((range) {
-                  if (range != null) {
-                    setState(() => _selectedRange = range);
-                  }
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        dateLabel,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF1C1C1C),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(Icons.expand_more, size: 18),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return DateRangeFilterBar(
+      selectedRange: _selectedRange,
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
+      onChanged: (range) => setState(() => _selectedRange = range),
     );
   }
 
@@ -313,24 +269,6 @@ class _MutasiScreenState extends State<MutasiScreen> {
         builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
       ),
     );
-  }
-
-  String _monthName(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des'
-    ];
-    return months[month - 1];
   }
 
   Widget _buildBody() {
