@@ -10,11 +10,10 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_dimensions.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/category_tree_picker.dart';
 import '../../widgets/product_list_item.dart';
-import '../../widgets/product_search_bar.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 import 'sort_mode.dart';
@@ -55,9 +54,12 @@ class _ProdukScreenState extends State<ProdukScreen> {
   late final CategoryRepository _categoryRepository =
       widget.categoryRepository ?? CategoryRepository(widget.isar);
 
+  final TextEditingController _searchController = TextEditingController();
+
   List<Product> _products = [];
   List<Category> _categories = [];
   CategorySelection _selection = const CategorySelection.all();
+  String _searchQuery = '';
   bool _loading = true;
   SortMode _sortMode = SortMode.defaultOrder;
 
@@ -87,6 +89,7 @@ class _ProdukScreenState extends State<ProdukScreen> {
   void dispose() {
     _productsSubscription?.cancel();
     _categoriesSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -139,9 +142,12 @@ class _ProdukScreenState extends State<ProdukScreen> {
     _loadData();
   }
 
-  /// Results sorted according to [_sortMode].
+  /// [_products] (already scoped to the selected category, archived
+  /// excluded) filtered in memory by [_searchQuery], then sorted by
+  /// [_sortMode]. In-memory filtering is cheap at this app's data scale.
   List<Product> get _visibleProducts {
-    return sortProducts(products: _products, sortMode: _sortMode);
+    final filtered = filterProducts(products: _products, searchQuery: _searchQuery);
+    return sortProducts(products: filtered, sortMode: _sortMode);
   }
 
   Future<void> _openAddForm() async {
@@ -174,7 +180,12 @@ class _ProdukScreenState extends State<ProdukScreen> {
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  _buildSearchBar(),
+                  const SizedBox(height: 12),
+                  AppSearchBar(
+                    controller: _searchController,
+                    hintText: 'Cari produk...',
+                    onChanged: (query) => setState(() => _searchQuery = query),
+                  ),
                   const SizedBox(height: 12),
                   _buildFilterBar(),
                 ],
@@ -205,41 +216,6 @@ class _ProdukScreenState extends State<ProdukScreen> {
           ? SortMode.stockAscending
           : SortMode.defaultOrder;
     });
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-          boxShadow: AppDimensions.elevatedSearchShadow,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                  ),
-            ),
-            child: ProductSearchBar(
-              productRepository: _productRepository,
-              onProductSelected: _openDetail,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildFilterBar() {

@@ -175,7 +175,9 @@
       "Bash(git commit -m ' *)",
       "Bash(adb shell *)",
       "Bash(adb logcat *)",
-      "Bash(pkill adb *)"
+      "Bash(pkill adb *)",
+      "Bash(grep -iE \"expected|actual|but:|reason|overflow|Which:|pixels|EXCEPTION|assert\" /tmp/ptest.txt)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

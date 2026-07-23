@@ -11,12 +11,10 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/restock_list_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
-import '../../theme/app_colors.dart';
-import '../../theme/app_dimensions.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/priority_product_card.dart';
-import '../../widgets/product_search_bar.dart';
 import '../../widgets/restock_qty_field.dart';
 import '../produk/product_detail_screen.dart';
 import 'kulakan_list_screen.dart';
@@ -41,8 +39,20 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
   late final RestockListRepository _restockListRepository = RestockListRepository(widget.isar);
   static const _calculator = PrioritasKulakanCalculator();
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   List<PrioritasKulakanResult> _results = [];
   bool _loading = true;
+
+  /// [_results] filtered in memory by product name against [_searchQuery].
+  List<PrioritasKulakanResult> get _visibleResults {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _results;
+    return _results
+        .where((r) => r.product.name.toLowerCase().contains(query))
+        .toList();
+  }
 
   /// Which products' checkboxes are currently ticked. Nothing is ever
   /// auto-checked (including on first load) — the user picks items
@@ -102,6 +112,7 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
     _productsSubscription?.cancel();
     _mutationsSubscription?.cancel();
     _settingsSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -271,55 +282,41 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
               ? _buildEmptyState()
               : Column(
                   children: [
-                    _buildSearchBar(),
+                    const SizedBox(height: 12),
+                    AppSearchBar(
+                      controller: _searchController,
+                      hintText: 'Cari produk...',
+                      onChanged: (query) => setState(() => _searchQuery = query),
+                    ),
                     const SizedBox(height: 12),
                     _buildCentangSemuaBar(),
                     const Divider(height: 0.5, thickness: 0.5),
                     Expanded(
-                      child: ListView.builder(
-                        key: const Key('prioritas_kulakan_list'),
-                        itemCount: _results.length,
-                        itemBuilder: (context, index) => _buildRow(_results[index]),
+                      child: Builder(
+                        builder: (context) {
+                          final visible = _visibleResults;
+                          if (visible.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  'Tidak ditemukan.',
+                                  style: AppTextStyles.body.copyWith(color: Colors.grey[700]),
+                                ),
+                              ),
+                            );
+                          }
+                          return ListView.builder(
+                            key: const Key('prioritas_kulakan_list'),
+                            itemCount: visible.length,
+                            itemBuilder: (context, index) => _buildRow(visible[index]),
+                          );
+                        },
                       ),
                     ),
                     _buildFooter(checkedCount),
                   ],
                 ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-          boxShadow: AppDimensions.elevatedSearchShadow,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                  ),
-            ),
-            child: ProductSearchBar(
-              productRepository: _productRepository,
-              onProductSelected: _openDetail,
-            ),
-          ),
-        ),
-      ),
     );
   }
 

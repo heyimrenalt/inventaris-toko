@@ -407,13 +407,21 @@ void main() {
 
         await pumpScreen(tester);
         for (final product in [a, b, c]) {
-          await tester.tap(find.byKey(Key('kulakan_checkbox_${product.id}')));
+          final checkbox = find.byKey(Key('kulakan_checkbox_${product.id}'));
+          // The search bar above the list means taller lists now scroll —
+          // bring each target into view before tapping it.
+          await tester.ensureVisible(checkbox);
+          await settleAfterAsyncWork(tester);
+          await tester.tap(checkbox);
           await settleAfterAsyncWork(tester);
         }
         // Edit B's qty before creating the list — the edited value (not
         // just the original prefill) must be what survives onto the new
         // list.
-        await tester.enterText(find.byKey(Key('kulakan_qty_field_${b.id}')), '77');
+        final bQtyField = find.byKey(Key('kulakan_qty_field_${b.id}'));
+        await tester.ensureVisible(bQtyField);
+        await settleAfterAsyncWork(tester);
+        await tester.enterText(bQtyField, '77');
         await settleAfterAsyncWork(tester);
 
         await tester.tap(find.byKey(const Key('kulakan_buat_daftar_button')));
