@@ -249,7 +249,7 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Selesai', style: AppTextStyles.body),
+                          : Text('Selesai', style: AppTextStyles.body.copyWith(color: AppColors.white)),
                     ),
                   ),
                 ),

@@ -427,7 +427,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Simpan', style: AppTextStyles.body),
+                  : Text('Simpan', style: AppTextStyles.body.copyWith(color: AppColors.white)),
             ),
           ),
         ],
@@ -461,13 +461,13 @@ class _TypeButton extends StatelessWidget {
               onPressed: onTap,
               style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: AppColors.white),
               icon: Icon(icon),
-              label: Text(label, style: AppTextStyles.body),
+              label: Text(label, style: AppTextStyles.body.copyWith(color: AppColors.white)),
             )
           : OutlinedButton.icon(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(foregroundColor: color, side: BorderSide(color: color)),
               icon: Icon(icon),
-              label: Text(label, style: AppTextStyles.body),
+              label: Text(label, style: AppTextStyles.body.copyWith(color: color)),
             ),
     );
   }

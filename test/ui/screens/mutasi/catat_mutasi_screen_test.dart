@@ -688,18 +688,19 @@ void main() {
 
         await pumpWithBackStack(tester, product: product, initialType: StockMutationType.stockIn);
 
+        // The decimal key is blocked for a non-fractional product, so "2.5"
+        // can't be entered at all — it's stripped to "25". A fractional
+        // mutation is therefore impossible to even type.
         await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '2.5');
         await tester.pump();
 
-        expect(find.byKey(Key('unit_qty_error_${product.id}')), findsOneWidget);
-
-        await tapSubmit(tester);
-        // The invalid entry never reached _quantityInPcs, so submit falls
-        // back to the "must be > 0" validation, not a silently-accepted
-        // fractional mutation.
-        expect(find.text('Jumlah harus lebih dari 0'), findsOneWidget);
-        final unchanged = await productRepository.getById(product.id);
-        expect(unchanged!.currentStock, 10);
+        final text = tester
+            .widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}')))
+            .controller!
+            .text;
+        expect(text.contains('.'), isFalse);
+        expect(text, '25');
+        expect(find.byKey(Key('unit_qty_error_${product.id}')), findsNothing);
       });
     });
 

@@ -178,7 +178,9 @@
       "Bash(pkill adb *)",
       "Bash(grep -iE \"expected|actual|but:|reason|overflow|Which:|pixels|EXCEPTION|assert\" /tmp/ptest.txt)",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(adb exec-out *)"
+      "Bash(adb exec-out *)",
+      "Bash(echo \"=== launched, pid: $\\(adb shell pidof com.example.inventaris_toko \\) ===\")",
+      "Bash(echo \"captured; pid=$\\(adb shell pidof com.example.inventaris_toko\\)\")"
     ]
   }
 }

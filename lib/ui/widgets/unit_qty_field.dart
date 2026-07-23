@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/models/product.dart';
 import '../../data/models/stock_mutation.dart';
@@ -141,6 +142,16 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
 
   VoidCallback? get _decrementOrNull => _currentValue > 0 ? () => _step(-1) : null;
 
+  /// Decimals only make sense for a fractional-unit product entered in pcs
+  /// (kg/liter/ml). Pack/dus are always whole, and a non-fractional product
+  /// is whole in pcs too — so the "."/"," keys are blocked for those rather
+  /// than only flagged after typing.
+  bool get _decimalAllowed => _unit == EnteredUnit.pcs && widget.product.allowsFractionalQuantity;
+
+  List<TextInputFormatter> get _inputFormatters => _decimalAllowed
+      ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
+      : [FilteringTextInputFormatter.digitsOnly];
+
   @override
   Widget build(BuildContext context) {
     final productId = widget.product.id;
@@ -159,7 +170,8 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
               child: TextField(
                 key: Key('unit_qty_field_$productId'),
                 controller: _controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.numberWithOptions(decimal: _decimalAllowed),
+                inputFormatters: _inputFormatters,
                 style: const TextStyle(fontSize: 16),
                 decoration: InputDecoration(labelText: widget.label, isDense: true),
                 onChanged: _onTextChanged,

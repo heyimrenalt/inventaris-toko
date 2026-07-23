@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../theme/app_colors.dart';
+import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 
 /// Simple, static "about" page — no external links and nothing editable,
@@ -69,66 +71,110 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppHeader.withBack(
         title: 'Tentang Aplikasi',
         onBack: () => Navigator.of(context).pop(),
       ),
-      body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  key: const Key('tentang_aplikasi_icon'),
-                  onTap: _onIconTap,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
-                      width: 96,
-                      height: 96,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 8),
+            // App identity header on a white card, matching the elevated
+            // card system used across the rest of the app.
+            _card(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    key: const Key('tentang_aplikasi_icon'),
+                    onTap: _onIconTap,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset('assets/icon/app_icon.png', width: 84, height: 84),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  TentangAplikasiScreen.appName,
-                  key: const Key('tentang_aplikasi_app_name'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Versi $_versionLabel',
-                  key: const Key('tentang_aplikasi_version'),
-                  style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Aplikasi pencatatan stok barang untuk toko kelontong. '
-                  'Dibuat dengan Flutter.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Dibuat oleh ${TentangAplikasiScreen.developerName}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 12),
-                Text('Flutter $_dartVersionLabel', style: const TextStyle(fontSize: 13)),
-                const SizedBox(height: 4),
-                const Text('Database: Isar', style: TextStyle(fontSize: 13)),
-              ],
+                  const SizedBox(height: 14),
+                  Text(
+                    TentangAplikasiScreen.appName,
+                    key: const Key('tentang_aplikasi_app_name'),
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.heading,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.greenSubtle,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Versi $_versionLabel',
+                      key: const Key('tentang_aplikasi_version'),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.greenText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Aplikasi pencatatan stok barang untuk toko kelontong.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body.copyWith(color: AppColors.gray700),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Dibuat oleh ${TentangAplikasiScreen.developerName}',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body.copyWith(color: AppColors.gray700),
+                  ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 12),
+            // Technical info as labelled rows on their own white card.
+            _card(
+              child: Column(
+                children: [
+                  _infoRow('Versi aplikasi', _versionLabel),
+                  const Divider(height: 20),
+                  _infoRow('Flutter', _dartVersionLabel),
+                  const Divider(height: 20),
+                  _infoRow('Database', 'Isar'),
+                ],
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 2)),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.body.copyWith(color: AppColors.gray700)),
+        Text(value, style: AppTextStyles.bodyMedium),
+      ],
+    );
   }
 }

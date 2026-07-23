@@ -547,7 +547,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             )
                           : Text(
                               widget.isEditing ? 'Simpan Perubahan' : 'Simpan',
-                              style: AppTextStyles.body,
+                              style: AppTextStyles.body.copyWith(color: AppColors.white),
                             ),
                     ),
                   ),

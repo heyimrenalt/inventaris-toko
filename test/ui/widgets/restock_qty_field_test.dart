@@ -101,16 +101,21 @@ void main() {
         onChanged: (qty, _) => capturedQty = qty,
       );
 
+      // The decimal key is blocked outright for a non-fractional pcs field,
+      // so "2.5" can't be entered at all — the "." is stripped to "25".
       await tester.enterText(find.byKey(const Key('kulakan_qty_field_1')), '2.5');
       await tester.pump();
 
-      expect(find.byKey(const Key('kulakan_qty_error_1')), findsOneWidget);
-      expect(find.text('Jumlah harus bilangan bulat'), findsOneWidget);
-      expect(capturedQty, isNull);
+      final text = tester.widget<TextField>(find.byKey(const Key('kulakan_qty_field_1'))).controller!.text;
+      expect(text.contains('.'), isFalse);
+      expect(text, '25');
+      // Whatever was captured is a whole number — a fraction is impossible.
+      expect(capturedQty, isNotNull);
+      expect(capturedQty, capturedQty!.roundToDouble());
     },
   );
 
-  testWidgets('pack mode rejects a fractional pack quantity with an inline error', (tester) async {
+  testWidgets('pack mode blocks a fractional pack quantity (decimal key stripped)', (tester) async {
     double? capturedQty;
     await pumpField(
       tester,
@@ -123,11 +128,12 @@ void main() {
     await tester.enterText(find.byKey(const Key('kulakan_qty_field_1')), '2.5');
     await tester.pump();
 
-    expect(find.byKey(const Key('kulakan_qty_error_1')), findsOneWidget);
-    expect(find.text('Jumlah pack harus bilangan bulat'), findsOneWidget);
-    // The last accepted value (the initial one) is what was ever reported —
-    // the invalid 2.5 pack edit must never reach onChanged.
-    expect(capturedQty, isNull);
+    final text = tester.widget<TextField>(find.byKey(const Key('kulakan_qty_field_1'))).controller!.text;
+    expect(text.contains('.'), isFalse);
+    expect(text, '25');
+    // No fractional pack quantity can ever reach onChanged.
+    expect(capturedQty, isNotNull);
+    expect(capturedQty, capturedQty!.roundToDouble());
   });
 
   testWidgets('pack mode accepts a whole-number pack quantity with no error', (tester) async {
@@ -285,12 +291,18 @@ void main() {
       // fractional-dus entry under test.
       capturedQty = null;
 
+      // Dus is always whole even when the product allows fractional pcs —
+      // the decimal key is blocked, so "0.5" is stripped to "05" ("."
+      // removed) and no fractional dus can be entered.
       await tester.enterText(find.byKey(const Key('kulakan_qty_field_1')), '0.5');
       await tester.pump();
 
-      expect(find.byKey(const Key('kulakan_qty_error_1')), findsOneWidget);
-      expect(find.text('Jumlah dus harus bilangan bulat'), findsOneWidget);
-      expect(capturedQty, isNull);
+      final text = tester.widget<TextField>(find.byKey(const Key('kulakan_qty_field_1'))).controller!.text;
+      expect(text.contains('.'), isFalse);
+      // Any value that did reach onChanged is a whole number of pcs.
+      if (capturedQty != null) {
+        expect(capturedQty, capturedQty!.roundToDouble());
+      }
     });
   });
 }

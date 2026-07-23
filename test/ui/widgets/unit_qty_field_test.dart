@@ -173,12 +173,16 @@ void main() {
         onChanged: (qty, _, _) => capturedQty = qty,
       );
 
+      // Decimal key blocked for a non-fractional product — "2.5" is stripped
+      // to "25", so a fraction can never be entered.
       await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '2.5');
       await tester.pump();
 
-      expect(find.byKey(const Key('unit_qty_error_1')), findsOneWidget);
-      expect(find.text('Jumlah harus bilangan bulat'), findsOneWidget);
-      expect(capturedQty, isNull);
+      final text = tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text;
+      expect(text.contains('.'), isFalse);
+      expect(text, '25');
+      expect(capturedQty, isNotNull);
+      expect(capturedQty, capturedQty!.roundToDouble());
     },
   );
 
@@ -213,17 +217,20 @@ void main() {
         onChanged: (qty, _, _) => capturedQty = qty,
       );
 
+      // Pack is always whole — decimal key blocked, "2.5" stripped to "25".
       await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '2.5');
       await tester.pump();
 
-      expect(find.byKey(const Key('unit_qty_error_1')), findsOneWidget);
-      expect(find.text('Jumlah pack harus bilangan bulat'), findsOneWidget);
-      expect(capturedQty, isNull);
+      final text = tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text;
+      expect(text.contains('.'), isFalse);
+      expect(text, '25');
+      expect(capturedQty, isNotNull);
+      expect(capturedQty, capturedQty!.roundToDouble());
     },
   );
 
   testWidgets(
-    'dus mode rejects a fractional value even for a product with allowsFractionalQuantity: true '
+    'dus mode blocks a fractional value even for a product with allowsFractionalQuantity: true '
     '— that flag only governs the base pcs unit',
     (tester) async {
       double? capturedQty;
@@ -235,12 +242,15 @@ void main() {
         onChanged: (qty, _, _) => capturedQty = qty,
       );
 
+      // Dus is always whole — decimal key blocked, "." stripped from "0.5".
       await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '0.5');
       await tester.pump();
 
-      expect(find.byKey(const Key('unit_qty_error_1')), findsOneWidget);
-      expect(find.text('Jumlah dus harus bilangan bulat'), findsOneWidget);
-      expect(capturedQty, isNull);
+      final text = tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text;
+      expect(text.contains('.'), isFalse);
+      if (capturedQty != null) {
+        expect(capturedQty, capturedQty!.roundToDouble());
+      }
     },
   );
 

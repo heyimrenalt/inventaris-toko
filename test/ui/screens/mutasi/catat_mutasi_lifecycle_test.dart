@@ -246,16 +246,24 @@ void main() {
     });
   });
 
-  testWidgets('validation: negative quantity shows inline error, no crash', (tester) async {
+  testWidgets('validation: negative quantity cannot be entered (minus key blocked), no crash',
+      (tester) async {
     await tester.runAsync(() async {
       await expectNoFlutterErrors(tester, () async {
         final product = await seedProduct();
         await pumpForm(tester, product: product, initialType: StockMutationType.stockIn);
 
+        // The quantity field only accepts digits, so the "-" is stripped —
+        // a negative quantity can't be typed in the first place.
         await tester.enterText(find.byKey(Key('unit_qty_field_${product.id}')), '-5');
-        await tapSubmit(tester);
+        await tester.pump();
 
-        expect(find.text('Jumlah harus lebih dari 0'), findsOneWidget);
+        final text = tester
+            .widget<TextField>(find.byKey(Key('unit_qty_field_${product.id}')))
+            .controller!
+            .text;
+        expect(text.contains('-'), isFalse);
+        expect(text, '5');
         expect(find.byType(CatatMutasiScreen), findsOneWidget);
       });
     });

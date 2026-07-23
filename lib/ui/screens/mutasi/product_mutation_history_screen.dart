@@ -5,6 +5,7 @@ import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
 
@@ -27,6 +28,14 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   int? _mostRecentMutationId;
   bool _loading = true;
 
+  /// Default newest-first (matches the Mutasi tab); the toggle flips to
+  /// oldest-first.
+  bool _newestFirst = true;
+
+  /// Optional date-range narrowing, entered via the same manual
+  /// DD/MM/YYYY [DateRangeFilterBar] used on the Mutasi tab.
+  DateTimeRange? _selectedRange;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +51,25 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
       _mostRecentMutationId = mostRecent?.id;
       _loading = false;
     });
+  }
+
+  /// [_mutations] (repository order = newest-first) narrowed by
+  /// [_selectedRange] and re-ordered per [_newestFirst].
+  List<StockMutation> get _visibleMutations {
+    Iterable<StockMutation> result = _mutations;
+    final range = _selectedRange;
+    if (range != null) {
+      final startInclusive = DateTime(range.start.year, range.start.month, range.start.day);
+      final endExclusive =
+          DateTime(range.end.year, range.end.month, range.end.day).add(const Duration(days: 1));
+      result = result.where(
+        (m) => !m.createdAt.isBefore(startInclusive) && m.createdAt.isBefore(endExclusive),
+      );
+    }
+    final list = result.toList();
+    list.sort((a, b) =>
+        _newestFirst ? b.createdAt.compareTo(a.createdAt) : a.createdAt.compareTo(b.createdAt));
+    return list;
   }
 
   /// Cancels immediately and offers an "Urungkan" action in the SnackBar
@@ -75,6 +103,14 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
       appBar: AppHeader.withBack(
         title: 'Riwayat ${widget.product.name}',
         onBack: () => Navigator.of(context).pop(),
+        trailing: _mutations.isEmpty
+            ? null
+            : IconButton(
+                key: const Key('mutation_history_sort_toggle'),
+                tooltip: _newestFirst ? 'Urut: Terbaru dulu' : 'Urut: Terlama dulu',
+                icon: Icon(_newestFirst ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded),
+                onPressed: () => setState(() => _newestFirst = !_newestFirst),
+              ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -98,24 +134,43 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   // in day_grouped_mutations.dart — kept identical on purpose so the two
   // screens never drift apart.
   Widget _buildHistory() {
-    final grouped = groupMutationsByDay(_mutations);
+    final now = DateTime.now();
+    final visible = _visibleMutations;
+    final grouped = groupMutationsByDay(visible);
 
     return ListView(
       children: [
-        // Already sorted newest-first by the repository, so grouping by
-        // insertion order naturally keeps both the day groups and each
-        // day's entries in newest-first order too.
-        for (final entry in grouped.entries) ...[
-          DayHeader(label: formatDayLabel(entry.key)),
-          for (final mutation in entry.value)
-            MutationListItem(
-              mutation: mutation,
-              productName: widget.product.name,
-              unit: widget.product.unit,
-              canCancel: _mostRecentMutationId == mutation.id,
-              onCancel: () => _cancelMutation(mutation),
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: DateRangeFilterBar(
+            selectedRange: _selectedRange,
+            firstDate: DateTime(now.year - 5),
+            lastDate: now,
+            onChanged: (range) => setState(() => _selectedRange = range),
+          ),
+        ),
+        const Divider(height: 0.5, thickness: 0.5),
+        if (visible.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Tidak ada mutasi pada rentang tanggal ini.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
             ),
-        ],
+          )
+        else
+          for (final entry in grouped.entries) ...[
+            DayHeader(label: formatDayLabel(entry.key)),
+            for (final mutation in entry.value)
+              MutationListItem(
+                mutation: mutation,
+                productName: widget.product.name,
+                unit: widget.product.unit,
+                canCancel: _mostRecentMutationId == mutation.id,
+                onCancel: () => _cancelMutation(mutation),
+              ),
+          ],
       ],
     );
   }

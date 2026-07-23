@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/models/stock_mutation.dart';
 import '../../domain/unit_conversion.dart';
@@ -151,6 +152,18 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
     widget.onChanged(currentQtyInPcs, newUnit == EnteredUnit.pack);
   }
 
+  /// Decimals are only meaningful for a fractional-unit product entered in
+  /// pcs (kg/liter/ml, etc.). Pack and dus are always whole, and a
+  /// non-fractional product is whole even in pcs — so for those the "."/","
+  /// keys are blocked outright rather than merely flagged after the fact.
+  bool get _decimalAllowed => _unit == EnteredUnit.pcs && widget.allowsFractionalQuantity;
+
+  TextInputType get _keyboardType => TextInputType.numberWithOptions(decimal: _decimalAllowed);
+
+  List<TextInputFormatter> get _inputFormatters => _decimalAllowed
+      ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
+      : [FilteringTextInputFormatter.digitsOnly];
+
   @override
   Widget build(BuildContext context) {
     final availableUnits = _availableUnits;
@@ -170,7 +183,8 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
                 child: TextField(
                   key: Key('kulakan_qty_field_${widget.productId}'),
                   controller: _controller,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: _keyboardType,
+                  inputFormatters: _inputFormatters,
                   textAlign: TextAlign.center,
                   decoration: const InputDecoration(suffixText: 'pcs', isDense: true),
                   onChanged: _onTextChanged,
@@ -201,7 +215,8 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
               child: TextField(
                 key: Key('kulakan_qty_field_${widget.productId}'),
                 controller: _controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: _keyboardType,
+                inputFormatters: _inputFormatters,
                 textAlign: TextAlign.center,
                 decoration: const InputDecoration(isDense: true),
                 onChanged: _onTextChanged,

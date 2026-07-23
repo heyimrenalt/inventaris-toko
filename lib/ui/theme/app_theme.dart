@@ -32,7 +32,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         shadowColor: Colors.transparent,
-        centerTitle: true,
+        centerTitle: false,
         titleTextStyle: AppTextStyles.heading,
         iconTheme: IconThemeData(color: AppColors.darkText),
         systemOverlayStyle: SystemUiOverlayStyle(

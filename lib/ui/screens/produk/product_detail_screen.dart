@@ -54,6 +54,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Product? _product;
   String? _categoryBreadcrumb;
   List<StockMutation> _recentMutations = [];
+  bool _hasMoreMutations = false;
   bool _loading = true;
 
   StreamSubscription<void>? _mutationsSubscription;
@@ -81,17 +82,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final product = await _productRepository.getById(widget.productId);
     final categoryId = product?.categoryId;
     final categoryBreadcrumb = categoryId == null ? null : await _buildCategoryBreadcrumb(categoryId);
-    final recentMutations = product == null
+    // Fetch one more than we display so we can tell whether a
+    // "Selengkapnya" button is warranted (more than the 7 shown exist)
+    // without a separate count query.
+    final recentPlusOne = product == null
         ? <StockMutation>[]
         : await _stockMutationRepository.getRecentHistoryForProduct(
             product.id,
-            _recentMutationsLimit,
+            _recentMutationsLimit + 1,
           );
+    final hasMore = recentPlusOne.length > _recentMutationsLimit;
+    final recentMutations = recentPlusOne.take(_recentMutationsLimit).toList();
     if (!mounted) return;
     setState(() {
       _product = product;
       _categoryBreadcrumb = categoryBreadcrumb;
       _recentMutations = recentMutations;
+      _hasMoreMutations = hasMore;
       _loading = false;
     });
   }
@@ -457,19 +464,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           else ...[
             for (final mutation in _recentMutations)
               MutationListItem(mutation: mutation, productName: product.name, unit: product.unit),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _openFullHistory(product),
-                child: Text(
-                  'Lihat semua',
-                  style: AppTextStyles.body.copyWith(
-                    color: const Color(0xFF00AA0D),
-                    fontWeight: FontWeight.w600,
+            // Only offer "Selengkapnya" when there's actually more history
+            // than the 7 rows shown here — otherwise the list above already
+            // shows everything.
+            if (_hasMoreMutations)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const Key('product_detail_selengkapnya_button'),
+                  onPressed: () => _openFullHistory(product),
+                  icon: const Icon(Icons.expand_more, size: 20, color: Color(0xFF00AA0D)),
+                  label: Text(
+                    'Selengkapnya',
+                    style: AppTextStyles.body.copyWith(
+                      color: const Color(0xFF00AA0D),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ],
       ),
