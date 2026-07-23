@@ -303,12 +303,18 @@ class _BerandaScreenState extends State<BerandaScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Second row: Total Keuntungan (full width)
-        StatCard(
-          key: const Key('beranda_summary_total_keuntungan'),
-          label: 'Total Keuntungan',
-          value: _formatCurrency(_totalProfit),
-          variant: StatCardVariant.yellow,
+        // Second row: Total Keuntungan (spans both columns, same width as top row)
+        Row(
+          children: [
+            Expanded(
+              child: StatCard(
+                key: const Key('beranda_summary_total_keuntungan'),
+                label: 'Total Keuntungan',
+                value: _formatCurrency(_totalProfit),
+                variant: StatCardVariant.yellow,
+              ),
+            ),
+          ],
         ),
       ],
     );
