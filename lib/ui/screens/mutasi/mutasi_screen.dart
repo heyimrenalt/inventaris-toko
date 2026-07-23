@@ -246,6 +246,10 @@ class _MutasiScreenState extends State<MutasiScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (hasAnyMutations) ...[
+          // Top gap so the search bar clears the app bar, matching the
+          // spacing on Produk/Prioritas/Sering Keluar (the search bar was
+          // sitting flush against the header here — "ngga presisi").
+          const SizedBox(height: 12),
           _buildSearchBar(),
           const SizedBox(height: 12),
           _buildFilterBar(),

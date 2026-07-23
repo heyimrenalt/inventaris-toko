@@ -183,7 +183,8 @@
       "Bash(echo \"captured; pid=$\\(adb shell pidof com.example.inventaris_toko\\)\")",
       "Bash(echo \"launched pid=$\\(adb shell pidof com.example.inventaris_toko\\)\")",
       "Bash(echo \"app pid=$\\(adb shell pidof com.example.inventaris_toko\\)\")",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(echo \"pid=$\\(adb shell pidof com.example.inventaris_toko\\)\")"
     ]
   }
 }
