@@ -91,7 +91,17 @@ class RestockListRepository {
   }) async {
     final list = await _requireList(listId);
     final item = _requireItem(list, productId);
-    item.qtyInPcs = qtyInPcs;
+
+    // Validate: reject fractional quantities for non-fractional units (pcs/pack/dus)
+    final product = await _isar.products.get(productId);
+    if (product != null && !product.allowsFractionalQuantity) {
+      // For non-fractional products, round to nearest integer to prevent decimals
+      final roundedQty = qtyInPcs.roundToDouble();
+      item.qtyInPcs = roundedQty;
+    } else {
+      item.qtyInPcs = qtyInPcs;
+    }
+
     item.inputUnitWasPack = inputUnitWasPack;
     await _isar.writeTxn(() => _isar.restockLists.put(list));
     return list;

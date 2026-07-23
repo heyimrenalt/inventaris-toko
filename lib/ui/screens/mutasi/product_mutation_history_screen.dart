@@ -50,7 +50,7 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
       context: context,
       title: 'Batalkan Mutasi',
       message: 'Batalkan mutasi ini? Ini akan membuat entri pembalik di riwayat.',
-      confirmLabel: 'Batalkan',
+      confirmLabel: 'Ya, Batalkan',
       isDestructive: true,
     );
     if (confirmed != true) return;

@@ -320,57 +320,74 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
 
   Widget _buildProductRow(RestockListItem item, Product product) {
     final isArchived = product.isArchived;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Checkbox(
-            key: Key('kulakan_list_checkbox_${product.id}'),
-            value: item.isChecked,
-            onChanged: (_) => _toggleChecked(product.id),
-          ),
-          _Thumbnail(photoPath: product.photoPath),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isArchived ? '${product.name} (diarsipkan)' : product.name,
-                    key: isArchived ? Key('kulakan_list_archived_marker_${product.id}') : null,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: isArchived ? AppColors.gray500 : null,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
-                    style: AppTextStyles.caption,
-                  ),
-                ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Checkbox(
+                key: Key('kulakan_list_checkbox_${product.id}'),
+                value: item.isChecked,
+                onChanged: (_) => _toggleChecked(product.id),
               ),
-            ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          _Thumbnail(photoPath: product.photoPath),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isArchived ? '${product.name} (diarsipkan)' : product.name,
+                                  key: isArchived ? Key('kulakan_list_archived_marker_${product.id}') : null,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: isArchived ? AppColors.gray500 : null,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
+                                  style: AppTextStyles.caption.copyWith(color: AppColors.gray700),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: RestockQtyField(
+                  productId: product.id,
+                  unitsPerPack: product.unitsPerPack,
+                  unitsPerDus: product.unitsPerDus,
+                  initialQtyInPcs: item.qtyInPcs,
+                  initialInputUnitWasPack: item.inputUnitWasPack,
+                  allowsFractionalQuantity: product.allowsFractionalQuantity,
+                  onChanged: (qtyInPcs, inputUnitWasPack) =>
+                      _onQtyChanged(product.id, qtyInPcs, inputUnitWasPack),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: RestockQtyField(
-              productId: product.id,
-              unitsPerPack: product.unitsPerPack,
-              initialQtyInPcs: item.qtyInPcs,
-              initialInputUnitWasPack: item.inputUnitWasPack,
-              allowsFractionalQuantity: product.allowsFractionalQuantity,
-              onChanged: (qtyInPcs, inputUnitWasPack) =>
-                  _onQtyChanged(product.id, qtyInPcs, inputUnitWasPack),
-            ),
-          ),
-        ],
-      ),
+        ),
+        const Divider(height: 1, thickness: 0.5),
+      ],
     );
   }
 }
