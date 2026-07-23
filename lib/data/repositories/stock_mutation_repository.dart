@@ -227,6 +227,27 @@ class StockMutationRepository {
     }
     return StockMutationTotals(stockIn: stockIn, stockOut: stockOut);
   }
+
+  /// Calculates total profit from all stock-out mutations.
+  /// Profit per unit = sellPrice - averageCostPrice
+  /// If a product has no averageCostPrice, no profit is counted for its stock-outs.
+  Future<double> calculateTotalProfit() async {
+    final stockOutMutations = await _isar.stockMutations
+        .filter()
+        .typeEqualTo(StockMutationType.stockOut)
+        .findAll();
+
+    double totalProfit = 0.0;
+    for (final mutation in stockOutMutations) {
+      final product = await _isar.products.get(mutation.productId);
+      if (product != null && product.averageCostPrice != null) {
+        final profitPerUnit = product.sellPrice - product.averageCostPrice!;
+        totalProfit += profitPerUnit * mutation.quantity;
+      }
+    }
+
+    return totalProfit;
+  }
 }
 
 class StockMutationTotals {

@@ -68,6 +68,7 @@ class _BerandaScreenState extends State<BerandaScreen> {
   int _totalProducts = 0;
   List<PrioritasKulakanResult> _priorityResults = [];
   List<PrioritasKulakanResult> _frequentlySoldResults = [];
+  double _totalProfit = 0.0;
   bool _loading = true;
 
   StreamSubscription<void>? _productsSubscription;
@@ -133,11 +134,14 @@ class _BerandaScreenState extends State<BerandaScreen> {
     final byVelocity = results.toList()
       ..sort((a, b) => b.dailyVelocity.compareTo(a.dailyVelocity));
 
+    final totalProfit = await _mutationRepository.calculateTotalProfit();
+
     if (!mounted) return;
     setState(() {
       _totalProducts = products.length;
       _priorityResults = results;
       _frequentlySoldResults = byVelocity.take(_previewCount).toList();
+      _totalProfit = totalProfit;
       _loading = false;
     });
   }
@@ -270,10 +274,10 @@ class _BerandaScreenState extends State<BerandaScreen> {
     );
   }
 
-  // IntrinsicHeight + a stretching Row is what actually guarantees the two
-  // cards render at the exact same height — Expanded alone only equalizes
+  // IntrinsicHeight + a stretching Row is what actually guarantees the cards
+  // render at the exact same height — Expanded alone only equalizes
   // their width, so any difference in content (e.g. label text wrapping
-  // differently) would otherwise let one card grow taller than the other.
+  // differently) would otherwise let cards grow taller than others.
   Widget _buildSummaryCards() {
     return IntrinsicHeight(
       child: Row(
@@ -296,9 +300,30 @@ class _BerandaScreenState extends State<BerandaScreen> {
               variant: StatCardVariant.red,
             ),
           ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: StatCard(
+              key: const Key('beranda_summary_total_keuntungan'),
+              label: 'Total Keuntungan',
+              value: _formatCurrency(_totalProfit),
+              variant: StatCardVariant.yellow,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  String _formatCurrency(double value) {
+    // Format as Rp with thousands separator, no decimals for large amounts
+    final absValue = value.abs();
+    if (absValue >= 1000000) {
+      return 'Rp${(value / 1000000).toStringAsFixed(1)}jt';
+    } else if (absValue >= 1000) {
+      return 'Rp${(value / 1000).toStringAsFixed(0)}rb';
+    } else {
+      return 'Rp${value.toStringAsFixed(0)}';
+    }
   }
 
   Widget _buildPrioritasKulakanSection() {
