@@ -16,6 +16,7 @@ class MutationListItem extends StatelessWidget {
     required this.unit,
     this.canCancel = false,
     this.onCancel,
+    this.onTap,
   });
 
   final StockMutation mutation;
@@ -32,6 +33,10 @@ class MutationListItem extends StatelessWidget {
   /// [canCancel] is true. The calling screen owns confirmation, calling
   /// [StockMutationRepository.undoMutation], and refreshing afterwards.
   final VoidCallback? onCancel;
+
+  /// Called when the user taps anywhere on the row (except the cancel button).
+  /// Typically used to navigate to the product detail screen.
+  final VoidCallback? onTap;
 
   bool get _isIn => mutation.type == StockMutationType.stockIn;
 
@@ -70,9 +75,11 @@ class MutationListItem extends StatelessWidget {
     final sign = _isIn ? '+' : '-';
     final note = mutation.note;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
@@ -135,6 +142,7 @@ class MutationListItem extends StatelessWidget {
             ),
           ],
         ],
+        ),
       ),
     );
   }

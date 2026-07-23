@@ -13,6 +13,7 @@ import '../../widgets/app_search_bar.dart';
 import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
+import '../produk/product_detail_screen.dart';
 import 'catat_mutasi_screen.dart';
 import 'catat_stok_keluar_batch_screen.dart';
 
@@ -143,6 +144,13 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
+  Future<void> _openProductDetail(int productId) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ProductDetailScreen(isar: widget.isar, productId: productId)),
+    );
+    await _load();
+  }
+
   /// Cancels a mutation immediately (no confirm dialog) and surfaces an
   /// "Urungkan" action in the SnackBar instead — the reversible,
   /// undo-friendly pattern the user asked for. Stock on the Produk/Detail
@@ -269,6 +277,7 @@ class _MutasiScreenState extends State<MutasiScreen> {
                 unit: _productById[mutation.productId]?.unit ?? '',
                 canCancel: _mostRecentMutationIdByProduct[mutation.productId] == mutation.id,
                 onCancel: () => _cancelMutation(mutation),
+                onTap: () => _openProductDetail(mutation.productId),
               ),
           ],
       ],
