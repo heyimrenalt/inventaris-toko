@@ -177,7 +177,8 @@
       "Bash(adb logcat *)",
       "Bash(pkill adb *)",
       "Bash(grep -iE \"expected|actual|but:|reason|overflow|Which:|pixels|EXCEPTION|assert\" /tmp/ptest.txt)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(adb exec-out *)"
     ]
   }
 }

@@ -526,12 +526,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// Only shown when [Product.unitsPerPack] is set — a plain pcs-only
-  /// product has no packaging hierarchy worth explaining.
+  /// Shown whenever the product has any packaging tier configured — a
+  /// pack, a dus, or both. A dus can be defined directly in pcs without a
+  /// pack tier (see UnitConversion), so this must not require unitsPerPack
+  /// to be set — that was hiding the whole section for dus-only products.
   Widget _buildKemasanSection(Product product) {
     final unitsPerPack = product.unitsPerPack;
-    if (unitsPerPack == null) return const SizedBox.shrink();
     final unitsPerDus = product.unitsPerDus;
+    if (unitsPerPack == null && unitsPerDus == null) return const SizedBox.shrink();
+
+    final lines = <String>[];
+    if (unitsPerPack != null) {
+      lines.add('1 pack = ${_formatGrouped(unitsPerPack.toDouble())} pcs');
+    }
+    if (unitsPerDus != null) {
+      if (unitsPerPack != null) {
+        lines.add(
+          '1 dus = ${_formatGrouped(unitsPerDus.toDouble())} pack = '
+          '${_formatGrouped((unitsPerDus * unitsPerPack).toDouble())} pcs',
+        );
+      } else {
+        // Dus defined directly in pcs, skipping the pack tier entirely.
+        lines.add('1 dus = ${_formatGrouped(unitsPerDus.toDouble())} pcs');
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -548,17 +566,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             Text('Kemasan', style: AppTextStyles.bodyMedium),
             const SizedBox(height: 8),
-            Text(
-              '1 pack = ${_formatGrouped(unitsPerPack.toDouble())} pcs',
-              style: AppTextStyles.body,
-            ),
-            if (unitsPerDus != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                '1 dus = ${_formatGrouped(unitsPerDus.toDouble())} pack = '
-                '${_formatGrouped((unitsPerDus * unitsPerPack).toDouble())} pcs',
-                style: AppTextStyles.body,
-              ),
+            for (var i = 0; i < lines.length; i++) ...[
+              if (i > 0) const SizedBox(height: 4),
+              Text(lines[i], style: AppTextStyles.body),
             ],
           ],
         ),

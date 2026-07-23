@@ -370,7 +370,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       body: _initializing
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              // Reserve the system navigation-bar inset at the bottom so the
+              // "Simpan" button clears the Android nav bar — without this it
+              // renders underneath it and taps land on the nav bar instead of
+              // the button (reported as "tombol Simpan tidak bisa diklik").
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).padding.bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
