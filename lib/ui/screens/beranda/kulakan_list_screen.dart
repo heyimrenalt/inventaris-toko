@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar_community/isar.dart';
@@ -10,11 +8,13 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../../data/models/product.dart';
 import '../../../data/models/restock_list.dart';
+import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/restock_list_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../domain/unit_conversion.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/restock_qty_field.dart';
 
@@ -318,56 +318,84 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
     );
   }
 
+  /// Deliberately mirrors PrioritasKulakanScreen._buildRow /
+  /// PriorityProductCard._buildFull exactly so the two lists look identical:
+  /// a single row of [checkbox | green accent bar + name + stock + unit
+  /// conversion | quantity stepper]. No urgency label here (this is a
+  /// shopping list, not the priority calculation), and no photo — same as
+  /// Prioritas Kulakan.
   Widget _buildProductRow(RestockListItem item, Product product) {
     final isArchived = product.isArchived;
-    // Two-line layout: product info (checkbox + photo + name + stock) spans
-    // the full width on top so the name never gets crushed, and the qty
-    // stepper/unit toggle sits on its own line below, right-aligned, with
-    // room for its pcs/pack/dus toggle. A single cramped row left almost no
-    // width for the name ("Teh …") — this keeps everything readable.
+    final accentColor = isArchived ? AppColors.gray500 : AppColors.primary;
+    final conversion = _stockConversionLine(
+      product.currentStock,
+      product.unitsPerPack,
+      product.unitsPerDus,
+    );
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 12, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Checkbox(
-                    key: Key('kulakan_list_checkbox_${product.id}'),
-                    value: item.isChecked,
-                    onChanged: (_) => _toggleChecked(product.id),
-                  ),
-                  _Thumbnail(photoPath: product.photoPath),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isArchived ? '${product.name} (diarsipkan)' : product.name,
-                          key: isArchived ? Key('kulakan_list_archived_marker_${product.id}') : null,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: isArchived ? AppColors.gray500 : null,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.gray700),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Checkbox(
+                key: Key('kulakan_list_checkbox_${product.id}'),
+                value: item.isChecked,
+                onChanged: (_) => _toggleChecked(product.id),
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
+              Expanded(
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(width: 6, color: accentColor),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                isArchived ? '${product.name} (diarsipkan)' : product.name,
+                                key: isArchived
+                                    ? Key('kulakan_list_archived_marker_${product.id}')
+                                    : null,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isArchived ? AppColors.gray500 : null,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
+                                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (conversion != null)
+                                Text(
+                                  conversion,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: RestockQtyField(
                   productId: product.id,
                   unitsPerPack: product.unitsPerPack,
@@ -392,43 +420,51 @@ extension _FirstOrNull<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }
 
-class _Thumbnail extends StatelessWidget {
-  const _Thumbnail({required this.photoPath});
-
-  final String? photoPath;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = photoPath;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: (path == null || path.isEmpty)
-            ? _placeholder()
-            : Image.file(
-                File(path),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => _placeholder(),
-              ),
-      ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: AppColors.gray300,
-      child: Icon(Icons.inventory_2_outlined, color: AppColors.gray500),
-    );
-  }
-}
-
 String _formatNumber(double value) {
   if (value == value.roundToDouble()) {
     return value.toInt().toString();
   }
   return value.toStringAsFixed(1);
+}
+
+/// "= 6 pack = 1 dus" breakdown of [currentStock] — identical rule and
+/// output to PriorityProductCard's own stock conversion, so the Daftar
+/// Kulakan rows read exactly like the Prioritas Kulakan rows.
+String? _stockConversionLine(double currentStock, int? unitsPerPack, int? unitsPerDus) {
+  final parts = <String>[];
+  if (unitsPerPack != null) {
+    final packs = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.pack,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(packs)) parts.add('${_formatGrouped(packs)} pack');
+  }
+  if (unitsPerDus != null) {
+    final dus = UnitConversion.fromPcs(
+      qtyInPcs: currentStock,
+      unit: EnteredUnit.dus,
+      unitsPerPack: unitsPerPack,
+      unitsPerDus: unitsPerDus,
+    );
+    if (_isWholeNumber(dus)) parts.add('${_formatGrouped(dus)} dus');
+  }
+  if (parts.isEmpty) return null;
+  return '= ${parts.join(' = ')}';
+}
+
+bool _isWholeNumber(double value) => (value - value.roundToDouble()).abs() < 0.001;
+
+String _formatGrouped(double value) {
+  final digits = value.round().toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    final positionFromEnd = digits.length - i;
+    buffer.write(digits[i]);
+    if (positionFromEnd > 1 && positionFromEnd % 3 == 1) buffer.write('.');
+  }
+  return buffer.toString();
 }
 
 const _shareMonths = [
