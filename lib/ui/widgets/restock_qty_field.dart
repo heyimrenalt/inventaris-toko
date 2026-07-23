@@ -166,7 +166,7 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
             children: [
               _stepperButton(suffix: 'minus', icon: Icons.remove, onPressed: _decrementOrNull),
               SizedBox(
-                width: 70,
+                width: 90,
                 child: TextField(
                   key: Key('kulakan_qty_field_${widget.productId}'),
                   controller: _controller,
@@ -197,7 +197,7 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
           children: [
             _stepperButton(suffix: 'minus', icon: Icons.remove, onPressed: _decrementOrNull),
             SizedBox(
-              width: 56,
+              width: 75,
               child: TextField(
                 key: Key('kulakan_qty_field_${widget.productId}'),
                 controller: _controller,

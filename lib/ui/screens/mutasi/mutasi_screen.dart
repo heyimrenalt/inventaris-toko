@@ -8,10 +8,14 @@ import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
+import '../../widgets/product_search_bar.dart';
+import '../produk/product_detail_screen.dart';
 import 'catat_mutasi_screen.dart';
 import 'catat_stok_keluar_batch_screen.dart';
 
@@ -206,6 +210,41 @@ class _MutasiScreenState extends State<MutasiScreen> {
   }
 
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          boxShadow: AppDimensions.elevatedSearchShadow,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
+            ),
+            child: ProductSearchBar(
+              productRepository: _productRepository,
+              onProductSelected: (product) => _openDetail(product),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterBar() {
     final now = DateTime.now();
     final start = _selectedRange?.start ?? now.subtract(const Duration(days: 7));
@@ -264,6 +303,14 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
+  Future<void> _openDetail(Product product) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
+      ),
+    );
+  }
+
   String _monthName(int month) {
     const months = [
       'Jan',
@@ -292,6 +339,8 @@ class _MutasiScreenState extends State<MutasiScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (hasAnyMutations) ...[
+          _buildSearchBar(),
+          const SizedBox(height: 12),
           _buildFilterBar(),
           const Divider(height: 0.5, thickness: 0.5),
         ],

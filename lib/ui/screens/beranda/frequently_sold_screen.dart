@@ -11,6 +11,8 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/category_tree_picker.dart';
@@ -222,27 +224,50 @@ class _FrequentlySoldScreenState extends State<FrequentlySoldScreen> {
   Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: TextField(
-        key: const Key('frequently_sold_search'),
-        controller: _searchController,
-        style: AppTextStyles.body,
-        decoration: InputDecoration(
-          labelText: 'Cari produk',
-          labelStyle: AppTextStyles.body.copyWith(color: Colors.grey[600]),
-          prefixIcon: const Icon(Icons.search, size: 20),
-          suffixIcon: _searchQuery.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.clear, size: 20),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          boxShadow: AppDimensions.elevatedSearchShadow,
         ),
-        onChanged: (value) => setState(() => _searchQuery = value),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
+            ),
+            child: TextField(
+              key: const Key('frequently_sold_search'),
+              controller: _searchController,
+              style: AppTextStyles.body,
+              decoration: InputDecoration(
+                hintText: 'Cari produk...',
+                hintStyle: AppTextStyles.body.copyWith(color: AppColors.gray500),
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.gray500),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, color: AppColors.gray500),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+          ),
+        ),
       ),
     );
   }

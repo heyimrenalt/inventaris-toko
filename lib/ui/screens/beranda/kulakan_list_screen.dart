@@ -519,4 +519,8 @@ String _formatQtyForShare(RestockListItem item, Product product) {
   return '${_formatNumber(packs)} pack (${_formatNumber(item.qtyInPcs)} pcs)';
 }
 
-String _formatShareDate(DateTime date) => '${date.day} ${_shareMonths[date.month - 1]} ${date.year}';
+String _formatShareDate(DateTime date) {
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '${date.day} ${_shareMonths[date.month - 1]} ${date.year} - $hour:$minute';
+}

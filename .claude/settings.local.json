@@ -166,7 +166,13 @@
       "Bash(vm_stat)",
       "Bash(top -l 1 -n 5 -o cpu)",
       "Bash(grep -E \"\\\\.\\(dart|jsx?\\)$\")",
-      "Bash(tee /tmp/analyze.log)"
+      "Bash(tee /tmp/analyze.log)",
+      "Bash(gh repo *)",
+      "Bash(brew install *)",
+      "Bash(gh auth *)",
+      "Bash(git push *)",
+      "Bash(timeout 120 flutter run -d MR9T5L9LJ7GIGYQ8 --no-fast-start)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -14,6 +14,7 @@ import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/hpp_calculator.dart';
 import '../../../domain/unit_conversion.dart';
 import '../../../services/photo_storage_service.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
@@ -48,7 +49,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   );
   late final CategoryRepository _categoryRepository = CategoryRepository(widget.isar);
 
-  static const int _recentMutationsLimit = 5;
+  static const int _recentMutationsLimit = 7;
 
   Product? _product;
   String? _categoryBreadcrumb;
@@ -537,6 +538,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _infoRow(String label, String value) {
+    final isHeading = ['HPP', 'Untung per unit', 'Margin', 'Stok saat ini'].contains(label);
+    final labelColor = isHeading ? AppColors.primary : Colors.grey[700];
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -544,7 +547,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           SizedBox(
             width: 130,
-            child: Text(label, style: AppTextStyles.body.copyWith(color: Colors.grey[700])),
+            child: Text(label, style: AppTextStyles.body.copyWith(color: labelColor)),
           ),
           Expanded(
             child: Text(value, style: AppTextStyles.bodyMedium),

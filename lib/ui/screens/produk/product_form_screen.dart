@@ -13,6 +13,7 @@ import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/hpp_calculator.dart';
 import '../../../domain/unit_conversion.dart';
 import '../../../services/photo_storage_service.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/category_picker_field.dart';
@@ -554,12 +555,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
+        border: Border.all(color: AppColors.primary),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+          const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -567,7 +568,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   ? 'HPP saat ini: belum ada data harga modal'
                   : 'HPP saat ini: ${_formatCurrency(avgCost)}/unit '
                       '(diperbarui otomatis saat restock, atau koreksi manual di bawah)',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              style: const TextStyle(fontSize: 14, color: AppColors.primary),
             ),
           ),
         ],
@@ -737,18 +738,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
+        border: Border.all(color: AppColors.primary),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+          const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Stok saat ini: ${_formatNumberInput(existing.currentStock)} ${existing.unit} '
               '(gunakan menu Stok masuk/keluar untuk mengubah)',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              style: const TextStyle(fontSize: 14, color: AppColors.primary),
             ),
           ),
         ],

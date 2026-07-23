@@ -11,9 +11,12 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/restock_list_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/priority_product_card.dart';
+import '../../widgets/product_search_bar.dart';
 import '../../widgets/restock_qty_field.dart';
 import '../produk/product_detail_screen.dart';
 import 'kulakan_list_screen.dart';
@@ -268,6 +271,8 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
               ? _buildEmptyState()
               : Column(
                   children: [
+                    _buildSearchBar(),
+                    const SizedBox(height: 12),
                     _buildCentangSemuaBar(),
                     const Divider(height: 0.5, thickness: 0.5),
                     Expanded(
@@ -280,6 +285,41 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
                     _buildFooter(checkedCount),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          boxShadow: AppDimensions.elevatedSearchShadow,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
+            ),
+            child: ProductSearchBar(
+              productRepository: _productRepository,
+              onProductSelected: _openDetail,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
