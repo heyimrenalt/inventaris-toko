@@ -208,8 +208,10 @@ void main() {
 
       await pumpScreen(tester, list.id);
 
+      // Two-line layout gives the name its own full-width row, so it may
+      // wrap to 2 lines before ellipsizing — still bounded, never overflowed.
       final nameText = tester.widget<Text>(find.text(product.name));
-      expect(nameText.maxLines, 1);
+      expect(nameText.maxLines, 2);
       expect(nameText.overflow, TextOverflow.ellipsis);
     });
   });

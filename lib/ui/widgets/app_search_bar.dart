@@ -35,19 +35,15 @@ class AppSearchBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
           boxShadow: AppDimensions.elevatedSearchShadow,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: TextField(
           controller: controller,
           onChanged: onChanged,
-          style: AppTextStyles.body,
+          style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: AppTextStyles.body.copyWith(color: AppColors.gray500),
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: AppColors.gray500,
-              size: 22,
-            ),
+            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.gray500),
             // Fully transparent field — the white rounded pill is painted by
             // the Container above; a filled/bordered field on top would peek
             // sharp corners out from under the rounded pill.
@@ -58,7 +54,6 @@ class AppSearchBar extends StatelessWidget {
             errorBorder: InputBorder.none,
             focusedErrorBorder: InputBorder.none,
             disabledBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
           ),
         ),
       ),

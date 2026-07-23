@@ -348,7 +348,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final stockColor = isLow ? Colors.red : Colors.green;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      // Always allow the gesture even when content is short, and reserve the
+      // system nav-bar inset at the bottom so the last rows/buttons scroll
+      // fully clear of it (the "scroll terasa belum dinamis" report).
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -454,36 +458,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ),
           const SizedBox(height: 24),
-          Text('Riwayat Mutasi', style: AppTextStyles.subheading),
-          const SizedBox(height: 12),
-          if (_recentMutations.isEmpty)
-            Text(
-              'Belum ada riwayat mutasi.',
-              style: AppTextStyles.body.copyWith(color: Colors.grey[600]),
-            )
-          else ...[
-            for (final mutation in _recentMutations)
-              MutationListItem(mutation: mutation, productName: product.name, unit: product.unit),
-            // Only offer "Selengkapnya" when there's actually more history
-            // than the 7 rows shown here — otherwise the list above already
-            // shows everything.
-            if (_hasMoreMutations)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
+          // Heading with the "Lihat semua" action inline on the right — only
+          // shown when there's more history than the 7 rows below, so the
+          // user reaches the full list without scrolling past every row.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text('Riwayat Mutasi', style: AppTextStyles.subheading),
+              const Spacer(),
+              if (_hasMoreMutations)
+                TextButton.icon(
                   key: const Key('product_detail_selengkapnya_button'),
                   onPressed: () => _openFullHistory(product),
-                  icon: const Icon(Icons.expand_more, size: 20, color: Color(0xFF00AA0D)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 18, color: Color(0xFF00AA0D)),
+                  iconAlignment: IconAlignment.end,
                   label: Text(
-                    'Selengkapnya',
+                    'Lihat semua',
                     style: AppTextStyles.body.copyWith(
                       color: const Color(0xFF00AA0D),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_recentMutations.isEmpty)
+            Text(
+              'Belum ada riwayat mutasi.',
+              style: AppTextStyles.body.copyWith(color: Colors.grey[600]),
+            )
+          else
+            for (final mutation in _recentMutations)
+              MutationListItem(mutation: mutation, productName: product.name, unit: product.unit),
         ],
       ),
     );

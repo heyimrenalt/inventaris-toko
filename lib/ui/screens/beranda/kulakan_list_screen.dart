@@ -320,58 +320,54 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
 
   Widget _buildProductRow(RestockListItem item, Product product) {
     final isArchived = product.isArchived;
+    // Two-line layout: product info (checkbox + photo + name + stock) spans
+    // the full width on top so the name never gets crushed, and the qty
+    // stepper/unit toggle sits on its own line below, right-aligned, with
+    // room for its pcs/pack/dus toggle. A single cramped row left almost no
+    // width for the name ("Teh …") — this keeps everything readable.
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          padding: const EdgeInsets.fromLTRB(8, 12, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Checkbox(
-                key: Key('kulakan_list_checkbox_${product.id}'),
-                value: item.isChecked,
-                onChanged: (_) => _toggleChecked(product.id),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          _Thumbnail(photoPath: product.photoPath),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isArchived ? '${product.name} (diarsipkan)' : product.name,
-                                  key: isArchived ? Key('kulakan_list_archived_marker_${product.id}') : null,
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: isArchived ? AppColors.gray500 : null,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
-                                  style: AppTextStyles.caption.copyWith(color: AppColors.gray700),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    key: Key('kulakan_list_checkbox_${product.id}'),
+                    value: item.isChecked,
+                    onChanged: (_) => _toggleChecked(product.id),
                   ),
-                ),
+                  _Thumbnail(photoPath: product.photoPath),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isArchived ? '${product.name} (diarsipkan)' : product.name,
+                          key: isArchived ? Key('kulakan_list_archived_marker_${product.id}') : null,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: isArchived ? AppColors.gray500 : null,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Stok: ${_formatNumber(product.currentStock)} ${product.unit}',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.gray700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
                 child: RestockQtyField(
                   productId: product.id,
                   unitsPerPack: product.unitsPerPack,
