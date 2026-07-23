@@ -274,43 +274,43 @@ class _BerandaScreenState extends State<BerandaScreen> {
     );
   }
 
-  // IntrinsicHeight + a stretching Row is what actually guarantees the cards
-  // render at the exact same height — Expanded alone only equalizes
-  // their width, so any difference in content (e.g. label text wrapping
-  // differently) would otherwise let cards grow taller than others.
   Widget _buildSummaryCards() {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: StatCard(
-              key: const Key('beranda_summary_total_produk'),
-              label: 'Total Produk',
-              value: '$_totalProducts',
-              variant: StatCardVariant.green,
-            ),
+    return Column(
+      children: [
+        // First row: Total Produk + Perlu Kulakan
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: StatCard(
+                  key: const Key('beranda_summary_total_produk'),
+                  label: 'Total Produk',
+                  value: '$_totalProducts',
+                  variant: StatCardVariant.green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: StatCard(
+                  key: const Key('beranda_summary_perlu_kulakan'),
+                  label: 'Perlu Kulakan',
+                  value: '$_perluKulakanCount',
+                  variant: StatCardVariant.red,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: StatCard(
-              key: const Key('beranda_summary_perlu_kulakan'),
-              label: 'Perlu Kulakan',
-              value: '$_perluKulakanCount',
-              variant: StatCardVariant.red,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: StatCard(
-              key: const Key('beranda_summary_total_keuntungan'),
-              label: 'Total Keuntungan',
-              value: _formatCurrency(_totalProfit),
-              variant: StatCardVariant.yellow,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        // Second row: Total Keuntungan (full width)
+        StatCard(
+          key: const Key('beranda_summary_total_keuntungan'),
+          label: 'Total Keuntungan',
+          value: _formatCurrency(_totalProfit),
+          variant: StatCardVariant.yellow,
+        ),
+      ],
     );
   }
 
