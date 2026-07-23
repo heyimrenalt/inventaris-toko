@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:intl/intl.dart';
 
 import 'package:flutter/material.dart';
 import 'package:isar_community/isar.dart';
@@ -321,15 +322,8 @@ class _BerandaScreenState extends State<BerandaScreen> {
   }
 
   String _formatCurrency(double value) {
-    // Format as Rp with thousands separator, no decimals for large amounts
-    final absValue = value.abs();
-    if (absValue >= 1000000) {
-      return 'Rp${(value / 1000000).toStringAsFixed(1)}jt';
-    } else if (absValue >= 1000) {
-      return 'Rp${(value / 1000).toStringAsFixed(0)}rb';
-    } else {
-      return 'Rp${value.toStringAsFixed(0)}';
-    }
+    final formatter = NumberFormat('#,##0', 'id_ID');
+    return 'Rp ${formatter.format(value.toInt())}';
   }
 
   Widget _buildPrioritasKulakanSection() {
