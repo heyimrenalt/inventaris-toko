@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../data/models/stock_mutation.dart';
 import '../../domain/unit_conversion.dart';
+import '../../domain/unit_quantity_rules.dart';
 
 /// Editable quantity input for one Kulakan List row.
 ///
@@ -40,9 +41,10 @@ class RestockQtyField extends StatefulWidget {
   final double initialQtyInPcs;
   final bool initialInputUnitWasPack;
 
-  /// Mirrors [Product.allowsFractionalQuantity] — when `false`, pcs input
-  /// doesn't accept a fractional value either (see [_applyValue]). Pack
-  /// and dus never accept a fractional value regardless of this flag.
+  /// Mirrors [Product.allowsFractionalQuantity]. Combined with the unit's
+  /// own discreteness by [UnitQuantityRules.allowsDecimal], which is the
+  /// only place that decision is made — pack and dus are discrete there,
+  /// so they never accept a fractional value regardless of this flag.
   final bool allowsFractionalQuantity;
 
   /// Called with the canonical pcs quantity and whether the field is
@@ -71,10 +73,19 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
         : EnteredUnit.pcs;
     final displayValue = _fromPcs(widget.initialQtyInPcs, _unit);
     _controller = TextEditingController(text: _formatNumber(displayValue));
+    // The field sizes itself to its own text (see _columnWidthFor), so every
+    // edit has to rebuild — including the ones _applyValue bails out of
+    // (empty/unparseable text), which never reach its setState.
+    _controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -101,13 +112,15 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
     _applyValue(value);
   }
 
+  /// Whether [unit] forbids a decimal part — see [UnitQuantityRules],
+  /// which is the only place that rule is decided.
+  bool _requiresIntegerIn(EnteredUnit unit) => !UnitQuantityRules.allowsDecimal(
+        unit: unit,
+        productAllowsFractional: widget.allowsFractionalQuantity,
+      );
+
   void _applyValue(double value) {
-    // Whether a fractional pcs value is meaningful is a per-product choice
-    // (see Product.allowsFractionalQuantity); pack/dus are always
-    // whole-number units regardless of that flag — you can't buy half a
-    // pack.
-    final requiresInteger = _unit != EnteredUnit.pcs || !widget.allowsFractionalQuantity;
-    if (requiresInteger && value != value.roundToDouble()) {
+    if (_requiresIntegerIn(_unit) && value != value.roundToDouble()) {
       setState(() => _error = _integerErrorFor(_unit));
       return;
     }
@@ -125,9 +138,18 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
       case EnteredUnit.pcs:
         return 'Jumlah harus bilangan bulat';
       case EnteredUnit.pack:
-        return 'Jumlah pack harus bilangan bulat';
+        if (widget.unitsPerPack == null) {
+          return 'Jumlah pack harus bilangan bulat';
+        }
+        return 'Hanya bisa dijual per pack. Gunakan kelipatan ${widget.unitsPerPack} pcs';
       case EnteredUnit.dus:
-        return 'Jumlah dus harus bilangan bulat';
+        if (widget.unitsPerDus == null) {
+          return 'Jumlah dus harus bilangan bulat';
+        }
+        final dusInPcs = widget.unitsPerPack == null
+            ? widget.unitsPerDus!
+            : widget.unitsPerDus! * widget.unitsPerPack!;
+        return 'Hanya bisa dijual per dus. Gunakan kelipatan $dusInPcs pcs';
     }
   }
 
@@ -142,27 +164,85 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
 
   void _changeUnit(EnteredUnit newUnit) {
     if (newUnit == _unit) return;
-    final currentQtyInPcs = _toPcs(_currentValue, _unit);
-    final displayValue = _fromPcs(currentQtyInPcs, newUnit);
+    final displayValue = _fromPcs(_toPcs(_currentValue, _unit), newUnit);
+
+    // Clears rather than rounds when the value doesn't divide evenly into
+    // the new unit — same rule and same rationale as [UnitQtyField], so
+    // both quantity fields behave identically. The switch still goes
+    // through; only the value is dropped.
+    if (_requiresIntegerIn(newUnit) && displayValue != displayValue.roundToDouble()) {
+      setState(() {
+        _unit = newUnit;
+        _controller.text = '';
+        _error = 'Jumlah dikosongkan: nilai sebelumnya tidak pas dalam '
+            '${_unitLabel(newUnit)}. Masukkan jumlah baru.';
+      });
+      widget.onChanged(0, newUnit == EnteredUnit.pack);
+      return;
+    }
+
     setState(() {
       _unit = newUnit;
       _error = null;
       _controller.text = _formatNumber(displayValue);
     });
-    widget.onChanged(currentQtyInPcs, newUnit == EnteredUnit.pack);
+    widget.onChanged(_toPcs(displayValue, newUnit), newUnit == EnteredUnit.pack);
   }
 
-  /// Decimals are only meaningful for a fractional-unit product entered in
-  /// pcs (kg/liter/ml, etc.). Pack and dus are always whole, and a
-  /// non-fractional product is whole even in pcs — so for those the "."/","
-  /// keys are blocked outright rather than merely flagged after the fact.
-  bool get _decimalAllowed => _unit == EnteredUnit.pcs && widget.allowsFractionalQuantity;
+  TextInputType get _keyboardType => UnitQuantityRules.keyboardType(
+        unit: _unit,
+        productAllowsFractional: widget.allowsFractionalQuantity,
+      );
 
-  TextInputType get _keyboardType => TextInputType.numberWithOptions(decimal: _decimalAllowed);
+  List<TextInputFormatter> get _inputFormatters => UnitQuantityRules.inputFormatters(
+        unit: _unit,
+        productAllowsFractional: widget.allowsFractionalQuantity,
+      );
 
-  List<TextInputFormatter> get _inputFormatters => _decimalAllowed
-      ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
-      : [FilteringTextInputFormatter.digitsOnly];
+  /// The whole widget is width-clamped so the caption and (much longer)
+  /// error message wrap inside the column instead of widening it — an
+  /// unclamped column pushes past the space the parent row can spare and
+  /// overflows the moment a unit switch produces a non-integer value.
+  ///
+  /// Kept deliberately narrow: on a 360dp phone this column sits beside a
+  /// checkbox *and* the product name, and anything wider truncates the
+  /// name away to nothing. [_minColumnWidth] is what a one- or two-digit
+  /// value takes (the common case, and the width this column always used
+  /// to be); a longer value grows the column — and so the field — up to
+  /// [_maxColumnWidth], sized to fit the longest realistic entry
+  /// ("10000pcs") at the default text scale.
+  ///
+  /// Growing this far does squeeze the product name hard on a 320dp
+  /// screen, but only while a 5-digit quantity is actually entered, and
+  /// the name ellipsizes rather than overflowing (see PriorityProductCard,
+  /// whose only fixed-width parts are an 18dp bar and gutter) — a clipped
+  /// number the user can't read back is the worse failure.
+  static const double _minColumnWidth = 148;
+  static const double _maxColumnWidth = 228;
+  static const double _stepperSize = 40;
+
+  /// Width the numeric field's own content needs: the digits plus the
+  /// "pcs" suffix (empty in the toggle variant, where the unit lives in
+  /// the segmented button instead), measured in the real style and text
+  /// scale so it holds up under accessibility font sizes.
+  ///
+  /// The padding allowance covers the caret and [InputDecoration.isDense]'s
+  /// content insets — without it the last glyph sits under the caret.
+  double _fieldContentWidth(String suffix) {
+    final text = _controller.text.isEmpty ? '0' : _controller.text;
+    final painter = TextPainter(
+      text: TextSpan(text: '$text$suffix', style: Theme.of(context).textTheme.bodyLarge),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    return painter.width + 16;
+  }
+
+  /// The stepper buttons are fixed, so whatever the field needs decides the
+  /// column — clamped at both ends. Past [_maxColumnWidth] the [TextField]
+  /// falls back to its own horizontal scrolling rather than clipping.
+  double _columnWidthFor(String suffix) =>
+      (_stepperSize * 2 + _fieldContentWidth(suffix)).clamp(_minColumnWidth, _maxColumnWidth);
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +250,43 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
     final showToggle = availableUnits.length > 1;
 
     if (!showToggle) {
-      return Column(
+      return SizedBox(
+        width: _columnWidthFor('pcs'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _stepperButton(suffix: 'minus', icon: Icons.remove, onPressed: _decrementOrNull),
+                // Expanded, not a fixed width: the field takes whatever the
+                // column has left over after the two steppers, so it can
+                // never push the row past the column and overflow.
+                Expanded(
+                  child: TextField(
+                    key: Key('kulakan_qty_field_${widget.productId}'),
+                    controller: _controller,
+                    keyboardType: _keyboardType,
+                    inputFormatters: _inputFormatters,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(suffixText: 'pcs', isDense: true),
+                    onChanged: _onTextChanged,
+                  ),
+                ),
+                _stepperButton(suffix: 'plus', icon: Icons.add, onPressed: () => _step(1)),
+              ],
+            ),
+            if (_error != null) _errorText(),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      // No suffix here — the segmented button below names the unit.
+      width: _columnWidthFor(''),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -178,84 +294,68 @@ class _RestockQtyFieldState extends State<RestockQtyField> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _stepperButton(suffix: 'minus', icon: Icons.remove, onPressed: _decrementOrNull),
-              SizedBox(
-                width: 90,
+              Expanded(
                 child: TextField(
                   key: Key('kulakan_qty_field_${widget.productId}'),
                   controller: _controller,
                   keyboardType: _keyboardType,
                   inputFormatters: _inputFormatters,
                   textAlign: TextAlign.center,
-                  decoration: const InputDecoration(suffixText: 'pcs', isDense: true),
+                  decoration: const InputDecoration(isDense: true),
                   onChanged: _onTextChanged,
                 ),
               ),
               _stepperButton(suffix: 'plus', icon: Icons.add, onPressed: () => _step(1)),
             ],
           ),
-          if (_error != null)
+          const SizedBox(height: 4),
+          SegmentedButton<EnteredUnit>(
+            key: Key('kulakan_qty_unit_toggle_${widget.productId}'),
+            showSelectedIcon: false,
+            // Default segment padding makes three segments wider than
+            // _columnWidth; trimmed so pcs/pack/dus fit without overflow.
+            style: SegmentedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              textStyle: const TextStyle(fontSize: 12),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            segments: [
+              for (final unit in availableUnits)
+                ButtonSegment(value: unit, label: Text(_unitLabel(unit))),
+            ],
+            selected: {_unit},
+            onSelectionChanged: (selection) => _changeUnit(selection.first),
+          ),
+          if (_unit != EnteredUnit.pcs) ...[
+            const SizedBox(height: 2),
             Text(
-              _error!,
-              key: Key('kulakan_qty_error_${widget.productId}'),
-              style: const TextStyle(fontSize: 12, color: Colors.red),
-            ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _stepperButton(suffix: 'minus', icon: Icons.remove, onPressed: _decrementOrNull),
-            SizedBox(
-              width: 75,
-              child: TextField(
-                key: Key('kulakan_qty_field_${widget.productId}'),
-                controller: _controller,
-                keyboardType: _keyboardType,
-                inputFormatters: _inputFormatters,
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(isDense: true),
-                onChanged: _onTextChanged,
+              UnitConversion.formatCaption(
+                value: _currentValue,
+                unit: _unit,
+                unitsPerPack: widget.unitsPerPack,
+                unitsPerDus: widget.unitsPerDus,
               ),
+              key: Key('kulakan_qty_caption_${widget.productId}'),
+              textAlign: TextAlign.end,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
-            _stepperButton(suffix: 'plus', icon: Icons.add, onPressed: () => _step(1)),
           ],
-        ),
-        const SizedBox(height: 4),
-        SegmentedButton<EnteredUnit>(
-          key: Key('kulakan_qty_unit_toggle_${widget.productId}'),
-          showSelectedIcon: false,
-          segments: [
-            for (final unit in availableUnits)
-              ButtonSegment(value: unit, label: Text(_unitLabel(unit))),
-          ],
-          selected: {_unit},
-          onSelectionChanged: (selection) => _changeUnit(selection.first),
-        ),
-        if (_unit != EnteredUnit.pcs) ...[
-          const SizedBox(height: 2),
-          Text(
-            UnitConversion.formatCaption(
-              value: _currentValue,
-              unit: _unit,
-              unitsPerPack: widget.unitsPerPack,
-              unitsPerDus: widget.unitsPerDus,
-            ),
-            key: Key('kulakan_qty_caption_${widget.productId}'),
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
+          if (_error != null) _errorText(),
         ],
-        if (_error != null)
-          Text(
-            _error!,
-            key: Key('kulakan_qty_error_${widget.productId}'),
-            style: const TextStyle(fontSize: 12, color: Colors.red),
-          ),
-      ],
+      ),
+    );
+  }
+
+  Widget _errorText() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Text(
+        _error!,
+        key: Key('kulakan_qty_error_${widget.productId}'),
+        textAlign: TextAlign.end,
+        style: const TextStyle(fontSize: 11, color: Colors.red, height: 1.25),
+      ),
     );
   }
 

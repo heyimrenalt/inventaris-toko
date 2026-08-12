@@ -307,4 +307,189 @@ void main() {
       '24',
     );
   });
+
+  group('switching unit with a value that does not divide evenly', () {
+    String fieldText(WidgetTester tester) =>
+        tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text;
+
+    Future<void> tapUnit(WidgetTester tester, String label) async {
+      await tester.tap(find.descendant(
+        of: find.byKey(const Key('unit_qty_toggle_1')),
+        matching: find.text(label),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('clears the field and explains, instead of silently rounding', (tester) async {
+      double? capturedQty;
+      EnteredUnit? capturedUnit;
+      await pumpField(
+        tester,
+        forProduct: product(unitsPerPack: 12),
+        // 5 pcs is 0.41666… pack — not a whole pack.
+        initialQtyInPcs: 5,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, unit, _) {
+          capturedQty = qty;
+          capturedUnit = unit;
+        },
+      );
+
+      await tapUnit(tester, 'pack');
+
+      // Emptied, *not* rounded to "0" or "1" — a rounded value is a
+      // quantity the user never entered.
+      expect(fieldText(tester), '');
+      expect(find.byKey(const Key('unit_qty_error_1')), findsOneWidget);
+      expect(find.textContaining('dikosongkan'), findsOneWidget);
+
+      // The switch itself still happened, so the user isn't stranded.
+      expect(capturedUnit, EnteredUnit.pack);
+      // Zero, so submit rejects it rather than recording the stale 5 pcs.
+      expect(capturedQty, 0);
+    });
+
+    testWidgets('a continuous pcs value switching to a discrete unit is cleared, not rounded',
+        (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        forProduct: product(unitsPerPack: 4, allowsFractionalQuantity: true),
+        initialQtyInPcs: 2.5,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, _, _) => capturedQty = qty,
+      );
+      expect(fieldText(tester), '2.5');
+
+      await tapUnit(tester, 'pack');
+
+      expect(fieldText(tester), '');
+      expect(capturedQty, 0);
+    });
+
+    testWidgets('a value that does divide evenly switches across intact', (tester) async {
+      double? capturedQty;
+      double? capturedEntered;
+      await pumpField(
+        tester,
+        forProduct: product(unitsPerPack: 12),
+        initialQtyInPcs: 24,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, _, entered) {
+          capturedQty = qty;
+          capturedEntered = entered;
+        },
+      );
+
+      await tapUnit(tester, 'pack');
+
+      expect(fieldText(tester), '2');
+      expect(capturedEntered, 2);
+      // Round-trips back to exactly the pcs it started from.
+      expect(capturedQty, 24);
+      expect(find.byKey(const Key('unit_qty_error_1')), findsNothing);
+    });
+
+    testWidgets('switching from a discrete unit back to continuous pcs keeps the value',
+        (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        forProduct: product(unitsPerPack: 4, allowsFractionalQuantity: true),
+        initialQtyInPcs: 8,
+        initialEnteredUnit: EnteredUnit.pack,
+        onChanged: (qty, _, _) => capturedQty = qty,
+      );
+      expect(fieldText(tester), '2');
+
+      await tapUnit(tester, 'pcs');
+
+      expect(fieldText(tester), '8');
+      expect(capturedQty, 8);
+    });
+  });
+
+  group('empty, zero and negative input', () {
+    testWidgets('an emptied field reports nothing new, leaving the last value to submit-time '
+        'validation', (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        forProduct: product(),
+        initialQtyInPcs: 3,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, _, _) => capturedQty = qty,
+      );
+
+      await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '');
+      await tester.pump();
+
+      // Unparseable text never propagates a quantity.
+      expect(capturedQty, isNull);
+    });
+
+    testWidgets('zero is reported but is not submittable', (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        forProduct: product(),
+        initialQtyInPcs: 3,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, _, _) => capturedQty = qty,
+      );
+
+      await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '0');
+      await tester.pump();
+
+      // The field allows 0 while typing (you have to pass through it to
+      // reach "10"); CatatMutasiScreen and StockMutationRepository are what
+      // reject it at submit.
+      expect(capturedQty, 0);
+      expect(capturedQty!, lessThanOrEqualTo(0));
+    });
+
+    testWidgets('a negative value cannot be entered — the minus key is filtered out',
+        (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        forProduct: product(allowsFractionalQuantity: true),
+        initialQtyInPcs: 3,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (qty, _, _) => capturedQty = qty,
+      );
+
+      await tester.enterText(find.byKey(const Key('unit_qty_field_1')), '-5');
+      await tester.pump();
+
+      expect(
+        tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text,
+        isNot(contains('-')),
+      );
+      // The whole edit is refused, so no new quantity is reported at all —
+      // and certainly never a negative one.
+      expect(capturedQty ?? 0, isNonNegative);
+    });
+
+    testWidgets('the decrement stepper stops at zero and never goes negative', (tester) async {
+      await pumpField(
+        tester,
+        forProduct: product(),
+        initialQtyInPcs: 1,
+        initialEnteredUnit: EnteredUnit.pcs,
+        onChanged: (_, _, _) {},
+      );
+
+      await tester.tap(find.byKey(const Key('unit_qty_stepper_minus_1')));
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byKey(const Key('unit_qty_field_1'))).controller!.text,
+        '0',
+      );
+
+      // At zero the button is disabled outright.
+      final minus = tester.widget<IconButton>(find.byKey(const Key('unit_qty_stepper_minus_1')));
+      expect(minus.onPressed, isNull);
+    });
+  });
 }

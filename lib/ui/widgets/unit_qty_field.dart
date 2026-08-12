@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../data/models/product.dart';
 import '../../data/models/stock_mutation.dart';
 import '../../domain/unit_conversion.dart';
+import '../../domain/unit_quantity_rules.dart';
 
 /// Editable pcs/pack/dus quantity input for stock mutation entry (Catat
 /// Mutasi, batch stok keluar). Offers a toggle only for the units
@@ -12,10 +13,10 @@ import '../../domain/unit_conversion.dart';
 /// pack-capable product gets a 2-way toggle, a dus-capable product gets
 /// all three.
 ///
-/// Whether a fractional value is accepted is driven uniformly by
-/// [Product.allowsFractionalQuantity] across every unit — unlike
-/// [RestockQtyField] before its own fix, there's no hardcoded "pack/dus
-/// is always whole, pcs is always fractional" assumption here.
+/// Whether a fractional value is accepted is never decided here:
+/// [UnitQuantityRules.allowsDecimal] owns that classification for every
+/// quantity field in the app, so pack/dus stay discrete and pcs defers to
+/// [Product.allowsFractionalQuantity] in exactly one place.
 class UnitQtyField extends StatefulWidget {
   const UnitQtyField({
     super.key,
@@ -94,12 +95,15 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
     _applyValue(value);
   }
 
+  /// Whether the currently selected unit forbids a decimal part — see
+  /// [UnitQuantityRules], which is the only place that rule is decided.
+  bool _requiresIntegerIn(EnteredUnit unit) => !UnitQuantityRules.allowsDecimal(
+        unit: unit,
+        productAllowsFractional: widget.product.allowsFractionalQuantity,
+      );
+
   void _applyValue(double value) {
-    // Pack/dus are always whole-number units — you can't buy half a pack —
-    // regardless of the product's own fractional-quantity setting, which
-    // only governs the base pcs unit.
-    final requiresInteger = _unit != EnteredUnit.pcs || !widget.product.allowsFractionalQuantity;
-    if (requiresInteger && value != value.roundToDouble()) {
+    if (_requiresIntegerIn(_unit) && value != value.roundToDouble()) {
       setState(() => _error = _integerErrorFor(_unit));
       return;
     }
@@ -114,9 +118,18 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
       case EnteredUnit.pcs:
         return 'Jumlah harus bilangan bulat';
       case EnteredUnit.pack:
-        return 'Jumlah pack harus bilangan bulat';
+        if (widget.product.unitsPerPack == null) {
+          return 'Jumlah pack harus bilangan bulat';
+        }
+        return 'Hanya bisa dijual per pack. Gunakan kelipatan ${widget.product.unitsPerPack} pcs';
       case EnteredUnit.dus:
-        return 'Jumlah dus harus bilangan bulat';
+        if (widget.product.unitsPerDus == null) {
+          return 'Jumlah dus harus bilangan bulat';
+        }
+        final dusInPcs = widget.product.unitsPerPack == null
+            ? widget.product.unitsPerDus!
+            : widget.product.unitsPerDus! * widget.product.unitsPerPack!;
+        return 'Hanya bisa dijual per dus. Gunakan kelipatan $dusInPcs pcs';
     }
   }
 
@@ -130,27 +143,45 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
 
   void _changeUnit(EnteredUnit newUnit) {
     if (newUnit == _unit) return;
-    final currentQtyInPcs = _toPcs(_currentValue, _unit);
-    final displayValue = _fromPcs(currentQtyInPcs, newUnit);
+    final displayValue = _fromPcs(_toPcs(_currentValue, _unit), newUnit);
+
+    // Switching into a unit the current value doesn't divide evenly into
+    // (1 pcs → dus, 2.5 kg → pack) clears the field rather than rounding
+    // it. Rounding here used to be silent, and silence is the problem: the
+    // user taps "dus", the number changes under them, and a quantity they
+    // never entered is what gets written to the ledger.
+    //
+    // The switch itself still goes through — refusing it would strand the
+    // user in the unit they're trying to leave, since every tap would
+    // appear to do nothing — so they land in the requested unit with an
+    // empty field and an explicit note about why.
+    if (_requiresIntegerIn(newUnit) && displayValue != displayValue.roundToDouble()) {
+      setState(() {
+        _unit = newUnit;
+        _controller.text = '';
+        _error = 'Jumlah dikosongkan: nilai sebelumnya tidak pas dalam '
+            '${_unitLabel(newUnit)}. Masukkan jumlah baru.';
+      });
+      // Zero, not the old quantity — submit rejects it ("Jumlah harus
+      // lebih dari 0"), so an abandoned switch can't record a stale value.
+      widget.onChanged(0, newUnit, 0);
+      return;
+    }
+
     setState(() {
       _unit = newUnit;
       _error = null;
       _controller.text = _formatNumber(displayValue);
     });
-    widget.onChanged(currentQtyInPcs, newUnit, displayValue);
+    widget.onChanged(_toPcs(displayValue, newUnit), newUnit, displayValue);
   }
 
   VoidCallback? get _decrementOrNull => _currentValue > 0 ? () => _step(-1) : null;
 
-  /// Decimals only make sense for a fractional-unit product entered in pcs
-  /// (kg/liter/ml). Pack/dus are always whole, and a non-fractional product
-  /// is whole in pcs too — so the "."/"," keys are blocked for those rather
-  /// than only flagged after typing.
-  bool get _decimalAllowed => _unit == EnteredUnit.pcs && widget.product.allowsFractionalQuantity;
-
-  List<TextInputFormatter> get _inputFormatters => _decimalAllowed
-      ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))]
-      : [FilteringTextInputFormatter.digitsOnly];
+  List<TextInputFormatter> get _inputFormatters => UnitQuantityRules.inputFormatters(
+        unit: _unit,
+        productAllowsFractional: widget.product.allowsFractionalQuantity,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +201,10 @@ class _UnitQtyFieldState extends State<UnitQtyField> {
               child: TextField(
                 key: Key('unit_qty_field_$productId'),
                 controller: _controller,
-                keyboardType: TextInputType.numberWithOptions(decimal: _decimalAllowed),
+                keyboardType: UnitQuantityRules.keyboardType(
+                  unit: _unit,
+                  productAllowsFractional: widget.product.allowsFractionalQuantity,
+                ),
                 inputFormatters: _inputFormatters,
                 style: const TextStyle(fontSize: 16),
                 decoration: InputDecoration(labelText: widget.label, isDense: true),

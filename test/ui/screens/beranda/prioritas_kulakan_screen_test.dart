@@ -323,6 +323,17 @@ void main() {
       final product =
           await seedEligibleProduct(category.id, 'Produk Pack', 1, unitsPerPack: 12);
 
+      // The velocity-derived suggestedRestockQty isn't guaranteed to be a
+      // whole number of packs, and RestockQtyField intentionally clears
+      // the field (rather than rounding) when switching to a unit the
+      // current value doesn't divide evenly into — pin lastRestockQty to
+      // a clean multiple of unitsPerPack so this test exercises the
+      // pack-mode stepper, not that unrelated clearing behavior.
+      await isar.writeTxn(() async {
+        product.lastRestockQty = 24;
+        await isar.products.put(product);
+      });
+
       await pumpScreen(tester);
 
       await tester.tap(find.descendant(

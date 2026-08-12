@@ -305,4 +305,151 @@ void main() {
       }
     });
   });
+
+  group('field sizing', () {
+    /// Width the field's own text needs, measured the way the field does.
+    double neededWidth(WidgetTester tester, String text) {
+      final style = Theme.of(tester.element(find.byType(RestockQtyField)))
+          .textTheme
+          .bodyLarge;
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      return painter.width;
+    }
+
+    double fieldWidth(WidgetTester tester) =>
+        tester.getSize(find.byKey(const Key('kulakan_qty_field_1'))).width;
+
+    testWidgets('pcs-only 5-digit value is not clipped by the "pcs" suffix', (tester) async {
+      await pumpField(
+        tester,
+        unitsPerPack: null,
+        initialQtyInPcs: 10000,
+        initialInputUnitWasPack: false,
+        onChanged: (_, _) {},
+      );
+
+      expect(fieldWidth(tester), greaterThan(neededWidth(tester, '10000pcs')));
+    });
+
+    testWidgets('field grows as digits are typed and never below the 1-digit width',
+        (tester) async {
+      await pumpField(
+        tester,
+        unitsPerPack: null,
+        initialQtyInPcs: 0,
+        initialInputUnitWasPack: false,
+        onChanged: (_, _) {},
+      );
+      final oneDigit = fieldWidth(tester);
+      expect(oneDigit, greaterThan(neededWidth(tester, '0pcs')));
+
+      await tester.enterText(find.byKey(const Key('kulakan_qty_field_1')), '10000');
+      await tester.pump();
+
+      expect(fieldWidth(tester), greaterThan(oneDigit));
+    });
+
+    testWidgets('pack/dus variant fits a 5-digit value too', (tester) async {
+      await pumpField(
+        tester,
+        unitsPerPack: 12,
+        unitsPerDus: 4,
+        initialQtyInPcs: 10000 * 12 * 4,
+        initialInputUnitWasPack: false,
+        onChanged: (_, _) {},
+      );
+
+      await tester.enterText(find.byKey(const Key('kulakan_qty_field_1')), '10000');
+      await tester.pump();
+
+      expect(fieldWidth(tester), greaterThan(neededWidth(tester, '10000')));
+    });
+
+    testWidgets('narrow screen with a large qty does not overflow the row', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: Row(
+              children: [
+                Checkbox(value: false, onChanged: (_) {}),
+                const Expanded(child: Text('Nama produk yang panjang sekali')),
+                RestockQtyField(
+                  productId: 1,
+                  unitsPerPack: 12,
+                  unitsPerDus: 4,
+                  initialQtyInPcs: 99999,
+                  initialInputUnitWasPack: false,
+                  allowsFractionalQuantity: false,
+                  onChanged: (_, _) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('switching unit with a value that does not divide evenly', () {
+    String fieldText(WidgetTester tester) =>
+        tester.widget<TextField>(find.byKey(const Key('kulakan_qty_field_1'))).controller!.text;
+
+    Future<void> tapUnit(WidgetTester tester, String label) async {
+      await tester.tap(find.descendant(
+        of: find.byKey(const Key('kulakan_qty_unit_toggle_1')),
+        matching: find.text(label),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('clears the field and explains, instead of silently rounding', (tester) async {
+      double? capturedQty;
+      await pumpField(
+        tester,
+        unitsPerPack: 12,
+        // 5 pcs is a fraction of a pack.
+        initialQtyInPcs: 5,
+        initialInputUnitWasPack: false,
+        onChanged: (qty, _) => capturedQty = qty,
+      );
+
+      await tapUnit(tester, 'pack');
+
+      expect(fieldText(tester), '');
+      expect(find.byKey(const Key('kulakan_qty_error_1')), findsOneWidget);
+      expect(find.textContaining('dikosongkan'), findsOneWidget);
+      expect(capturedQty, 0);
+    });
+
+    testWidgets('a value that does divide evenly switches across intact', (tester) async {
+      double? capturedQty;
+      bool? capturedWasPack;
+      await pumpField(
+        tester,
+        unitsPerPack: 12,
+        initialQtyInPcs: 24,
+        initialInputUnitWasPack: false,
+        onChanged: (qty, wasPack) {
+          capturedQty = qty;
+          capturedWasPack = wasPack;
+        },
+      );
+
+      await tapUnit(tester, 'pack');
+
+      expect(fieldText(tester), '2');
+      expect(capturedQty, 24);
+      expect(capturedWasPack, isTrue);
+      expect(find.byKey(const Key('kulakan_qty_error_1')), findsNothing);
+    });
+  });
 }

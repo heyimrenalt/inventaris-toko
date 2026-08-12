@@ -176,13 +176,15 @@ String formatEstimatedDaysLabel(double days) {
   return '${days.round()} hari lagi';
 }
 
-/// Formats [velocity] to 1 decimal place, stripping a trailing ".0" (so
-/// `9.0` reads as `9`, while `1.5` stays `1.5`) — used anywhere a daily
-/// sell rate is shown in the UI.
+/// Formats [velocity] as a whole number — products are sold in whole
+/// units (pcs/bungkus), so a decimal like "5.2/hari" reads as nonsense to
+/// a shopkeeper. Rounds to the nearest integer, except a positive rate
+/// that would round down to 0 (a slow mover selling less than one a day,
+/// e.g. 2 a week) shows "1" instead of the contradictory "0" — it's here
+/// precisely because it has sales. Used anywhere a daily sell rate is
+/// shown in the UI.
 String formatVelocity(double velocity) {
-  final rounded = (velocity * 10).round() / 10;
-  if (rounded == rounded.roundToDouble()) {
-    return rounded.toInt().toString();
-  }
-  return rounded.toStringAsFixed(1);
+  final rounded = velocity.round();
+  if (rounded == 0 && velocity > 0) return '1';
+  return rounded.toString();
 }

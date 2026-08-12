@@ -396,18 +396,25 @@ void main() {
   });
 
   group('formatVelocity', () {
-    test('strips a trailing ".0"', () {
+    test('shows whole numbers with no decimals', () {
       expect(formatVelocity(9.0), '9');
       expect(formatVelocity(9), '9');
     });
 
-    test('keeps one decimal place otherwise', () {
-      expect(formatVelocity(1.5), '1.5');
+    test('rounds a fractional rate to the nearest whole number', () {
+      expect(formatVelocity(5.2), '5');
+      expect(formatVelocity(1.5), '2');
+      expect(formatVelocity(1.44), '1');
+      expect(formatVelocity(1.46), '1');
     });
 
-    test('rounds to 1 decimal place', () {
-      expect(formatVelocity(1.44), '1.4');
-      expect(formatVelocity(1.46), '1.5');
+    test('rounds a positive rate that would round down to zero up to 1', () {
+      expect(formatVelocity(0.3), '1');
+      expect(formatVelocity(0.49), '1');
+    });
+
+    test('shows "0" only when the rate is truly zero', () {
+      expect(formatVelocity(0), '0');
     });
   });
 }
