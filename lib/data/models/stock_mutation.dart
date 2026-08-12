@@ -54,4 +54,36 @@ class StockMutation {
   /// Used only to redisplay history (see `MutationListItem`); never used
   /// for stock math.
   double? enteredQuantity;
+
+  /// [Product.sellPrice] as it stood the instant this mutation was
+  /// recorded. Frozen here so a later price edit can't retroactively
+  /// rewrite historical profit — the whole reason these snapshots exist.
+  ///
+  /// `null` means "no snapshot was recorded" (a row written before these
+  /// fields existed, or one the backfill couldn't resolve), which is
+  /// deliberately distinct from a snapshot of `0`. Never read directly
+  /// for profit math: go through [MutationPricing], which owns the
+  /// fall-back-to-current-price rule.
+  double? sellPriceSnapshot;
+
+  /// [Product.averageCostPrice] as it stood the instant this mutation was
+  /// recorded — for a stockIn, *after* [HppCalculator] folded that batch
+  /// into the weighted average, so it reflects the post-batch cost.
+  ///
+  /// `null` when the product had no cost data at all at that moment
+  /// (averageCostPrice was itself null), same nullable-vs-zero
+  /// distinction as [sellPriceSnapshot].
+  double? costPriceSnapshot;
+
+  /// `true` when the snapshots on this row were filled in by the one-time
+  /// [MutationSnapshotBackfill] from the product's *current* prices rather
+  /// than captured at mutation time — so their imprecision stays
+  /// traceable, since those prices may have drifted since the mutation
+  /// actually happened.
+  ///
+  /// Defaults to `false`, which is also what Isar's binary reader returns
+  /// for a bool missing from an already-stored record (see the note on
+  /// [Product.allowsFractionalQuantity]) — so legacy rows read as
+  /// "not backfilled" with no explicit migration of this field needed.
+  bool snapshotBackfilled = false;
 }

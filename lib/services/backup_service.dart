@@ -379,6 +379,9 @@ class BackupService {
         'createdAt': mutation.createdAt.toIso8601String(),
         'enteredUnit': mutation.enteredUnit?.name,
         'enteredQuantity': mutation.enteredQuantity,
+        'sellPriceSnapshot': mutation.sellPriceSnapshot,
+        'costPriceSnapshot': mutation.costPriceSnapshot,
+        'snapshotBackfilled': mutation.snapshotBackfilled,
       };
 
   StockMutation _mutationFromJson(Map<String, dynamic> json) => StockMutation()
@@ -390,7 +393,13 @@ class BackupService {
     ..stockAfter = (json['stockAfter'] as num).toDouble()
     ..createdAt = DateTime.parse(json['createdAt'] as String)
     ..enteredUnit = _parseNullableEnum(json['enteredUnit'], EnteredUnit.values)
-    ..enteredQuantity = (json['enteredQuantity'] as num?)?.toDouble();
+    ..enteredQuantity = (json['enteredQuantity'] as num?)?.toDouble()
+    // Absent from backups taken before price snapshots existed, which
+    // restore as null/false — exactly the state MutationSnapshotBackfill
+    // is there to resolve.
+    ..sellPriceSnapshot = (json['sellPriceSnapshot'] as num?)?.toDouble()
+    ..costPriceSnapshot = (json['costPriceSnapshot'] as num?)?.toDouble()
+    ..snapshotBackfilled = json['snapshotBackfilled'] as bool? ?? false;
 
   Map<String, dynamic> _costPriceAdjustmentToJson(CostPriceAdjustment adjustment) => {
         'id': adjustment.id,

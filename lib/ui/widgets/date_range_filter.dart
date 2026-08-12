@@ -22,6 +22,24 @@ class DateInputFormatter extends TextInputFormatter {
   }
 }
 
+/// Earliest year typed input accepts. Matches [ReportPeriodFilter]'s
+/// calendar `firstDate: DateTime(2020)` — the same floor the calendar
+/// picker enforces, so typed and picked dates can't disagree on what's in
+/// range.
+const int kMinValidYear = 2020;
+
+/// Latest year typed input accepts: the current year, matching
+/// [ReportPeriodFilter]'s calendar `lastDate` (today's date — this checks
+/// only the year component, since a year-level bound can't reproduce the
+/// picker's exact day cutoff without duplicating its call site).
+int maxValidYear() => DateTime.now().year;
+
+/// Message for a year outside [kMinValidYear]..[maxValidYear]. Kept next to
+/// [parseDdMmYyyy] so a caller can surface a specific reason instead of a
+/// generic "invalid date" message — not wired into any screen by this
+/// change, since that's a UI-layer concern.
+String yearRangeError() => 'Tahun harus antara $kMinValidYear–${maxValidYear()}';
+
 /// Parses a DD/MM/YYYY string, or returns null if it isn't a real
 /// calendar date. Rather than a hand-rolled days-per-month table, this
 /// relies on [DateTime]'s own normalizing constructor: DateTime(2026, 2,
@@ -30,6 +48,10 @@ class DateInputFormatter extends TextInputFormatter {
 /// out-of-range days and month-specific ones (30 Feb, 29 Feb outside a
 /// leap year) without this code needing to know how many days each month
 /// has.
+///
+/// Leading/trailing whitespace is rejected, not trimmed — `text` must be
+/// exactly 10 characters of `DD/MM/YYYY`, so a stray space already fails
+/// the length check below before reaching the digit parsing.
 DateTime? parseDdMmYyyy(String text) {
   if (text.length != 10) return null;
   final parts = text.split('/');
@@ -41,6 +63,7 @@ DateTime? parseDdMmYyyy(String text) {
   if (day == null || month == null || year == null) return null;
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
+  if (year < kMinValidYear || year > maxValidYear()) return null;
 
   final date = DateTime(year, month, day);
   if (date.year != year || date.month != month || date.day != day) return null;

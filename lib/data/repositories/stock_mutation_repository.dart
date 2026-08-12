@@ -1,6 +1,8 @@
 import 'package:isar_community/isar.dart';
 
 import '../../domain/hpp_calculator.dart';
+import '../../domain/mutation_pricing.dart';
+import '../../domain/profit_report.dart';
 import '../models/product.dart';
 import '../models/stock_mutation.dart';
 import 'repository_exceptions.dart';
@@ -85,6 +87,18 @@ class StockMutationRepository {
         product.criticalStockAlertState = null;
       }
 
+      // Price snapshots are read here, after the HPP recalculation above,
+      // and written inside this same transaction as the product itself —
+      // so a stockIn's costPriceSnapshot is the *post*-batch weighted
+      // average, and no crash can leave a mutation whose snapshot
+      // disagrees with the product row it was taken from.
+      //
+      // averageCostPrice is nullable and stays nullable here: a product
+      // with no cost data yet (or a stockIn recorded without a cost
+      // price, which doesn't trigger a recalculation) snapshots a `null`
+      // cost rather than a fabricated 0. Profit for such a row is
+      // "unknown", not "equal to the full sell price" — see
+      // [MutationPricing].
       final mutation = StockMutation()
         ..productId = productId
         ..type = type
@@ -93,6 +107,9 @@ class StockMutationRepository {
         ..stockAfter = newStock
         ..enteredUnit = enteredUnit
         ..enteredQuantity = enteredQuantity
+        ..sellPriceSnapshot = product.sellPrice
+        ..costPriceSnapshot = product.averageCostPrice
+        ..snapshotBackfilled = false
         ..createdAt = DateTime.now();
 
       await _isar.products.put(product);
@@ -228,26 +245,246 @@ class StockMutationRepository {
     return StockMutationTotals(stockIn: stockIn, stockOut: stockOut);
   }
 
-  /// Calculates total profit from all stock-out mutations.
-  /// Profit per unit = sellPrice - averageCostPrice
-  /// If a product has no averageCostPrice, no profit is counted for its stock-outs.
-  Future<double> calculateTotalProfit() async {
-    final stockOutMutations = await _isar.stockMutations
+  /// Profit for a single mutation, resolved through [MutationPricing] —
+  /// its price snapshots when it has them, the product's current prices
+  /// otherwise. `null` when the prices can't be resolved at all (no cost
+  /// data has ever been recorded, or the product is gone and the row
+  /// predates snapshots), which callers treat as "not counted" rather
+  /// than as zero.
+  Future<double?> profitForMutation(StockMutation mutation) async {
+    final product = await _isar.products.get(mutation.productId);
+    return MutationPricing.profit(mutation, product);
+  }
+
+  /// Every stock-out mutation inside [period], oldest first.
+  ///
+  /// The period is applied **here, by the database**, via the `createdAt`
+  /// index — not by filtering an already-loaded "fetch everything" result
+  /// and not after aggregation. [ReportPeriod.allTime] deliberately runs
+  /// with no where-clause at all rather than with sentinel bounds.
+  ///
+  /// Bounds are `startInclusive <= createdAt < endExclusive`; see
+  /// [ReportPeriod] for why the upper bound is exclusive-at-next-midnight
+  /// rather than a literal 23:59:59.999, and for the local-time reasoning.
+  Future<List<StockMutation>> getStockOutMutationsInPeriod(ReportPeriod period) {
+    if (period.isAllTime) {
+      return _isar.stockMutations
+          .filter()
+          .typeEqualTo(StockMutationType.stockOut)
+          .sortByCreatedAt()
+          .findAll();
+    }
+
+    return _isar.stockMutations
+        .where()
+        .createdAtBetween(
+          period.startInclusive!,
+          period.endExclusive!,
+          includeLower: true,
+          includeUpper: false,
+        )
         .filter()
         .typeEqualTo(StockMutationType.stockOut)
+        .sortByCreatedAt()
         .findAll();
+  }
+
+  /// The `createdAt` of the oldest mutation ever recorded, or `null` when
+  /// the ledger is empty.
+  ///
+  /// Runs as a **single indexed query**: `anyCreatedAt()` walks the
+  /// `createdAt` index in ascending order and [findFirst] stops at the
+  /// first entry, so the cost is one index seek regardless of how many
+  /// mutations exist. Nothing is loaded into memory to be minimised.
+  ///
+  /// The returned value is a local [DateTime] (Isar reads timestamps back
+  /// with `.toLocal()`), matching how [ReportPeriod] builds its bounds —
+  /// so callers can compare or format it without mixing UTC and local.
+  Future<DateTime?> getEarliestMutationDate() async {
+    final earliest =
+        await _isar.stockMutations.where().anyCreatedAt().findFirst();
+    return earliest?.createdAt;
+  }
+
+  /// How many rows one page of [_edgeProfitableStockOutDate] pulls at a
+  /// time. Large enough that the realistic case (the oldest/newest sale
+  /// resolves prices fine) costs exactly one page, small enough that a
+  /// long tail of unresolvable rows never loads the whole ledger.
+  static const int _edgeScanPageSize = 100;
+
+  /// The earliest and latest sale dates that actually feed the profit
+  /// figures, or `null` when nothing qualifies.
+  ///
+  /// "Qualifies" is deliberately the *same* predicate the profit
+  /// calculation uses (see [calculateProfitByDate] /
+  /// [ProfitReportBuilder.build]): a stock-out mutation whose sell **and**
+  /// cost price can both be resolved through [MutationPricing]. A stock-out
+  /// with no resolvable cost contributes nothing to the total, so it must
+  /// not be allowed to define the range either — otherwise the label would
+  /// claim a start date whose transaction isn't in the number below it.
+  ///
+  /// Walks the `createdAt` index from each end (ascending for the min,
+  /// descending for the max) in pages, stopping at the first qualifying
+  /// row. It never loads the whole ledger to be minimised: with resolvable
+  /// prices — the normal case — it reads one row's worth of work per end.
+  ///
+  /// Returned values are local [DateTime]s (Isar reads timestamps back with
+  /// `.toLocal()`), consistent with how [ReportPeriod] builds its day
+  /// boundaries — no UTC is involved anywhere on this path.
+  Future<ProfitDateRange?> getProfitableStockOutDateRange() async {
+    final earliest = await _edgeProfitableStockOutDate(descending: false);
+    if (earliest == null) return null;
+    final latest = await _edgeProfitableStockOutDate(descending: true);
+    // `latest` cannot be null once `earliest` isn't — the same row
+    // qualifies from either direction — but fall back rather than assert.
+    return ProfitDateRange(earliest: earliest, latest: latest ?? earliest);
+  }
+
+  Future<DateTime?> _edgeProfitableStockOutDate({required bool descending}) async {
+    var offset = 0;
+    while (true) {
+      final page = await _isar.stockMutations
+          .where(sort: descending ? Sort.desc : Sort.asc)
+          .anyCreatedAt()
+          .filter()
+          .typeEqualTo(StockMutationType.stockOut)
+          .offset(offset)
+          .limit(_edgeScanPageSize)
+          .findAll();
+      if (page.isEmpty) return null;
+
+      final products =
+          await _isar.products.getAll(page.map((m) => m.productId).toSet().toList());
+      final productsById = <int, Product>{
+        for (final product in products) ?product?.id: ?product,
+      };
+
+      for (final mutation in page) {
+        if (MutationPricing.profit(mutation, productsById[mutation.productId]) != null) {
+          return mutation.createdAt;
+        }
+      }
+
+      if (page.length < _edgeScanPageSize) return null;
+      offset += page.length;
+    }
+  }
+
+  /// The profit report for [period]: totals and per-product breakdown,
+  /// aggregated from the [StockMutation] ledger.
+  ///
+  /// Every figure it returns — revenue, cost, profit, per-product
+  /// quantity — comes from stock-out rows in the period, valued through
+  /// [MutationPricing]. Nothing is read from a precomputed [Product]
+  /// total, because a Product row has no time dimension and so cannot
+  /// respond to the selected range at all.
+  Future<ProfitReport> buildProfitReport(ReportPeriod period) async {
+    final mutations = await getStockOutMutationsInPeriod(period);
+    if (mutations.isEmpty) return ProfitReport.empty(period);
+
+    // One batched lookup for the products involved, rather than a `get`
+    // per mutation: a busy day can hold hundreds of rows for a handful of
+    // products. Missing ids (deleted products) simply stay absent from
+    // the map — see [ProfitReportBuilder.build].
+    final productIds = mutations.map((m) => m.productId).toSet().toList();
+    final products = await _isar.products.getAll(productIds);
+    final productsById = <int, Product>{
+      for (final product in products) ?product?.id: ?product,
+    };
+
+    return ProfitReportBuilder.build(
+      period: period,
+      stockOutMutations: mutations,
+      products: productsById,
+    );
+  }
+
+  /// Calculates total profit from all stock-out mutations, using each
+  /// mutation's price snapshots (see [profitForMutation]). Mutations
+  /// whose prices can't be resolved contribute nothing.
+  ///
+  /// [period] defaults to [ReportPeriod.allTime]; pass a bounded period to
+  /// scope the total to it.
+  Future<double> calculateTotalProfit([
+    ReportPeriod period = const ReportPeriod.allTime(),
+  ]) async {
+    final stockOutMutations = await getStockOutMutationsInPeriod(period);
 
     double totalProfit = 0.0;
     for (final mutation in stockOutMutations) {
-      final product = await _isar.products.get(mutation.productId);
-      if (product != null && product.averageCostPrice != null) {
-        final profitPerUnit = product.sellPrice - product.averageCostPrice!;
-        totalProfit += profitPerUnit * mutation.quantity;
-      }
+      totalProfit += (await profitForMutation(mutation)) ?? 0;
     }
 
     return totalProfit;
   }
+
+  /// Calculates profit grouped by date. Returns a map of date -> profit.
+  /// Only includes dates with stock-out mutations.
+  ///
+  /// [period] defaults to [ReportPeriod.allTime]; pass a bounded period to
+  /// scope the grouping to it. Keys are local midnight dates, matching the
+  /// local-day boundaries [ReportPeriod] filters on.
+  Future<Map<DateTime, double>> calculateProfitByDate([
+    ReportPeriod period = const ReportPeriod.allTime(),
+  ]) async {
+    final stockOutMutations = await getStockOutMutationsInPeriod(period);
+
+    final profitByDate = <DateTime, double>{};
+
+    for (final mutation in stockOutMutations) {
+      final profit = await profitForMutation(mutation);
+      if (profit == null) continue;
+
+      final dateKey = DateTime(
+        mutation.createdAt.year,
+        mutation.createdAt.month,
+        mutation.createdAt.day,
+      );
+
+      profitByDate[dateKey] = (profitByDate[dateKey] ?? 0) + profit;
+    }
+
+    return profitByDate;
+  }
+
+  /// Calculates profit grouped by month. Returns a map of "Bulan Tahun" -> profit.
+  ///
+  /// [period] defaults to [ReportPeriod.allTime]; pass a bounded period to
+  /// scope the grouping to it.
+  Future<Map<String, double>> calculateProfitByMonth([
+    ReportPeriod period = const ReportPeriod.allTime(),
+  ]) async {
+    final profitByDate = await calculateProfitByDate(period);
+    final profitByMonth = <String, double>{};
+
+    for (final entry in profitByDate.entries) {
+      final date = entry.key;
+      final monthKey = '${_getMonthName(date.month)} ${date.year}';
+      profitByMonth[monthKey] = (profitByMonth[monthKey] ?? 0) + entry.value;
+    }
+
+    return profitByMonth;
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return months[month - 1];
+  }
+}
+
+/// The span of sale dates behind a profit figure — see
+/// [StockMutationRepository.getProfitableStockOutDateRange]. Both ends are
+/// real `createdAt` instants of qualifying mutations, in local time;
+/// [earliest] and [latest] are the same instant when only one sale
+/// qualifies.
+class ProfitDateRange {
+  const ProfitDateRange({required this.earliest, required this.latest});
+
+  final DateTime earliest;
+  final DateTime latest;
 }
 
 class StockMutationTotals {

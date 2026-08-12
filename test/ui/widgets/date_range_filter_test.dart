@@ -58,5 +58,80 @@ void main() {
       expect(parseDdMmYyyy('01/01'), isNull);
       expect(parseDdMmYyyy(''), isNull);
     });
+
+    test('rejects a year outside kMinValidYear..maxValidYear, accepts the boundaries', () {
+      expect(parseDdMmYyyy('01/01/${kMinValidYear - 1}'), isNull);
+      expect(parseDdMmYyyy('01/01/${maxValidYear() + 1}'), isNull);
+      expect(parseDdMmYyyy('01/01/$kMinValidYear'), DateTime(kMinValidYear, 1, 1));
+      expect(parseDdMmYyyy('01/01/${maxValidYear()}'), DateTime(maxValidYear(), 1, 1));
+    });
+
+    test('rejects a non-numeric segment reaching the parser directly', () {
+      expect(parseDdMmYyyy('aa/01/2026'), isNull);
+      expect(parseDdMmYyyy('01/aa/2026'), isNull);
+      expect(parseDdMmYyyy('01/01/aaaa'), isNull);
+    });
+
+    test('rejects a negative day (the leading "-" makes int.tryParse succeed, '
+        'so the day<1 bound is what actually rejects it)', () {
+      expect(parseDdMmYyyy('-1/01/2026'), isNull);
+    });
+
+    test('rejects malformed slash placement', () {
+      expect(parseDdMmYyyy('01//2026'), isNull);
+      expect(parseDdMmYyyy('0/1/12/2026'), isNull);
+    });
+
+    test('rejects leading/trailing whitespace rather than trimming it', () {
+      expect(parseDdMmYyyy(' 05/03/2026'), isNull);
+      expect(parseDdMmYyyy('05/03/2026 '), isNull);
+    });
+  });
+
+  group('DateInputFormatter backspace', () {
+    final formatter = DateInputFormatter();
+
+    test('deleting the literal last character at each step reformats cleanly, '
+        'including the boundary where deleting an auto-inserted slash drops it '
+        'instead of leaving a dangling separator', () {
+      // Platform backspace removes exactly the last character of the
+      // currently displayed (already-formatted) text and hands the
+      // formatter oldValue=displayed, newValue=displayed-minus-last-char —
+      // this walks that sequence one keystroke at a time from a full date.
+      var current = '01/12/2026';
+      expect(current.length, 10);
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01/12/202'); // dropped the trailing digit '6'
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01/12/20');
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01/12/2');
+
+      // Deleting the last digit of the year here also removes the slash
+      // before it, since with only 4 digits left the grouping rule no
+      // longer places a separator after the (now-last) 4th digit.
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01/12');
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01/1');
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '01');
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '0');
+
+      current = _apply(formatter, current, current.substring(0, current.length - 1)).text;
+      expect(current, '');
+    });
+
+    test('re-typing after backspacing to empty reformats from scratch', () {
+      final retyped = _apply(formatter, '', 'ab01cd12ef2026gh99').text;
+      expect(retyped, '01/12/2026');
+    });
   });
 }

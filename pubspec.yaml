@@ -44,7 +44,7 @@ dependencies:
   path: ^1.9.1
   share_plus: ^11.0.0
   flutter_local_notifications: ^18.0.0
-  workmanager: ^0.9.0+3
+  workmanager: ^0.10.0
   android_alarm_manager_plus: ^4.0.7
   android_intent_plus: ^6.0.0
   sliver_tools: ^0.2.12
@@ -58,6 +58,9 @@ dependencies:
   # unconditionally, like every other native plugin this app depends on.
   file_picker: ^10.3.10
   package_info_plus: ^9.0.1
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  intl: ^0.20.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

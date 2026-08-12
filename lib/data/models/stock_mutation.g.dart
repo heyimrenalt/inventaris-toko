@@ -17,40 +17,55 @@ const StockMutationSchema = CollectionSchema(
   name: r'StockMutation',
   id: -2155642014273145552,
   properties: {
-    r'createdAt': PropertySchema(
+    r'costPriceSnapshot': PropertySchema(
       id: 0,
+      name: r'costPriceSnapshot',
+      type: IsarType.double,
+    ),
+    r'createdAt': PropertySchema(
+      id: 1,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'enteredQuantity': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'enteredQuantity',
       type: IsarType.double,
     ),
     r'enteredUnit': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'enteredUnit',
       type: IsarType.string,
       enumMap: _StockMutationenteredUnitEnumValueMap,
     ),
-    r'note': PropertySchema(id: 3, name: r'note', type: IsarType.string),
+    r'note': PropertySchema(id: 4, name: r'note', type: IsarType.string),
     r'productId': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'productId',
       type: IsarType.long,
     ),
     r'quantity': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'quantity',
       type: IsarType.double,
     ),
+    r'sellPriceSnapshot': PropertySchema(
+      id: 7,
+      name: r'sellPriceSnapshot',
+      type: IsarType.double,
+    ),
+    r'snapshotBackfilled': PropertySchema(
+      id: 8,
+      name: r'snapshotBackfilled',
+      type: IsarType.bool,
+    ),
     r'stockAfter': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'stockAfter',
       type: IsarType.double,
     ),
     r'type': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'type',
       type: IsarType.string,
       enumMap: _StockMutationtypeEnumValueMap,
@@ -114,14 +129,17 @@ void _stockMutationSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeDouble(offsets[1], object.enteredQuantity);
-  writer.writeString(offsets[2], object.enteredUnit?.name);
-  writer.writeString(offsets[3], object.note);
-  writer.writeLong(offsets[4], object.productId);
-  writer.writeDouble(offsets[5], object.quantity);
-  writer.writeDouble(offsets[6], object.stockAfter);
-  writer.writeString(offsets[7], object.type.name);
+  writer.writeDouble(offsets[0], object.costPriceSnapshot);
+  writer.writeDateTime(offsets[1], object.createdAt);
+  writer.writeDouble(offsets[2], object.enteredQuantity);
+  writer.writeString(offsets[3], object.enteredUnit?.name);
+  writer.writeString(offsets[4], object.note);
+  writer.writeLong(offsets[5], object.productId);
+  writer.writeDouble(offsets[6], object.quantity);
+  writer.writeDouble(offsets[7], object.sellPriceSnapshot);
+  writer.writeBool(offsets[8], object.snapshotBackfilled);
+  writer.writeDouble(offsets[9], object.stockAfter);
+  writer.writeString(offsets[10], object.type.name);
 }
 
 StockMutation _stockMutationDeserialize(
@@ -131,19 +149,22 @@ StockMutation _stockMutationDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = StockMutation();
-  object.createdAt = reader.readDateTime(offsets[0]);
-  object.enteredQuantity = reader.readDoubleOrNull(offsets[1]);
+  object.costPriceSnapshot = reader.readDoubleOrNull(offsets[0]);
+  object.createdAt = reader.readDateTime(offsets[1]);
+  object.enteredQuantity = reader.readDoubleOrNull(offsets[2]);
   object.enteredUnit =
       _StockMutationenteredUnitValueEnumMap[reader.readStringOrNull(
-        offsets[2],
+        offsets[3],
       )];
   object.id = id;
-  object.note = reader.readStringOrNull(offsets[3]);
-  object.productId = reader.readLong(offsets[4]);
-  object.quantity = reader.readDouble(offsets[5]);
-  object.stockAfter = reader.readDouble(offsets[6]);
+  object.note = reader.readStringOrNull(offsets[4]);
+  object.productId = reader.readLong(offsets[5]);
+  object.quantity = reader.readDouble(offsets[6]);
+  object.sellPriceSnapshot = reader.readDoubleOrNull(offsets[7]);
+  object.snapshotBackfilled = reader.readBool(offsets[8]);
+  object.stockAfter = reader.readDouble(offsets[9]);
   object.type =
-      _StockMutationtypeValueEnumMap[reader.readStringOrNull(offsets[7])] ??
+      _StockMutationtypeValueEnumMap[reader.readStringOrNull(offsets[10])] ??
       StockMutationType.stockIn;
   return object;
 }
@@ -156,23 +177,29 @@ P _stockMutationDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
-    case 1:
       return (reader.readDoubleOrNull(offset)) as P;
+    case 1:
+      return (reader.readDateTime(offset)) as P;
     case 2:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 3:
       return (_StockMutationenteredUnitValueEnumMap[reader.readStringOrNull(
             offset,
           )])
           as P;
-    case 3:
-      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 6:
       return (reader.readDouble(offset)) as P;
     case 7:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 8:
+      return (reader.readBool(offset)) as P;
+    case 9:
+      return (reader.readDouble(offset)) as P;
+    case 10:
       return (_StockMutationtypeValueEnumMap[reader.readStringOrNull(offset)] ??
               StockMutationType.stockIn)
           as P;
@@ -410,6 +437,99 @@ extension StockMutationQueryWhere
 
 extension StockMutationQueryFilter
     on QueryBuilder<StockMutation, StockMutation, QFilterCondition> {
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'costPriceSnapshot'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'costPriceSnapshot'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotEqualTo(double? value, {double epsilon = Query.epsilon}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'costPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'costPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'costPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  costPriceSnapshotBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'costPriceSnapshot',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
   createdAtEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -1067,6 +1187,108 @@ extension StockMutationQueryFilter
   }
 
   QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'sellPriceSnapshot'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'sellPriceSnapshot'),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotEqualTo(double? value, {double epsilon = Query.epsilon}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'sellPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'sellPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'sellPriceSnapshot',
+          value: value,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  sellPriceSnapshotBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'sellPriceSnapshot',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+
+          epsilon: epsilon,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
+  snapshotBackfilledEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'snapshotBackfilled', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterFilterCondition>
   stockAfterEqualTo(double value, {double epsilon = Query.epsilon}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1294,6 +1516,20 @@ extension StockMutationQueryLinks
 
 extension StockMutationQuerySortBy
     on QueryBuilder<StockMutation, StockMutation, QSortBy> {
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortByCostPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'costPriceSnapshot', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortByCostPriceSnapshotDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'costPriceSnapshot', Sort.desc);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1372,6 +1608,34 @@ extension StockMutationQuerySortBy
     });
   }
 
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortBySellPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellPriceSnapshot', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortBySellPriceSnapshotDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellPriceSnapshot', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortBySnapshotBackfilled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snapshotBackfilled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  sortBySnapshotBackfilledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snapshotBackfilled', Sort.desc);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterSortBy> sortByStockAfter() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'stockAfter', Sort.asc);
@@ -1400,6 +1664,20 @@ extension StockMutationQuerySortBy
 
 extension StockMutationQuerySortThenBy
     on QueryBuilder<StockMutation, StockMutation, QSortThenBy> {
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenByCostPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'costPriceSnapshot', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenByCostPriceSnapshotDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'costPriceSnapshot', Sort.desc);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1490,6 +1768,34 @@ extension StockMutationQuerySortThenBy
     });
   }
 
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenBySellPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellPriceSnapshot', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenBySellPriceSnapshotDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellPriceSnapshot', Sort.desc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenBySnapshotBackfilled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snapshotBackfilled', Sort.asc);
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QAfterSortBy>
+  thenBySnapshotBackfilledDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'snapshotBackfilled', Sort.desc);
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QAfterSortBy> thenByStockAfter() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'stockAfter', Sort.asc);
@@ -1518,6 +1824,13 @@ extension StockMutationQuerySortThenBy
 
 extension StockMutationQueryWhereDistinct
     on QueryBuilder<StockMutation, StockMutation, QDistinct> {
+  QueryBuilder<StockMutation, StockMutation, QDistinct>
+  distinctByCostPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'costPriceSnapshot');
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
@@ -1559,6 +1872,20 @@ extension StockMutationQueryWhereDistinct
     });
   }
 
+  QueryBuilder<StockMutation, StockMutation, QDistinct>
+  distinctBySellPriceSnapshot() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sellPriceSnapshot');
+    });
+  }
+
+  QueryBuilder<StockMutation, StockMutation, QDistinct>
+  distinctBySnapshotBackfilled() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'snapshotBackfilled');
+    });
+  }
+
   QueryBuilder<StockMutation, StockMutation, QDistinct> distinctByStockAfter() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'stockAfter');
@@ -1579,6 +1906,13 @@ extension StockMutationQueryProperty
   QueryBuilder<StockMutation, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<StockMutation, double?, QQueryOperations>
+  costPriceSnapshotProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'costPriceSnapshot');
     });
   }
 
@@ -1617,6 +1951,20 @@ extension StockMutationQueryProperty
   QueryBuilder<StockMutation, double, QQueryOperations> quantityProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'quantity');
+    });
+  }
+
+  QueryBuilder<StockMutation, double?, QQueryOperations>
+  sellPriceSnapshotProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sellPriceSnapshot');
+    });
+  }
+
+  QueryBuilder<StockMutation, bool, QQueryOperations>
+  snapshotBackfilledProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'snapshotBackfilled');
     });
   }
 
