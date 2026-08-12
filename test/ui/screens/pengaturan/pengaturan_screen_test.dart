@@ -485,6 +485,88 @@ void main() {
     },
   );
 
+  group('Prioritas Kulakan copy', () {
+    testWidgets('both rows render their label and description', (tester) async {
+      await tester.runAsync(() async {
+        await pumpScreen(tester);
+
+        expect(find.text(restockLeadTimeLabel), findsOneWidget);
+        expect(find.text(restockLeadTimeDescription), findsOneWidget);
+        expect(find.text('Perkiraan jumlah stok untuk dikulak'), findsOneWidget);
+        expect(find.text(restockCoverDaysDescription), findsOneWidget);
+      });
+    });
+
+    testWidgets('lead-time dialog result line follows what is typed', (tester) async {
+      await tester.runAsync(() async {
+        await pumpScreen(tester);
+
+        await tester.tap(find.byKey(const Key('pengaturan_restock_lead_time_tile')));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byKey(const Key('pengaturan_restock_setting_field')), '5');
+        await tester.pump();
+        expect(
+          find.text(
+            'Barang ditandai perlu dikulak saat stok diperkirakan tinggal cukup untuk 5 hari.',
+          ),
+          findsOneWidget,
+        );
+
+        // Empty field: the line disappears rather than showing "null hari".
+        await tester.enterText(find.byKey(const Key('pengaturan_restock_setting_field')), '');
+        await tester.pump();
+        expect(find.byKey(const Key('pengaturan_restock_setting_result')), findsNothing);
+      });
+    });
+
+    testWidgets('cover-days dialog uses its own result sentence', (tester) async {
+      await tester.runAsync(() async {
+        await pumpScreen(tester);
+
+        await tester.tap(find.byKey(const Key('pengaturan_restock_cover_days_tile')));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byKey(const Key('pengaturan_restock_setting_field')), '10');
+        await tester.pump();
+        expect(
+          find.text('Saran jumlah beli dihitung agar stok cukup untuk 10 hari ke depan.'),
+          findsOneWidget,
+        );
+      });
+    });
+  });
+
+  group('buildRestockSettingResultText', () {
+    test('fills the day count into each template', () {
+      expect(
+        buildRestockSettingResultText(restockLeadTimeResultTemplate, '3'),
+        'Barang ditandai perlu dikulak saat stok diperkirakan tinggal cukup untuk 3 hari.',
+      );
+      expect(
+        buildRestockSettingResultText(restockCoverDaysResultTemplate, ' 7 '),
+        'Saran jumlah beli dihitung agar stok cukup untuk 7 hari ke depan.',
+      );
+    });
+
+    test('returns null for empty, non-numeric, and below-minimum input', () {
+      for (final input in ['', '   ', 'abc', '0', '-2']) {
+        expect(
+          buildRestockSettingResultText(restockLeadTimeResultTemplate, input),
+          isNull,
+          reason: 'input "$input" should produce no result line',
+        );
+      }
+    });
+
+    test('still describes above-maximum input (validation rejects it on save)', () {
+      expect(
+        buildRestockSettingResultText(restockCoverDaysResultTemplate, '200'),
+        contains('200 hari'),
+      );
+    });
+  });
+
   group('exact-alarm permission', () {
     testWidgets(
       'turning critical stock alerts on with permission denied shows a dialog instead of scheduling',

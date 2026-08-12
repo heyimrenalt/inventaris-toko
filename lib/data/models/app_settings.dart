@@ -52,6 +52,17 @@ class AppSettings {
   /// `false`), so the dialog still shows exactly once for either case.
   bool batteryOptimizationDialogDismissed = false;
 
+  /// Whether the one-time [MutationSnapshotBackfill] — which fills
+  /// [StockMutation.sellPriceSnapshot]/[StockMutation.costPriceSnapshot]
+  /// on rows recorded before those fields existed — has already run.
+  ///
+  /// Same reasoning as [batteryOptimizationDialogDismissed]: `false` for
+  /// both fresh installs and legacy rows written before this field
+  /// existed (Isar zero-fills a missing bool to `false`), so the backfill
+  /// runs exactly once for either case. The backfill is idempotent
+  /// regardless, so a lost flag costs a redundant pass, not corruption.
+  bool mutationPriceSnapshotBackfillDone = false;
+
   /// The 1-3 configured "Alert stok kritis" times, derived from the slot
   /// fields above. Never empty: slot 1 always contributes.
   @ignore

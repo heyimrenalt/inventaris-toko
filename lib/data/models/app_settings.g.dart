@@ -82,13 +82,18 @@ const AppSettingsSchema = CollectionSchema(
       name: r'lastBackupAt',
       type: IsarType.dateTime,
     ),
-    r'restockCoverDays': PropertySchema(
+    r'mutationPriceSnapshotBackfillDone': PropertySchema(
       id: 13,
+      name: r'mutationPriceSnapshotBackfillDone',
+      type: IsarType.bool,
+    ),
+    r'restockCoverDays': PropertySchema(
+      id: 14,
       name: r'restockCoverDays',
       type: IsarType.long,
     ),
     r'restockLeadTimeDays': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'restockLeadTimeDays',
       type: IsarType.long,
     ),
@@ -137,8 +142,9 @@ void _appSettingsSerialize(
   writer.writeLong(offsets[10], object.dailySummaryMinute);
   writer.writeDouble(offsets[11], object.defaultMinStockThreshold);
   writer.writeDateTime(offsets[12], object.lastBackupAt);
-  writer.writeLong(offsets[13], object.restockCoverDays);
-  writer.writeLong(offsets[14], object.restockLeadTimeDays);
+  writer.writeBool(offsets[13], object.mutationPriceSnapshotBackfillDone);
+  writer.writeLong(offsets[14], object.restockCoverDays);
+  writer.writeLong(offsets[15], object.restockLeadTimeDays);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -162,8 +168,9 @@ AppSettings _appSettingsDeserialize(
   object.defaultMinStockThreshold = reader.readDouble(offsets[11]);
   object.id = id;
   object.lastBackupAt = reader.readDateTimeOrNull(offsets[12]);
-  object.restockCoverDays = reader.readLong(offsets[13]);
-  object.restockLeadTimeDays = reader.readLong(offsets[14]);
+  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[13]);
+  object.restockCoverDays = reader.readLong(offsets[14]);
+  object.restockLeadTimeDays = reader.readLong(offsets[15]);
   return object;
 }
 
@@ -201,8 +208,10 @@ P _appSettingsDeserializeProp<P>(
     case 12:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 13:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 14:
+      return (reader.readLong(offset)) as P;
+    case 15:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1083,6 +1092,18 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  mutationPriceSnapshotBackfillDoneEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'mutationPriceSnapshotBackfillDone',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   restockCoverDaysEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1383,6 +1404,20 @@ extension AppSettingsQuerySortBy
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByMutationPriceSnapshotBackfillDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByMutationPriceSnapshotBackfillDoneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   sortByRestockCoverDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'restockCoverDays', Sort.asc);
@@ -1607,6 +1642,20 @@ extension AppSettingsQuerySortThenBy
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByMutationPriceSnapshotBackfillDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByMutationPriceSnapshotBackfillDoneDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   thenByRestockCoverDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'restockCoverDays', Sort.asc);
@@ -1728,6 +1777,13 @@ extension AppSettingsQueryWhereDistinct
   }
 
   QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByMutationPriceSnapshotBackfillDone() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'mutationPriceSnapshotBackfillDone');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
   distinctByRestockCoverDays() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'restockCoverDays');
@@ -1837,6 +1893,13 @@ extension AppSettingsQueryProperty
   lastBackupAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastBackupAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, bool, QQueryOperations>
+  mutationPriceSnapshotBackfillDoneProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'mutationPriceSnapshotBackfillDone');
     });
   }
 

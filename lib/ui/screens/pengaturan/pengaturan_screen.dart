@@ -13,8 +13,12 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../services/backup_service.dart';
 import '../../../services/data_wipe_service.dart';
 import '../../../services/notification_service.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_spacing.dart';
+import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/day_grouped_mutations.dart';
+import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/time_picker_sheet.dart';
 import 'kelola_kategori_screen.dart';
 import 'tentang_aplikasi_screen.dart';
@@ -226,12 +230,12 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                   '2. Atau cari \'Pengoptimalan baterai\' dan nonaktifkan '
                   'untuk aplikasi ini.',
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 CheckboxListTile(
                   key: const Key('pengaturan_battery_dialog_dont_show_again'),
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text('Jangan tampilkan lagi', style: TextStyle(fontSize: 14)),
+                  title: const Text('Jangan tampilkan lagi', style: AppTextStyles.bodyMedium),
                   value: dontShowAgain,
                   onChanged: (value) => setDialogState(() => dontShowAgain = value ?? false),
                 ),
@@ -299,7 +303,8 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     if (settings == null) return;
     final updated = await _showRestockSettingDialog(
       title: 'Peringatan Kulakan',
-      helperText: 'Peringatan kulakan berapa hari sebelum stok habis',
+      helperText: restockLeadTimeDescription,
+      resultTemplate: restockLeadTimeResultTemplate,
       initialValue: settings.restockLeadTimeDays,
       update: _settingsRepository.updateRestockLeadTimeDays,
     );
@@ -311,8 +316,9 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     final settings = _settings;
     if (settings == null) return;
     final updated = await _showRestockSettingDialog(
-      title: 'Jumlah Hari Kulakan',
-      helperText: 'Sekali kulakan untuk berapa hari',
+      title: restockCoverDaysLabel,
+      helperText: restockCoverDaysDescription,
+      resultTemplate: restockCoverDaysResultTemplate,
       initialValue: settings.restockCoverDays,
       update: _settingsRepository.updateRestockCoverDays,
     );
@@ -328,6 +334,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
   Future<AppSettings?> _showRestockSettingDialog({
     required String title,
     required String helperText,
+    required String resultTemplate,
     required int initialValue,
     required Future<AppSettings> Function(int value) update,
   }) {
@@ -336,6 +343,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       builder: (dialogContext) => _RestockSettingDialog(
         title: title,
         helperText: helperText,
+        resultTemplate: resultTemplate,
         initialValue: initialValue,
         update: update,
       ),
@@ -422,12 +430,19 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           'Semua produk, mutasi, kategori, dan pengaturan akan dihapus permanen.',
         ),
         actions: [
+          // TODO(ui-migration): dialog button labels across this file are
+          // 16/w500 — no token matches that pair, and every text token
+          // carries a color that would override the button's foreground.
+          // Deliberately left raw everywhere.
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Batal', style: TextStyle(fontSize: 16)),
           ),
           FilledButton(
             key: const Key('hapus_semua_data_step1_lanjutkan'),
+            // TODO(ui-migration): Colors.red (#F44336), not the theme's
+            // error / AppColors.redPrimary (#D32F2F). Same in _pulihkanData
+            // and _HapusSemuaDataConfirmDialog.
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Lanjutkan', style: TextStyle(fontSize: 16)),
@@ -487,7 +502,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           content: Row(
             children: [
               const CircularProgressIndicator(),
-              const SizedBox(width: 24),
+              const SizedBox(width: AppSpacing.xxl),
               Expanded(child: Text(message)),
             ],
           ),
@@ -672,27 +687,36 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     return Scaffold(
       appBar: const AppHeader(title: 'Pengaturan'),
       body: ListView(
+        // Clears the floating glass nav bar. extendBody already reports the
+        // bar's full height as padding.bottom, so this is just that plus a
+        // small gap.
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + GlassBottomNav.contentGap,
+        ),
         children: [
           const _SectionHeader('Produk'),
           ListTile(
-            minVerticalPadding: 16,
+            minVerticalPadding: AppSpacing.lg,
             leading: const Icon(Icons.category),
+            // TODO(ui-migration): every ListTile/SwitchListTile title on this
+            // screen is a raw fontSize:16 — AppTextStyles.subheading is
+            // 16/w700, so tokenizing them would bold the whole settings list.
+            // Left raw pending a design decision (applies to all tiles below).
             title: const Text('Kelola kategori', style: TextStyle(fontSize: 16)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => KelolaKategoriScreen(isar: widget.isar)),
-              );
-            },
+            onTap: () => KelolaKategoriScreen.show(context, isar: widget.isar),
           ),
           if (settings != null) ..._buildPrioritasKulakanSection(settings),
           if (settings != null) ..._buildNotifikasiSection(settings),
           const _SectionHeader('Data'),
           ListTile(
             key: const Key('pengaturan_cadangkan_data_tile'),
-            minVerticalPadding: 16,
+            minVerticalPadding: AppSpacing.lg,
             leading: const Icon(Icons.backup),
             title: const Text('Cadangkan Data', style: TextStyle(fontSize: 16)),
+            // TODO(ui-migration): subtitles here are fontSize:13 — the nearest
+            // token (AppTextStyles.caption) is 12px and gray700, changing both
+            // size and color. Left raw (applies to every subtitle below).
             subtitle: Text(
               _formatLastBackupSubtitle(settings?.lastBackupAt),
               style: const TextStyle(fontSize: 13),
@@ -702,7 +726,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           ),
           ListTile(
             key: const Key('pengaturan_pulihkan_data_tile'),
-            minVerticalPadding: 16,
+            minVerticalPadding: AppSpacing.lg,
             leading: const Icon(Icons.restore),
             title: const Text('Pulihkan Data', style: TextStyle(fontSize: 16)),
             trailing: const Icon(Icons.chevron_right),
@@ -710,7 +734,13 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           ),
           ListTile(
             key: const Key('pengaturan_hapus_semua_data_tile'),
-            minVerticalPadding: 16,
+            minVerticalPadding: AppSpacing.lg,
+            // TODO(ui-migration): Colors.red (#F44336) here and on the title
+            // below is not AppColors.redPrimary (#D32F2F) or redText
+            // (#C62828) — three different reds express one destructive
+            // concept across this file (see also the FilledButton fills in
+            // the delete/restore dialogs). Needs a design pass, not a
+            // mechanical swap.
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text(
               'Hapus semua data',
@@ -722,7 +752,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           const _SectionHeader('Lainnya'),
           ListTile(
             key: const Key('pengaturan_tentang_aplikasi_tile'),
-            minVerticalPadding: 16,
+            minVerticalPadding: AppSpacing.lg,
             leading: const Icon(Icons.info_outline),
             title: const Text('Tentang Aplikasi', style: TextStyle(fontSize: 16)),
             trailing: const Icon(Icons.chevron_right),
@@ -742,16 +772,19 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       const _SectionHeader('Prioritas Kulakan'),
       ListTile(
         key: const Key('pengaturan_restock_lead_time_tile'),
-        minVerticalPadding: 16,
+        minVerticalPadding: AppSpacing.lg,
         leading: const Icon(Icons.warning_amber_outlined),
-        title: const Text('Peringatan kulakan', style: TextStyle(fontSize: 16)),
+        title: const Text(restockLeadTimeLabel, style: TextStyle(fontSize: 16)),
         subtitle: const Text(
-          'Peringatan kulakan berapa hari sebelum stok habis',
+          restockLeadTimeDescription,
           style: TextStyle(fontSize: 13),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // TODO(ui-migration): trailing values are fontSize:16 —
+            // AppTextStyles.subheading would change both weight (w700) and
+            // color. Left raw (applies to every trailing value below).
             Text('${settings.restockLeadTimeDays} hari', style: const TextStyle(fontSize: 16)),
             const Icon(Icons.chevron_right),
           ],
@@ -760,11 +793,11 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       ),
       ListTile(
         key: const Key('pengaturan_restock_cover_days_tile'),
-        minVerticalPadding: 16,
+        minVerticalPadding: AppSpacing.lg,
         leading: const Icon(Icons.shopping_cart_outlined),
-        title: const Text('Jumlah hari kulakan', style: TextStyle(fontSize: 16)),
+        title: const Text(restockCoverDaysLabel, style: TextStyle(fontSize: 16)),
         subtitle: const Text(
-          'Sekali kulakan untuk berapa hari',
+          restockCoverDaysDescription,
           style: TextStyle(fontSize: 13),
         ),
         trailing: Row(
@@ -783,6 +816,10 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     final time = TimeOfDay(hour: settings.dailySummaryHour, minute: settings.dailySummaryMinute);
     return [
       const _SectionHeader('Notifikasi'),
+      // TODO(ui-migration): this and the "Alert stok kritis" SwitchListTile
+      // below are the only rows with no leading icon and no
+      // minVerticalPadding — they sit shorter and unindented next to every
+      // other tile. Deliberately not fixed here (layout change).
       SwitchListTile(
         key: const Key('pengaturan_daily_summary_toggle'),
         title: const Text('Ringkasan harian', style: TextStyle(fontSize: 16)),
@@ -792,10 +829,13 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       if (settings.dailySummaryEnabled)
         ListTile(
           key: const Key('pengaturan_daily_summary_time'),
-          minVerticalPadding: 16,
+          minVerticalPadding: AppSpacing.lg,
           leading: const Icon(Icons.access_time),
           title: const Text('Jam pengiriman', style: TextStyle(fontSize: 16)),
           trailing: ConstrainedBox(
+            // TODO(ui-migration): off-scale magic number, and the identical
+            // trailing-time content in _buildCriticalStockAlertTimeRows is
+            // capped at 70 instead — two widths for one thing.
             constraints: const BoxConstraints(maxWidth: 90),
             child: Text(
               time.format(context),
@@ -815,7 +855,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       if (settings.criticalStockAlertEnabled) ..._buildCriticalStockAlertTimeRows(settings),
       ListTile(
         key: const Key('pengaturan_notification_troubleshoot_tile'),
-        minVerticalPadding: 16,
+        minVerticalPadding: AppSpacing.lg,
         leading: const Icon(Icons.help_outline),
         title: const Text('Notifikasi tidak muncul?', style: TextStyle(fontSize: 16)),
         trailing: const Icon(Icons.chevron_right),
@@ -835,13 +875,15 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       for (var index = 0; index < times.length; index++)
         ListTile(
           key: Key('pengaturan_critical_stock_time_$index'),
-          minVerticalPadding: 16,
+          minVerticalPadding: AppSpacing.lg,
           leading: const Icon(Icons.access_time),
           title: Text('Jam ke-${index + 1}', style: const TextStyle(fontSize: 16)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               ConstrainedBox(
+                // TODO(ui-migration): off-scale, and 70 here vs 90 on the
+                // "Jam pengiriman" row for the same formatted-time content.
                 constraints: const BoxConstraints(maxWidth: 70),
                 child: Text(
                   TimeOfDay(hour: times[index].hour, minute: times[index].minute).format(context),
@@ -861,9 +903,11 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           onTap: () => _pickCriticalStockAlertTime(index),
         ),
       if (times.length < 3)
+        // TODO(ui-migration): unlike every other onTap tile on this screen,
+        // this one has no trailing chevron.
         ListTile(
           key: const Key('pengaturan_critical_stock_add_time'),
-          minVerticalPadding: 16,
+          minVerticalPadding: AppSpacing.lg,
           leading: const Icon(Icons.add),
           title: const Text('Tambah jam', style: TextStyle(fontSize: 16)),
           onTap: _addCriticalStockAlertSlot,
@@ -884,16 +928,55 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
 /// instead means Flutter itself only calls `dispose()` once the widget
 /// is actually gone. See [_CategoryFormDialog] for the same fix applied
 /// to the category add/rename dialog.
+/// Placeholder inside the restock result templates below, replaced by the
+/// day count the user is currently typing.
+const String restockDaysPlaceholder = '{hari}';
+
+const String restockLeadTimeLabel = 'Peringatan kulakan';
+const String restockLeadTimeDescription =
+    'Peringatan kulakan stok barang untuk beberapa hari ke depan, sebelum stok barang habis.';
+const String restockLeadTimeResultTemplate =
+    'Barang ditandai perlu dikulak saat stok diperkirakan tinggal cukup untuk '
+    '$restockDaysPlaceholder hari.';
+
+const String restockCoverDaysLabel = 'Perkiraan jumlah stok untuk dikulak';
+const String restockCoverDaysDescription =
+    'Memperkirakan berapa banyak mama perlu kulakan, agar stok cukup untuk beberapa hari ke depan.';
+const String restockCoverDaysResultTemplate =
+    'Saran jumlah beli dihitung agar stok cukup untuk $restockDaysPlaceholder hari ke depan.';
+
+/// Builds the live "what this number means" line shown under the day
+/// field in the restock settings dialog, from whatever is typed right now.
+///
+/// Returns `null` when there is nothing sensible to say — an empty field,
+/// a non-number, or a number below the allowed minimum — so the dialog
+/// simply hides the line rather than rendering "null hari". Values above
+/// the maximum still get a sentence: the field's own validation is what
+/// rejects them on save, and this line only describes what was typed.
+String? buildRestockSettingResultText(String template, String rawInput) {
+  final days = int.tryParse(rawInput.trim());
+  if (days == null || days < AppSettingsRepository.minRestockSettingDays) return null;
+  return template.replaceAll(restockDaysPlaceholder, '$days');
+}
+
 class _RestockSettingDialog extends StatefulWidget {
   const _RestockSettingDialog({
     required this.title,
     required this.helperText,
+    required this.resultTemplate,
     required this.initialValue,
     required this.update,
   });
 
   final String title;
   final String helperText;
+
+  /// Sentence describing what the typed number will do, with
+  /// [restockDaysPlaceholder] standing in for the day count. Passed in
+  /// (rather than branched on inside the dialog) because this one widget
+  /// serves both restock settings — see [restockLeadTimeResultTemplate]
+  /// and [restockCoverDaysResultTemplate].
+  final String resultTemplate;
   final int initialValue;
   final Future<AppSettings> Function(int value) update;
 
@@ -909,10 +992,16 @@ class _RestockSettingDialogState extends State<_RestockSettingDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue.toString());
+    // The result line under the field restates the typed number, so it
+    // has to rebuild on every keystroke, not just on save.
+    _controller.addListener(_onInputChanged);
   }
+
+  void _onInputChanged() => setState(() {});
 
   @override
   void dispose() {
+    _controller.removeListener(_onInputChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -935,10 +1024,14 @@ class _RestockSettingDialogState extends State<_RestockSettingDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final resultText = buildRestockSettingResultText(widget.resultTemplate, _controller.text);
     return AlertDialog(
+      // TODO(ui-migration): 18px has no token in the scale (heading is 20,
+      // subheading 16), and this dialog + _HapusSemuaDataConfirmDialog are
+      // the only two that override the theme's default 20px dialog title.
       title: Text(widget.title, style: const TextStyle(fontSize: 18)),
-      // The description reads as a full sentence ("Peringatan kulakan
-      // berapa hari sebelum stok habis") — too long for
+      // The description reads as a full sentence (see
+      // [restockLeadTimeDescription]) — too long for
       // InputDecoration.labelText, which floats as a single line above
       // the field and clips with an ellipsis instead of wrapping. A
       // plain Text above the field wraps properly, so the field itself
@@ -947,13 +1040,15 @@ class _RestockSettingDialogState extends State<_RestockSettingDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.helperText, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-          const SizedBox(height: 12),
+          Text(widget.helperText, style: AppTextStyles.body.copyWith(color: AppColors.gray700)),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             key: const Key('pengaturan_restock_setting_field'),
             controller: _controller,
             autofocus: true,
             keyboardType: TextInputType.number,
+            // TODO(ui-migration): fontSize:16 — AppTextStyles.subheading is
+            // 16/w700 and would bold the input text.
             style: const TextStyle(fontSize: 16),
             decoration: InputDecoration(
               labelText: 'Jumlah hari',
@@ -962,6 +1057,14 @@ class _RestockSettingDialogState extends State<_RestockSettingDialog> {
             ),
             onSubmitted: (_) => _submit(),
           ),
+          if (resultText != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              resultText,
+              key: const Key('pengaturan_restock_setting_result'),
+              style: AppTextStyles.caption,
+            ),
+          ],
         ],
       ),
       actions: [
@@ -1026,17 +1129,23 @@ class _HapusSemuaDataConfirmDialogState extends State<_HapusSemuaDataConfirmDial
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      // TODO(ui-migration): 18px — no token; see _RestockSettingDialog.
       title: const Text('Konfirmasi hapus data', style: TextStyle(fontSize: 18)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // TODO(ui-migration): unstyled dialog body here (and in
+          // _showBatteryOptimizationDialog) vs the explicitly styled
+          // helperText in _RestockSettingDialog — same role, three
+          // different treatments.
           const Text('Ketik HAPUS untuk konfirmasi'),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             key: const Key('hapus_semua_data_confirm_field'),
             controller: _controller,
             autofocus: true,
+            // TODO(ui-migration): fontSize:16 — subheading would bold it.
             style: const TextStyle(fontSize: 16),
             decoration: const InputDecoration(labelText: 'Konfirmasi'),
             onSubmitted: (_) => _submit(),
@@ -1067,9 +1176,11 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.sm),
       child: Text(
         title,
+        // TODO(ui-migration): 14/w700/primary — AppTextStyles.bodyMedium is
+        // 14/w600, so swapping would lighten every section header. Left raw.
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
