@@ -8,6 +8,9 @@ import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../navigation/keyboard_safe_push.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_spacing.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
 import '../../widgets/date_range_filter.dart';
@@ -145,7 +148,10 @@ class _MutasiScreenState extends State<MutasiScreen> {
   }
 
   Future<void> _openProductDetail(int productId) async {
-    await Navigator.of(context).push<bool>(
+    // keyboardSafePush keeps the search keyboard from popping back up when
+    // we return to this list — see its doc for the ModalRoute focus bug.
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(builder: (_) => ProductDetailScreen(isar: widget.isar, productId: productId)),
     );
     await _load();
@@ -184,11 +190,11 @@ class _MutasiScreenState extends State<MutasiScreen> {
       appBar: const AppHeader(title: 'Mutasi stok'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(onRefresh: _handleRefresh, child: _buildBody()),
+          : RefreshIndicator(onRefresh: _handleRefresh, child: _buildBody(context)),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
           child: Row(
             children: [
               Expanded(
@@ -199,12 +205,12 @@ class _MutasiScreenState extends State<MutasiScreen> {
                     icon: const Icon(Icons.add),
                     label: const Text('Stok masuk', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00AA0D),
+                      backgroundColor: AppColors.primary,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: SizedBox(
                   height: 48,
@@ -213,7 +219,7 @@ class _MutasiScreenState extends State<MutasiScreen> {
                     icon: const Icon(Icons.remove),
                     label: const Text('Stok keluar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD32F2F),
+                      backgroundColor: AppColors.redPrimary,
                     ),
                   ),
                 ),
@@ -244,7 +250,7 @@ class _MutasiScreenState extends State<MutasiScreen> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(BuildContext context) {
     final hasAnyMutations = _allMutations.isNotEmpty;
     final visible = hasAnyMutations ? _visibleMutations : const <StockMutation>[];
     final grouped = groupMutationsByDay(visible);
@@ -252,14 +258,19 @@ class _MutasiScreenState extends State<MutasiScreen> {
     return ListView(
       controller: widget.scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
+      // This screen has its own bottomNavigationBar (the Stok
+      // masuk/keluar buttons), so Scaffold already shrinks the viewport
+      // above it — unlike screens cleared by the floating glass nav, no
+      // extra clearance is needed here beyond a small breathing gap.
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       children: [
         if (hasAnyMutations) ...[
           // Top gap so the search bar clears the app bar, matching the
           // spacing on Produk/Prioritas/Sering Keluar (the search bar was
           // sitting flush against the header here — "ngga presisi").
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildSearchBar(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildFilterBar(),
           const Divider(height: 0.5, thickness: 0.5),
         ],
@@ -286,7 +297,7 @@ class _MutasiScreenState extends State<MutasiScreen> {
 
   Widget _buildMessage(String message) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       child: Text(
         message,
         textAlign: TextAlign.center,

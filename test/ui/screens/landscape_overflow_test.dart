@@ -178,10 +178,13 @@ void main() {
 
   testWidgets('KelolaKategoriScreen: no landscape overflow (empty + with data)', (tester) async {
     await tester.runAsync(() async {
+      // KelolaKategoriScreen is bottom-sheet content: showModalBottomSheet
+      // normally wraps it in a Material ancestor, which this direct pump
+      // has to provide itself.
       await _expectNoLandscapeOverflow(
         tester,
         'KelolaKategoriScreen (empty)',
-        () => KelolaKategoriScreen(isar: isar),
+        () => Material(child: KelolaKategoriScreen(isar: isar)),
       );
 
       await categoryRepository.create('Snacks');
@@ -190,7 +193,7 @@ void main() {
       await _expectNoLandscapeOverflow(
         tester,
         'KelolaKategoriScreen (with data)',
-        () => KelolaKategoriScreen(isar: isar),
+        () => Material(child: KelolaKategoriScreen(isar: isar)),
       );
     });
   });

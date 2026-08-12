@@ -6,6 +6,7 @@ import '../../domain/prioritas_kulakan_calculator.dart';
 import '../../domain/unit_conversion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimensions.dart';
+import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import 'product_thumb.dart';
 import 'status_badge.dart';
@@ -163,7 +164,7 @@ class PriorityProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(width: 6, color: color),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             // The urgency label used to sit beside the name in its own
             // Flexible column, splitting the row's width between the two.
             // This row is now also squeezed by a checkbox and quantity
@@ -182,21 +183,21 @@ class PriorityProductCard extends StatelessWidget {
                   children: [
                     Text(
                       _product.name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: AppTextStyles.subheading,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Stok: ${_formatQuantity(_product.currentStock)} ${_product.unit}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      style: AppTextStyles.body.copyWith(color: AppColors.gray700),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (_stockConversion != null)
                       Text(
                         _stockConversion!,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                        style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -206,7 +207,7 @@ class PriorityProductCard extends StatelessWidget {
                         _daysLabel,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
+                        style: AppTextStyles.bodyMedium.copyWith(color: color),
                       ),
                     ],
                   ],

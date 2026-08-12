@@ -10,14 +10,30 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../data/repositories/repository_exceptions.dart';
-import '../../widgets/app_header.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
+import '../../theme/app_text_styles.dart';
+import '../../widgets/app_search_bar.dart';
 import '../../widgets/category_form_dialog.dart';
 import '../../widgets/confirm_dialog.dart';
 
+/// The "Kelola Kategori" management UI, presented as a bottom sheet from
+/// Pengaturan rather than a pushed page.
 class KelolaKategoriScreen extends StatefulWidget {
   const KelolaKategoriScreen({super.key, required this.isar});
 
   final Isar isar;
+
+  /// Opens this screen as a modal bottom sheet with rounded top corners.
+  static Future<void> show(BuildContext context, {required Isar isar}) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => KelolaKategoriScreen(isar: isar),
+    );
+  }
 
   @override
   State<KelolaKategoriScreen> createState() => _KelolaKategoriScreenState();
@@ -30,6 +46,9 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     StockMutationRepository(widget.isar),
     AppSettingsRepository(widget.isar),
   );
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   List<Category> _categories = [];
   List<Product> _products = [];
@@ -44,9 +63,9 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     super.initState();
     _loadData();
     // A product's category (or existence) can change from a separately
-    // mounted screen (Produk tab, product form) while this screen stays
-    // alive underneath in MainScaffold's IndexedStack — the aggregate
-    // product-count badges need to reflect that without a manual reload.
+    // mounted screen (Produk tab, product form) while this sheet stays
+    // open above it — the aggregate product-count badges need to reflect
+    // that without a manual reload.
     _categoriesSubscription = widget.isar.categories.watchLazy().listen((_) => _loadData());
     _productsSubscription = widget.isar.products.watchLazy().listen((_) => _loadData());
   }
@@ -55,6 +74,7 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
   void dispose() {
     _categoriesSubscription?.cancel();
     _productsSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -73,9 +93,9 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     });
   }
 
-  Map<int?, List<Category>> get _childrenByParentId {
+  Map<int?, List<Category>> _childrenByParentIdOf(List<Category> categories) {
     final map = <int?, List<Category>>{};
-    for (final category in _categories) {
+    for (final category in categories) {
       map.putIfAbsent(category.parentId, () => []).add(category);
     }
     for (final siblings in map.values) {
@@ -88,7 +108,7 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
   /// products plus every descendant's), computed once from the already
   /// loaded flat lists rather than one repository round-trip per node.
   Map<int, int> _aggregateProductCounts() {
-    final childrenByParentId = _childrenByParentId;
+    final childrenByParentId = _childrenByParentIdOf(_categories);
     final directCounts = <int, int>{};
     for (final product in _products) {
       final categoryId = product.categoryId;
@@ -112,6 +132,29 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
       compute(category.id);
     }
     return aggregate;
+  }
+
+  /// Categories to render: everything when there's no search query;
+  /// otherwise name matches plus their ancestors, so a matched child stays
+  /// reachable under its parent instead of floating without context.
+  List<Category> _visibleCategories() {
+    if (_searchQuery.isEmpty) return _categories;
+    final query = _searchQuery.toLowerCase();
+    final byId = {for (final c in _categories) c.id: c};
+    final keep = <int>{};
+    for (final category in _categories) {
+      if (!category.name.toLowerCase().contains(query)) continue;
+      var current = category;
+      while (true) {
+        keep.add(current.id);
+        final parentId = current.parentId;
+        if (parentId == null) break;
+        final parent = byId[parentId];
+        if (parent == null) break;
+        current = parent;
+      }
+    }
+    return _categories.where((c) => keep.contains(c.id)).toList();
   }
 
   void _showSnackBar(String message) {
@@ -167,12 +210,12 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Tidak Bisa Dihapus', style: TextStyle(fontSize: 18)),
-        content: Text(message, style: const TextStyle(fontSize: 16)),
+        title: const Text('Tidak Bisa Dihapus', style: AppTextStyles.subheading),
+        content: Text(message, style: AppTextStyles.body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK', style: TextStyle(fontSize: 16)),
+            child: const Text('OK', style: AppTextStyles.bodyMedium),
           ),
         ],
       ),
@@ -181,70 +224,141 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppHeader.withBack(
-        title: 'Kelola Kategori',
-        onBack: () => Navigator.of(context).pop(),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _categories.isEmpty
-              ? _buildEmptyState()
-              : _buildCategoryTree(),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: () => _showCategoryFormDialog(),
-              icon: const Icon(Icons.add),
-              label: const Text('Tambah Kategori', style: TextStyle(fontSize: 16)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Belum ada kategori. Tambahkan kategori pertama untuk mulai.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTree() {
-    final childrenByParentId = _childrenByParentId;
+    final visibleCategories = _visibleCategories();
+    final childrenByParentId = _childrenByParentIdOf(visibleCategories);
     final aggregateCounts = _aggregateProductCounts();
     final roots = childrenByParentId[null] ?? const <Category>[];
+    final searching = _searchQuery.isNotEmpty;
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      children: [
-        for (final root in roots)
-          _CategoryTreeTile(
-            category: root,
-            depth: 0,
-            childrenByParentId: childrenByParentId,
-            aggregateCounts: aggregateCounts,
-            expandedIds: _expandedIds,
-            onToggleExpand: (id) => setState(() {
-              if (!_expandedIds.add(id)) _expandedIds.remove(id);
-            }),
-            onRename: (category) => _showCategoryFormDialog(existing: category),
-            onDelete: _confirmDelete,
-            onAddChild: (parent) => _showCategoryFormDialog(parentId: parent.id),
-          ),
-      ],
+    // While searching, force every matched branch open so results stay
+    // visible regardless of the user's manual expand/collapse state.
+    final effectiveExpandedIds = searching
+        ? childrenByParentId.keys.whereType<int>().toSet()
+        : _expandedIds;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimensions.cardRadius)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gray300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Kelola kategori', style: AppTextStyles.heading),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.gray700),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppSearchBar(
+                controller: _searchController,
+                hintText: 'Cari kategori',
+                onChanged: (value) => setState(() => _searchQuery = value.trim()),
+              ),
+            ),
+            Flexible(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(AppSpacing.xxl),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    )
+                  : roots.isEmpty
+                      ? _buildEmptyState(searching)
+                      : ListView(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          children: [
+                            for (final root in roots)
+                              _CategoryTreeTile(
+                                category: root,
+                                depth: 0,
+                                childrenByParentId: childrenByParentId,
+                                aggregateCounts: aggregateCounts,
+                                expandedIds: effectiveExpandedIds,
+                                onToggleExpand: (id) => setState(() {
+                                  if (!_expandedIds.add(id)) _expandedIds.remove(id);
+                                }),
+                                onRename: (category) =>
+                                    _showCategoryFormDialog(existing: category),
+                                onDelete: _confirmDelete,
+                                onAddChild: (parent) =>
+                                    _showCategoryFormDialog(parentId: parent.id),
+                              ),
+                          ],
+                        ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _showCategoryFormDialog(),
+                    icon: const Icon(Icons.add, color: AppColors.primary),
+                    label: const Text(
+                      'Tambah kategori',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool searching) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      child: Center(
+        child: Text(
+          searching
+              ? 'Kategori tidak ditemukan.'
+              : 'Belum ada kategori. Tambahkan kategori pertama untuk mulai.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.body.copyWith(color: AppColors.gray500),
+        ),
+      ),
     );
   }
 }
@@ -280,63 +394,78 @@ class _CategoryTreeTile extends StatelessWidget {
     final countLabel = children.isEmpty
         ? '$count produk'
         : '$count produk (termasuk sub-kategori)';
+    final isRoot = depth == 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(left: 16.0 + depth * 20, right: 4, top: 4, bottom: 4),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 32,
-                child: children.isEmpty
-                    ? null
-                    : IconButton(
-                        key: Key('kelola_kategori_expand_${category.id}'),
-                        padding: EdgeInsets.zero,
-                        icon: Icon(expanded ? Icons.expand_more : Icons.chevron_right),
-                        onPressed: () => onToggleExpand(category.id),
-                      ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      category.name,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      countLabel,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                    ),
-                  ],
+          padding: const EdgeInsets.only(
+            left: AppSpacing.lg,
+            right: AppSpacing.sm,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < depth; i++) _buildIndentGuide(),
+                SizedBox(
+                  width: 28,
+                  child: children.isEmpty
+                      ? null
+                      : IconButton(
+                          key: Key('kelola_kategori_expand_${category.id}'),
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            expanded ? Icons.expand_more : Icons.chevron_right,
+                            color: AppColors.gray700,
+                          ),
+                          onPressed: () => onToggleExpand(category.id),
+                        ),
                 ),
-              ),
-              IconButton(
-                key: Key('kelola_kategori_add_child_${category.id}'),
-                icon: const Icon(Icons.add),
-                tooltip: 'Tambah sub-kategori',
-                onPressed: () => onAddChild(category),
-              ),
-              IconButton(
-                key: Key('kelola_kategori_rename_${category.id}'),
-                icon: const Icon(Icons.edit),
-                tooltip: 'Ubah',
-                onPressed: () => onRename(category),
-              ),
-              IconButton(
-                key: Key('kelola_kategori_delete_${category.id}'),
-                icon: const Icon(Icons.delete),
-                tooltip: 'Hapus',
-                color: Colors.red,
-                onPressed: () => onDelete(category),
-              ),
-            ],
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(category.name, style: AppTextStyles.bodyMedium),
+                        Text(
+                          countLabel,
+                          style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isRoot)
+                  IconButton(
+                    key: Key('kelola_kategori_add_child_${category.id}'),
+                    icon: const Icon(Icons.add_circle_outline, size: 20),
+                    color: AppColors.primary,
+                    tooltip: 'Tambah sub-kategori',
+                    onPressed: () => onAddChild(category),
+                  ),
+                IconButton(
+                  key: Key('kelola_kategori_rename_${category.id}'),
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  color: AppColors.gray700,
+                  tooltip: 'Ubah',
+                  onPressed: () => onRename(category),
+                ),
+                IconButton(
+                  key: Key('kelola_kategori_delete_${category.id}'),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  color: AppColors.gray700,
+                  tooltip: 'Hapus',
+                  onPressed: () => onDelete(category),
+                ),
+              ],
+            ),
           ),
         ),
-        const Divider(height: 1),
+        Divider(height: 1, color: AppColors.gray100),
         if (expanded)
           for (final child in children)
             _CategoryTreeTile(
@@ -351,6 +480,16 @@ class _CategoryTreeTile extends StatelessWidget {
               onAddChild: onAddChild,
             ),
       ],
+    );
+  }
+
+  Widget _buildIndentGuide() {
+    return SizedBox(
+      width: AppSpacing.xl,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(width: 1.5, color: AppColors.gray300),
+      ),
     );
   }
 }

@@ -235,21 +235,27 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
                           itemBuilder: (context, index) => _buildRow(list.items[index]),
                         ),
                 ),
+                // SafeArea + an inner 16 Padding: bottom gap is the system
+                // inset *plus* 16 (matching the Tambah Produk "Simpan"
+                // button's floating spacing), not SafeArea(minimum:)'s
+                // max(inset, 16) which sits the button flush-low.
                 SafeArea(
-                  minimum: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      key: const Key('kulakan_list_complete_button'),
-                      onPressed: (_completing || list.items.isEmpty) ? null : _complete,
-                      child: _completing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text('Selesai', style: AppTextStyles.body.copyWith(color: AppColors.white)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        key: const Key('kulakan_list_complete_button'),
+                        onPressed: (_completing || list.items.isEmpty) ? null : _complete,
+                        child: _completing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text('Selesai', style: AppTextStyles.body.copyWith(color: AppColors.white)),
+                      ),
                     ),
                   ),
                 ),

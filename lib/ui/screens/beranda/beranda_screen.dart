@@ -11,16 +11,20 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../navigation/keyboard_safe_push.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_dimensions.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/frequently_sold_card.dart';
+import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/priority_product_card.dart';
 import '../../widgets/product_search_bar.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/stat_card.dart';
 import '../produk/product_detail_screen.dart';
+import '../produk/produk_screen.dart';
+import '../keuntungan/keuntungan_detail_screen.dart';
 import 'frequently_sold_screen.dart';
 import 'prioritas_kulakan_screen.dart';
 
@@ -161,7 +165,11 @@ class _BerandaScreenState extends State<BerandaScreen> {
       _priorityResults.where((result) => result.urgency != PriorityUrgency.neutral).length;
 
   Future<void> _openDetail(Product product) async {
-    await Navigator.of(context).push<bool>(
+    // keyboardSafePush keeps the search keyboard from popping back up when
+    // we return here — the ProductSearchBar already unfocuses on select,
+    // but ModalRoute restores that focus on pop. See its doc.
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
       ),
@@ -169,15 +177,36 @@ class _BerandaScreenState extends State<BerandaScreen> {
     await _load();
   }
 
+  // Every navigation off Beranda goes through keyboardSafePush, not just
+  // the product-detail one: the search field's keyboard can be open while
+  // the user taps *any* of these cards (Total Keuntungan, "Lihat Semua",
+  // etc.), and without this the keyboard pops back up on return. See
+  // [keyboardSafePush] for the ModalRoute focus-restore bug behind it.
+  void _openProduk() {
+    keyboardSafePush(
+      context,
+      MaterialPageRoute(builder: (_) => ProdukScreen(isar: widget.isar)),
+    );
+  }
+
   void _openPrioritasKulakan() {
-    Navigator.of(context).push(
+    keyboardSafePush(
+      context,
       MaterialPageRoute(builder: (_) => PrioritasKulakanScreen(isar: widget.isar)),
     );
   }
 
   void _openFrequentlySold() {
-    Navigator.of(context).push(
+    keyboardSafePush(
+      context,
       MaterialPageRoute(builder: (_) => FrequentlySoldScreen(isar: widget.isar)),
+    );
+  }
+
+  void _openKeuntunganDetail() {
+    keyboardSafePush(
+      context,
+      MaterialPageRoute(builder: (_) => KeuntunganDetailScreen(isar: widget.isar)),
     );
   }
 
@@ -207,7 +236,13 @@ class _BerandaScreenState extends State<BerandaScreen> {
                   ),
                   _buildPrioritasKulakanSection(),
                   if (_frequentlySoldResults.isNotEmpty) _buildFrequentlySoldSection(),
-                  const SizedBox(height: 16),
+                  // Clears the floating glass nav bar. extendBody already
+                  // reports the bar's full height as padding.bottom, so this
+                  // is just that plus a small gap — no hand-computed height.
+                  SizedBox(
+                    height: MediaQuery.of(context).padding.bottom +
+                        GlassBottomNav.contentGap,
+                  ),
                 ],
               ),
             ),
@@ -284,20 +319,26 @@ class _BerandaScreenState extends State<BerandaScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: StatCard(
-                  key: const Key('beranda_summary_total_produk'),
-                  label: 'Total Produk',
-                  value: '$_totalProducts',
-                  variant: StatCardVariant.green,
+                child: GestureDetector(
+                  onTap: _openProduk,
+                  child: StatCard(
+                    key: const Key('beranda_summary_total_produk'),
+                    label: 'Total Produk',
+                    value: '$_totalProducts',
+                    variant: StatCardVariant.green,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: StatCard(
-                  key: const Key('beranda_summary_perlu_kulakan'),
-                  label: 'Perlu Kulakan',
-                  value: '$_perluKulakanCount',
-                  variant: StatCardVariant.red,
+                child: GestureDetector(
+                  onTap: _openPrioritasKulakan,
+                  child: StatCard(
+                    key: const Key('beranda_summary_perlu_kulakan'),
+                    label: 'Perlu Kulakan',
+                    value: '$_perluKulakanCount',
+                    variant: StatCardVariant.red,
+                  ),
                 ),
               ),
             ],
@@ -308,11 +349,14 @@ class _BerandaScreenState extends State<BerandaScreen> {
         Row(
           children: [
             Expanded(
-              child: StatCard(
-                key: const Key('beranda_summary_total_keuntungan'),
-                label: 'Total Keuntungan',
-                value: _formatCurrency(_totalProfit),
-                variant: StatCardVariant.yellow,
+              child: GestureDetector(
+                onTap: _openKeuntunganDetail,
+                child: StatCard(
+                  key: const Key('beranda_summary_total_keuntungan'),
+                  label: 'Total Keuntungan',
+                  value: _formatCurrency(_totalProfit),
+                  variant: StatCardVariant.yellow,
+                ),
               ),
             ),
           ],

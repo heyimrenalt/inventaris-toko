@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 
@@ -78,11 +80,11 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
         onBack: () => Navigator.of(context).pop(),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             // App identity header on a white card, matching the elevated
             // card system used across the rest of the app.
             _card(
@@ -92,7 +94,7 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                     key: const Key('tentang_aplikasi_icon'),
                     onTap: _onIconTap,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppDimensions.pillRadius),
                       child: Image.asset('assets/icon/app_icon.png', width: 84, height: 84),
                     ),
                   ),
@@ -105,10 +107,13 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.greenSubtle,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppDimensions.pillRadius),
                     ),
                     child: Text(
                       'Versi $_versionLabel',
@@ -119,7 +124,7 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
                     'Aplikasi pencatatan stok barang untuk toko kelontong.',
                     textAlign: TextAlign.center,
@@ -134,15 +139,15 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.xl),
             // Technical info as labelled rows on their own white card.
             _card(
               child: Column(
                 children: [
                   _infoRow('Versi aplikasi', _versionLabel),
-                  const Divider(height: 20),
+                  const Divider(height: AppSpacing.md),
                   _infoRow('Flutter', _dartVersionLabel),
-                  const Divider(height: 20),
+                  const Divider(height: AppSpacing.md),
                   _infoRow('Database', 'Isar'),
                 ],
               ),
@@ -156,10 +161,10 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
   Widget _card({required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
         boxShadow: const [
           BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 2)),
         ],

@@ -11,6 +11,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../navigation/keyboard_safe_push.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
@@ -147,7 +148,10 @@ class _FrequentlySoldScreenState extends State<FrequentlySoldScreen> {
   }
 
   Future<void> _openDetail(Product product) async {
-    await Navigator.of(context).push<bool>(
+    // keyboardSafePush keeps the search keyboard from popping back up when
+    // we return to this list — see its doc for the ModalRoute focus bug.
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
       ),
@@ -185,6 +189,11 @@ class _FrequentlySoldScreenState extends State<FrequentlySoldScreen> {
             if (_buildListLimitCaption() case final caption?)
               SliverToBoxAdapter(child: caption),
             _buildList(),
+            // Clears the Android system navigation bar so the last row
+            // isn't cut off at the bottom of the scroll.
+            SliverToBoxAdapter(
+              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+            ),
           ],
         ],
       ),

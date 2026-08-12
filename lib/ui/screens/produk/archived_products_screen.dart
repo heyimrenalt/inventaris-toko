@@ -67,7 +67,7 @@ class _ArchivedProductsScreenState extends State<ArchivedProductsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _products.isEmpty
               ? _buildEmptyState()
-              : _buildList(),
+              : _buildList(context),
     );
   }
 
@@ -84,11 +84,16 @@ class _ArchivedProductsScreenState extends State<ArchivedProductsScreen> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(BuildContext context) {
     final categoryNameById = {for (final category in _categories) category.id: category.name};
 
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      // Bottom inset clears the Android system nav bar so the last row
+      // isn't cut off.
+      padding: EdgeInsets.only(
+        top: 8,
+        bottom: 8 + MediaQuery.of(context).padding.bottom,
+      ),
       itemCount: _products.length,
       separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {

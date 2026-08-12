@@ -15,6 +15,7 @@ import '../../../domain/hpp_calculator.dart';
 import '../../../domain/unit_conversion.dart';
 import '../../../services/photo_storage_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/confirm_dialog.dart';
@@ -202,11 +203,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final shouldArchive = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
+          // TODO(ui-migration): fontSize 18 has no matching AppTextStyles token.
           title: const Text('Tidak Bisa Dihapus', style: TextStyle(fontSize: 18)),
           content: Text(
             'Produk ini memiliki ${e.mutationCount} riwayat mutasi stok dan tidak '
             'dapat dihapus. Anda bisa mengarsipkan produk ini agar tidak muncul '
             'di daftar utama, tanpa menghapus riwayatnya.',
+            // TODO(ui-migration): the fontSize 16 in this dialog (content and
+            // both action labels) can't become AppTextStyles.subheading — that
+            // token also forces w400 -> w700, which is not a neutral swap.
             style: const TextStyle(fontSize: 16),
           ),
           actions: [
@@ -262,6 +267,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
+        // TODO(ui-migration): bottom-sheet top radius 20 — no
+        // semantically-correct radius token (pillRadius is 20 but means a pill).
         decoration: const BoxDecoration(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -270,7 +277,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Text(
                   'Kelola Produk',
                   style: AppTextStyles.heading,
@@ -304,6 +311,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   },
                 ),
                 ListTile(
+                  // TODO(ui-migration): Colors.red (0xFFF44336) has no exact
+                  // token — AppColors.redPrimary/redText are different hexes,
+                  // so swapping would change the rendered color.
                   leading: const Icon(Icons.delete_rounded, color: Colors.red),
                   title: const Text('Hapus produk', style: TextStyle(color: Colors.red)),
                   onTap: () {
@@ -312,7 +322,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   },
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
             ],
           ),
         ),
@@ -338,6 +348,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : product == null
+              // TODO(ui-migration): fontSize 16 -> subheading would also change
+              // w400 -> w700; not a neutral swap.
               ? const Center(child: Text('Produk tidak ditemukan', style: TextStyle(fontSize: 16)))
               : _buildContent(product),
     );
@@ -345,6 +357,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildContent(Product product) {
     final isLow = product.currentStock < product.minStockThreshold;
+    // TODO(ui-migration): low-stock indicator color is display logic, left as
+    // is. Colors.red/Colors.green also have no exact AppColors equivalent.
     final stockColor = isLow ? Colors.red : Colors.green;
 
     return SingleChildScrollView(
@@ -352,14 +366,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // system nav-bar inset at the bottom so the last rows/buttons scroll
       // fully clear of it (the "scroll terasa belum dinamis" report).
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(child: _buildPhoto(product.photoPath)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           if (product.isArchived) ...[
             Container(
+              // TODO(ui-migration): horizontal 14 / vertical 10 are off the
+              // AppSpacing scale; grey[200] has no exact token (gray300/gray100
+              // are different hexes); radius 10 has no semantically-correct
+              // token (stockBadgeRadius is 10 but means a stock chip).
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.grey[200],
@@ -367,10 +390,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               child: Text(
                 'Diarsipkan pada ${_formatDate(product.archivedAt)}',
-                style: AppTextStyles.bodyMedium.copyWith(color: Colors.grey[700]),
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.gray700),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
           ],
           Text(
             product.name,
@@ -378,19 +401,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: AppTextStyles.heading,
           ),
           if (product.code != null && product.code!.isNotEmpty) ...[
+            // TODO(ui-migration): 6 off-scale
             const SizedBox(height: 6),
             Text(
               'Kode: ${product.code}',
-              style: AppTextStyles.body.copyWith(color: Colors.grey[700]),
+              style: AppTextStyles.body.copyWith(color: AppColors.gray700),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           _infoRow('Kategori', _categoryBreadcrumb ?? 'Lainnya'),
           _infoRow('Harga jual', _formatCurrency(product.sellPrice)),
           _infoRow('Satuan', product.unit),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            // TODO(ui-migration): horizontal 14 is off the AppSpacing scale;
+            // radius 10 has no semantically-correct token here.
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpacing.md),
             decoration: BoxDecoration(
               color: stockColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
@@ -405,6 +431,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (_stockConversionLine(product.currentStock, product.unitsPerPack, product.unitsPerDus)
               case final conversion?)
             Padding(
+              // TODO(ui-migration): top 6 is off the AppSpacing scale;
+              // grey[600] has no exact token (gray700/gray500 differ).
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 conversion,
@@ -412,12 +440,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 style: AppTextStyles.caption.copyWith(color: Colors.grey[600]),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _infoRow('Batas minimum', '${_formatQuantity(product.minStockThreshold)} ${product.unit}'),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildHppSection(product),
           _buildKemasanSection(product),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           if (product.isArchived)
             SizedBox(
               width: double.infinity,
@@ -425,9 +453,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: ElevatedButton.icon(
                 onPressed: () => _unarchiveProduct(product),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00AA0D),
+                  backgroundColor: AppColors.primary,
                 ),
                 icon: const Icon(Icons.unarchive_outlined),
+                // TODO(ui-migration): AppTextStyles.body would force
+                // color: darkText over the button's white foreground.
                 label: const Text('Pulihkan produk', style: TextStyle(fontSize: 14)),
               ),
             )
@@ -438,26 +468,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () => _openCatatMutasi(StockMutationType.stockIn),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00AA0D),
+                      backgroundColor: AppColors.primary,
                     ),
                     icon: const Icon(Icons.add_box_outlined),
+                    // TODO(ui-migration): AppTextStyles.body would force
+                    // color: darkText over the button's white foreground.
                     label: const Text('Stok masuk', style: TextStyle(fontSize: 14)),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _openBatchStokKeluar,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD32F2F),
+                      backgroundColor: AppColors.redPrimary,
                     ),
                     icon: const Icon(Icons.remove_circle_outline),
+                    // TODO(ui-migration): AppTextStyles.body would force
+                    // color: darkText over the button's white foreground.
                     label: const Text('Stok keluar', style: TextStyle(fontSize: 14)),
                   ),
                 ),
               ],
             ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxl),
           // Heading with the "Lihat semua" action inline on the right — only
           // shown when there's more history than the 7 rows below, so the
           // user reaches the full list without scrolling past every row.
@@ -471,26 +505,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   key: const Key('product_detail_selengkapnya_button'),
                   onPressed: () => _openFullHistory(product),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18, color: Color(0xFF00AA0D)),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.primary),
                   iconAlignment: IconAlignment.end,
                   label: Text(
                     'Lihat semua',
                     style: AppTextStyles.body.copyWith(
-                      color: const Color(0xFF00AA0D),
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           if (_recentMutations.isEmpty)
             Text(
               'Belum ada riwayat mutasi.',
+              // TODO(ui-migration): grey[600] has no exact token.
               style: AppTextStyles.body.copyWith(color: Colors.grey[600]),
             )
           else
@@ -503,10 +541,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildPhoto(String? photoPath) {
     if (photoPath == null || photoPath.isEmpty) {
+      // TODO(ui-migration): image radius 12 has no semantically-correct token
+      // (inputRadius is 12 but means a form field); grey[600] has no exact
+      // token.
       return Container(
         width: 160,
         height: 160,
-        decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: AppColors.gray300,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[600]),
       );
     }
@@ -520,7 +564,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         errorBuilder: (context, error, stackTrace) => Container(
           width: 160,
           height: 160,
-          color: Colors.grey[300],
+          color: AppColors.gray300,
           child: const Icon(Icons.broken_image),
         ),
       ),
@@ -535,9 +579,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Container(
       key: const Key('product_detail_hpp_section'),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      // TODO(ui-migration): horizontal 14 is off the AppSpacing scale; radius
+      // 10 has no semantically-correct token here.
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppColors.gray100,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -577,22 +623,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Container(
         key: const Key('product_detail_kemasan_section'),
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        // TODO(ui-migration): horizontal 14 is off the AppSpacing scale; radius
+        // 10 has no semantically-correct token here.
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: AppSpacing.md),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: AppColors.gray100,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Kemasan', style: AppTextStyles.bodyMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             for (var i = 0; i < lines.length; i++) ...[
-              if (i > 0) const SizedBox(height: 4),
+              if (i > 0) const SizedBox(height: AppSpacing.xs),
               Text(lines[i], style: AppTextStyles.body),
             ],
           ],
@@ -603,8 +651,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _infoRow(String label, String value) {
     final isHeading = ['HPP', 'Untung per unit', 'Margin', 'Stok saat ini'].contains(label);
-    final labelColor = isHeading ? AppColors.primary : Colors.grey[700];
+    final labelColor = isHeading ? AppColors.primary : AppColors.gray700;
     return Padding(
+      // TODO(ui-migration): vertical 6 is off the AppSpacing scale.
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

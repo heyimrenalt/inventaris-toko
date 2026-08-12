@@ -48,12 +48,31 @@ void main() {
   }
 
   Future<void> pumpScreen(WidgetTester tester) async {
-    await tester.pumpWidget(MaterialApp(home: KelolaKategoriScreen(isar: isar)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => KelolaKategoriScreen.show(context, isar: isar),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    // Advance past the sheet's entrance transition without pumpAndSettle:
+    // the category tree is still loading at this point (CircularProgressIndicator
+    // spins indefinitely), which would make pumpAndSettle hang.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await settleAfterAsyncWork(tester);
   }
 
   Future<void> openAddDialog(WidgetTester tester) async {
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah Kategori'));
+    await tester.tap(find.widgetWithText(TextButton, 'Tambah kategori'));
     await tester.pumpAndSettle();
   }
 
@@ -65,7 +84,7 @@ void main() {
         find.text('Belum ada kategori. Tambahkan kategori pertama untuk mulai.'),
         findsOneWidget,
       );
-      expect(find.widgetWithText(ElevatedButton, 'Tambah Kategori'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Tambah kategori'), findsOneWidget);
     });
   });
 
@@ -131,7 +150,7 @@ void main() {
       await pumpScreen(tester);
 
       await openAddDialog(tester);
-      await tester.enterText(find.byType(TextField), 'Snacks');
+      await tester.enterText(find.byType(TextField).last, 'Snacks');
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await settleAfterAsyncWork(tester);
 
@@ -148,7 +167,7 @@ void main() {
       await pumpScreen(tester);
 
       await openAddDialog(tester);
-      await tester.enterText(find.byType(TextField), '   ');
+      await tester.enterText(find.byType(TextField).last, '   ');
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await settleAfterAsyncWork(tester);
 
@@ -164,7 +183,7 @@ void main() {
       await pumpScreen(tester);
 
       await openAddDialog(tester);
-      await tester.enterText(find.byType(TextField), 'Snacks');
+      await tester.enterText(find.byType(TextField).last, 'Snacks');
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await settleAfterAsyncWork(tester);
 
@@ -181,7 +200,7 @@ void main() {
 
       await tester.tap(find.byKey(Key('kelola_kategori_add_child_${alatTulis.id}')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Pulpen');
+      await tester.enterText(find.byType(TextField).last, 'Pulpen');
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await settleAfterAsyncWork(tester);
 
@@ -197,10 +216,10 @@ void main() {
       await categoryRepository.create('Snacks');
       await pumpScreen(tester);
 
-      await tester.tap(find.byIcon(Icons.edit));
+      await tester.tap(find.byIcon(Icons.edit_outlined));
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField), 'Minuman');
+      await tester.enterText(find.byType(TextField).last, 'Minuman');
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await settleAfterAsyncWork(tester);
 
@@ -215,7 +234,7 @@ void main() {
       await categoryRepository.create('Snacks');
       await pumpScreen(tester);
 
-      await tester.tap(find.byIcon(Icons.delete));
+      await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
 
       // Confirm inside the "Hapus Kategori" confirmation dialog.
@@ -247,7 +266,7 @@ void main() {
 
         await pumpScreen(tester);
 
-        await tester.tap(find.byIcon(Icons.delete));
+        await tester.tap(find.byIcon(Icons.delete_outline));
         await tester.pumpAndSettle();
 
         await tester.tap(
@@ -278,7 +297,7 @@ void main() {
 
         await pumpScreen(tester);
 
-        await tester.tap(find.byIcon(Icons.delete));
+        await tester.tap(find.byIcon(Icons.delete_outline));
         await tester.pumpAndSettle();
 
         await tester.tap(
@@ -313,7 +332,7 @@ void main() {
 
         // "Alat Tulis" is a root tile — the only visible delete icon
         // before expanding, so this targets its delete action.
-        await tester.tap(find.byIcon(Icons.delete));
+        await tester.tap(find.byIcon(Icons.delete_outline));
         await tester.pumpAndSettle();
 
         await tester.tap(
@@ -331,6 +350,53 @@ void main() {
       });
     },
   );
+
+  testWidgets('search filters categories by name, case-insensitive', (tester) async {
+    await tester.runAsync(() async {
+      await categoryRepository.create('Minuman');
+      await categoryRepository.create('Makanan Ringan');
+
+      await pumpScreen(tester);
+
+      await tester.enterText(find.byType(TextField).last, 'min');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Minuman'), findsOneWidget);
+      expect(find.text('Makanan Ringan'), findsNothing);
+    });
+  });
+
+  testWidgets('search auto-expands a matched child so it stays visible', (tester) async {
+    await tester.runAsync(() async {
+      final minuman = await categoryRepository.create('Minuman');
+      await categoryRepository.create('Kopi', parentId: minuman.id);
+      await categoryRepository.create('Teh', parentId: minuman.id);
+
+      await pumpScreen(tester);
+
+      expect(find.text('Kopi'), findsNothing);
+
+      await tester.enterText(find.byType(TextField).last, 'kopi');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Minuman'), findsOneWidget);
+      expect(find.text('Kopi'), findsOneWidget);
+      expect(find.text('Teh'), findsNothing);
+    });
+  });
+
+  testWidgets('the close button dismisses the sheet', (tester) async {
+    await tester.runAsync(() async {
+      await pumpScreen(tester);
+
+      expect(find.text('Kelola kategori'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kelola kategori'), findsNothing);
+    });
+  });
 
   // Regression coverage for the category add/rename dialog's controller
   // lifecycle: the dialog used to dispose its TextEditingController
@@ -350,7 +416,7 @@ void main() {
 
           for (var i = 0; i < 5; i++) {
             await openAddDialog(tester);
-            await tester.enterText(find.byType(TextField), 'Kategori $i');
+            await tester.enterText(find.byType(TextField).last, 'Kategori $i');
             await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
             await settleAfterAsyncWork(tester);
             expect(find.text('Kategori $i'), findsOneWidget);

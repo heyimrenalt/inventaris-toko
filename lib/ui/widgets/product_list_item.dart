@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/product.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import 'stock_badge.dart';
 
@@ -32,12 +33,18 @@ class ProductListItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        // TODO(ui-migration): no clean token — the 14 vertical inset is
+        // off-scale (between AppSpacing.md and .lg); left raw so the row
+        // height doesn't change.
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: 14,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _Thumbnail(photoPath: product.photoPath),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,6 +55,9 @@ class ProductListItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  // TODO(ui-migration): no clean token — 3 is below
+                  // AppSpacing.xs (4); left raw to keep the name/subtitle
+                  // gap identical.
                   const SizedBox(height: 3),
                   Text(
                     '$categoryName · Rp ${_formatPrice(product.sellPrice)}',
@@ -58,7 +68,7 @@ class ProductListItem extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -66,9 +76,15 @@ class ProductListItem extends StatelessWidget {
                   text: _formatQuantity(product.currentStock),
                   level: _stockLevel,
                 ),
+                // TODO(ui-migration): no clean token — 2 is below
+                // AppSpacing.xs (4); left raw to keep the badge/unit gap
+                // identical.
                 const SizedBox(height: 2),
                 Text(
                   product.unit,
+                  // TODO(ui-migration): no clean token — 10px has no
+                  // AppTextStyles entry (caption is 12); kept as a caption
+                  // override rather than resizing the unit label.
                   style: AppTextStyles.caption.copyWith(fontSize: 10),
                 ),
               ],
@@ -103,6 +119,10 @@ class _Thumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = photoPath;
     return ClipRRect(
+      // TODO(ui-migration): no clean token — the thumbnail radius is 10,
+      // which only numerically matches AppDimensions.stockBadgeRadius (a
+      // stock-chip token, different semantic role). No thumbnail/avatar
+      // radius token exists yet. Same for the 52x52 size.
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
         width: 52,

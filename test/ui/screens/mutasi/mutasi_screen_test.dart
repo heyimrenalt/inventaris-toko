@@ -8,6 +8,7 @@ import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
 import 'package:inventaris_toko/ui/screens/mutasi/mutasi_screen.dart';
+import 'package:inventaris_toko/ui/theme/app_colors.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/repositories/test_isar.dart';
@@ -106,9 +107,9 @@ void main() {
       expect(find.text('-3 pcs'), findsOneWidget);
 
       final inIcon = tester.widget<Icon>(find.byIcon(Icons.arrow_upward).first);
-      expect(inIcon.color, Colors.green[700]);
+      expect(inIcon.color, AppColors.greenText);
       final outIcon = tester.widget<Icon>(find.byIcon(Icons.arrow_downward).first);
-      expect(outIcon.color, Colors.red[700]);
+      expect(outIcon.color, AppColors.redText);
     });
   });
 

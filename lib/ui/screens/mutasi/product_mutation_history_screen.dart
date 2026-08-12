@@ -125,7 +125,7 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
                     ),
                   ),
                 )
-              : _buildHistory(),
+              : _buildHistory(context),
     );
   }
 
@@ -133,12 +133,15 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   // Mutasi tab, via the shared groupMutationsByDay/formatDayLabel/DayHeader
   // in day_grouped_mutations.dart — kept identical on purpose so the two
   // screens never drift apart.
-  Widget _buildHistory() {
+  Widget _buildHistory(BuildContext context) {
     final now = DateTime.now();
     final visible = _visibleMutations;
     final grouped = groupMutationsByDay(visible);
 
     return ListView(
+      // Bottom inset clears the Android system nav bar so the last row
+      // isn't cut off.
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 12),

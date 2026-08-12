@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/stock_mutation.dart';
+import '../theme/app_spacing.dart';
 
 /// Groups [mutations] by calendar day (time-of-day ignored), preserving
 /// insertion order — Dart's default [Map] is a [LinkedHashMap]. Assumes
@@ -48,7 +49,7 @@ class DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xs),
       child: Text(
         label,
         style: TextStyle(

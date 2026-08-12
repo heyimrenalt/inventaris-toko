@@ -9,9 +9,14 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../navigation/keyboard_safe_push.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
+import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
+import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/category_tree_picker.dart';
 import '../../widgets/product_list_item.dart';
 import 'product_detail_screen.dart';
@@ -151,14 +156,18 @@ class _ProdukScreenState extends State<ProdukScreen> {
   }
 
   Future<void> _openAddForm() async {
-    await Navigator.of(context).push<bool>(
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(builder: (_) => ProductFormScreen(isar: widget.isar)),
     );
     await _loadData();
   }
 
   Future<void> _openDetail(Product product) async {
-    await Navigator.of(context).push<bool>(
+    // keyboardSafePush keeps the search keyboard from popping back up when
+    // we return to this list — see its doc for the ModalRoute focus bug.
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
       ),
@@ -180,13 +189,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   AppSearchBar(
                     controller: _searchController,
                     hintText: 'Cari produk...',
                     onChanged: (query) => setState(() => _searchQuery = query),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   _buildFilterBar(),
                 ],
               ),
@@ -200,12 +209,38 @@ class _ProdukScreenState extends State<ProdukScreen> {
               SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
             else
               _buildProductList(),
+            // Clears the floating glass nav bar below the last product.
+            // extendBody already reports the bar's full height as
+            // padding.bottom, so this is just that plus a small gap.
+            if (!_loading && _visibleProducts.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: MediaQuery.of(context).padding.bottom +
+                      GlassBottomNav.contentGap,
+                ),
+              ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddForm,
-        child: const Icon(Icons.add),
+      // extendBody (for the glass nav) makes the body — and so the FAB's
+      // default anchor — run to the screen bottom, which would tuck the FAB
+      // under the floating nav. Lift it by the bar's height (which
+      // extendBody reports as padding.bottom) minus the FAB's own default
+      // margin, so it sits a small gap above the bar.
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(
+          // Clamped at 0: when this screen is shown standalone (e.g. in a
+          // widget test) there's no glass nav, so padding.bottom is 0 and
+          // the raw expression would go negative — an invalid EdgeInsets.
+          bottom: (MediaQuery.of(context).padding.bottom -
+                  kFloatingActionButtonMargin +
+                  GlassBottomNav.contentGap)
+              .clamp(0.0, double.infinity),
+        ),
+        child: FloatingActionButton(
+          onPressed: _openAddForm,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -236,30 +271,32 @@ class _ProdukScreenState extends State<ProdukScreen> {
         : Icons.swap_vert_rounded;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
               key: const Key('produk_category_filter'),
               onTap: _openCategoryFilterPicker,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.gray100,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         label,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.darkText,
-                        ),
+                        style: AppTextStyles.bodyMedium,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -273,20 +310,22 @@ class _ProdukScreenState extends State<ProdukScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Container(
+            // TODO(ui-migration): no clean token — 40x40 tap target has no
+            // size token; icon size 24 has no icon-size token either.
             width: 40,
             height: 40,
             decoration: BoxDecoration(
               color: AppColors.gray100,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
             ),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 key: const Key('produk_sort_button'),
                 onTap: _toggleSort,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
                 child: Icon(
                   sortIcon,
                   size: 24,
@@ -313,11 +352,15 @@ class _ProdukScreenState extends State<ProdukScreen> {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16),
+          // TODO(ui-migration): no clean token — 16px at regular weight has
+          // no AppTextStyles entry (subheading is 16/w700, which would
+          // change the rendered weight). Kept as body scaled to 16, which
+          // matches what the inline TextStyle(fontSize: 16) inherited.
+          style: AppTextStyles.body.copyWith(fontSize: 16),
         ),
       ),
     );

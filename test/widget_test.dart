@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
 import 'package:inventaris_toko/ui/navigation/main_scaffold.dart';
+import 'package:inventaris_toko/ui/widgets/glass_bottom_nav.dart';
 import 'package:isar_community/isar.dart';
 
 import 'data/repositories/test_isar.dart';
@@ -18,12 +19,12 @@ void main() {
     await closeTestIsar(isar);
   });
 
-  // MainScaffold uses IndexedStack, so all 4 tab bodies (including
-  // ProdukScreen, which now does a real Isar load on mount) are built
-  // immediately on the first pump, not lazily on tab selection.
+  // MainScaffold uses a swipeable PageView; each tab's label in the
+  // GlassBottomNav is stable regardless of its selected/unselected icon, so
+  // we tap tabs by that label rather than by icon.
   Future<void> tapTab(WidgetTester tester, String label) {
     return tester.tap(
-      find.descendant(of: find.byType(BottomNavigationBar), matching: find.text(label)),
+      find.descendant(of: find.byType(GlassBottomNav), matching: find.text(label)),
     );
   }
 

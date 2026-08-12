@@ -6,8 +6,10 @@ import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
 import 'package:inventaris_toko/services/notification_service.dart';
 import 'package:inventaris_toko/ui/navigation/main_scaffold.dart';
+import 'package:inventaris_toko/ui/screens/pengaturan/pengaturan_screen.dart';
 import 'package:inventaris_toko/ui/screens/produk/produk_screen.dart';
 import 'package:inventaris_toko/ui/widgets/app_header.dart';
+import 'package:inventaris_toko/ui/widgets/glass_bottom_nav.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../data/repositories/test_isar.dart';
@@ -80,6 +82,14 @@ void main() {
     await closeTestIsar(isar);
   });
 
+  // Taps a nav destination by its (state-independent) label inside the
+  // GlassBottomNav, rather than by icon — the icon swaps outline/filled with
+  // selection, but the label doesn't.
+  Finder navItem(String label) => find.descendant(
+        of: find.byType(GlassBottomNav),
+        matching: find.text(label),
+      );
+
   Future<void> pumpScaffold(WidgetTester tester) async {
     await AppSettingsRepository(isar).dismissBatteryOptimizationDialog();
     await tester.pumpWidget(MaterialApp(home: MainScaffold(isar: isar)));
@@ -115,7 +125,7 @@ void main() {
       await seedManyProducts(40);
       await pumpScaffold(tester);
 
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await settleAfterAsyncWork(tester);
 
       await tester.drag(find.byType(ProdukScreen), const Offset(0, -1000));
@@ -124,7 +134,7 @@ void main() {
 
       // Produk is already the active tab — this tap should scroll it
       // back to the top instead of doing nothing.
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
@@ -138,7 +148,7 @@ void main() {
       await seedManyProducts(40);
       await pumpScaffold(tester);
 
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await settleAfterAsyncWork(tester);
 
       await tester.drag(find.byType(ProdukScreen), const Offset(0, -1000));
@@ -147,13 +157,13 @@ void main() {
       expect(scrolledOffset, greaterThan(0));
 
       // Tapping a different tab (Mutasi) switches tabs...
-      await tester.tap(find.byIcon(Icons.swap_horiz));
+      await tester.tap(navItem('Mutasi'));
       await settleAfterAsyncWork(tester);
       expect(find.widgetWithText(AppHeader, 'Mutasi stok'), findsOneWidget);
 
       // ...and Produk (kept alive underneath by IndexedStack) must not
       // have had its scroll position touched by that tap.
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await settleAfterAsyncWork(tester);
       expect(produkScrollOffset(tester), scrolledOffset);
     });
@@ -164,11 +174,11 @@ void main() {
       await seedManyProducts(40);
       await pumpScaffold(tester);
 
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await settleAfterAsyncWork(tester);
       expect(produkScrollOffset(tester), 0);
 
-      await tester.tap(find.byIcon(Icons.inventory_2));
+      await tester.tap(navItem('Produk'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
@@ -203,13 +213,19 @@ void main() {
             );
         expect(totalProdukText().data, '1');
 
-        await tester.tap(find.byIcon(Icons.settings));
+        await tester.tap(navItem('Pengaturan'));
         await settleAfterAsyncWork(tester);
 
         await tester.scrollUntilVisible(
           find.byKey(const Key('pengaturan_hapus_semua_data_tile')),
           300,
-          scrollable: find.byType(Scrollable).first,
+          // Scope to the settings list: the swipeable PageView is itself a
+          // (horizontal) Scrollable and now the first one in the tree, so an
+          // unscoped `.first` would try to scroll pages sideways instead.
+          scrollable: find.descendant(
+            of: find.byType(PengaturanScreen),
+            matching: find.byType(Scrollable),
+          ).first,
         );
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('pengaturan_hapus_semua_data_tile')));
@@ -221,8 +237,12 @@ void main() {
         await tester.tap(find.byKey(const Key('hapus_semua_data_step2_confirm')));
         await settleAfterAsyncWork(tester);
 
-        final bottomNav = tester.widget<BottomNavigationBar>(find.byType(BottomNavigationBar));
-        expect(bottomNav.currentIndex, 0, reason: 'must switch back to the Beranda tab');
+        // The nav is now a swipeable PageView; assert the reset landed us
+        // back on the first page (Beranda) rather than reading a
+        // BottomNavigationBar.currentIndex that no longer exists.
+        final pageController =
+            tester.widget<PageView>(find.byType(PageView)).controller!;
+        expect(pageController.page, 0.0, reason: 'must switch back to the Beranda tab');
 
         expect(totalProdukText().data, '0');
         expect(find.byKey(const Key('beranda_priority_empty_state')), findsOneWidget);

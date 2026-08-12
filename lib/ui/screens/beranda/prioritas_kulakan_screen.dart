@@ -11,6 +11,7 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/restock_list_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
+import '../../navigation/keyboard_safe_push.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
@@ -178,7 +179,10 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
       result.product.lastRestockQty ?? result.suggestedRestockQty.toDouble();
 
   Future<void> _openDetail(Product product) async {
-    await Navigator.of(context).push<bool>(
+    // keyboardSafePush keeps the search keyboard from popping back up when
+    // we return to this list — see its doc for the ModalRoute focus bug.
+    await keyboardSafePush<bool>(
+      context,
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(isar: widget.isar, productId: product.id),
       ),
@@ -282,6 +286,10 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
               ? _buildEmptyState()
               : Column(
                   children: [
+                    // Only the search bar is pinned; "Centang Semua" rides
+                    // along inside the list (see the index-0 item below) so
+                    // it scrolls away with the rows instead of eating a
+                    // fixed strip of screen height.
                     const SizedBox(height: 12),
                     AppSearchBar(
                       controller: _searchController,
@@ -289,27 +297,45 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
                       onChanged: (query) => setState(() => _searchQuery = query),
                     ),
                     const SizedBox(height: 12),
-                    _buildCentangSemuaBar(),
-                    const Divider(height: 0.5, thickness: 0.5),
                     Expanded(
                       child: Builder(
                         builder: (context) {
                           final visible = _visibleResults;
                           if (visible.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                  'Tidak ditemukan.',
-                                  style: AppTextStyles.body.copyWith(color: Colors.grey[700]),
+                            return Column(
+                              children: [
+                                _buildCentangSemuaBar(),
+                                const Divider(height: 0.5, thickness: 0.5),
+                                Expanded(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24),
+                                      child: Text(
+                                        'Tidak ditemukan.',
+                                        style:
+                                            AppTextStyles.body.copyWith(color: Colors.grey[700]),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             );
                           }
                           return ListView.builder(
                             key: const Key('prioritas_kulakan_list'),
-                            itemCount: visible.length,
-                            itemBuilder: (context, index) => _buildRow(visible[index]),
+                            itemCount: visible.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildCentangSemuaBar(),
+                                    const Divider(height: 0.5, thickness: 0.5),
+                                  ],
+                                );
+                              }
+                              return _buildRow(visible[index - 1]);
+                            },
                           );
                         },
                       ),
@@ -340,31 +366,37 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
   }
 
   Widget _buildFooter(int checkedCount) {
+    // SafeArea + an inner 16 Padding, so the bottom gap is the system inset
+    // *plus* 16 (matching the Tambah Produk "Simpan" button's floating
+    // spacing) rather than SafeArea(minimum:)'s max(inset, 16), which sits
+    // the button flush-low against the nav bar.
     return SafeArea(
-      minimum: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$checkedCount barang dipilih',
-            key: const Key('prioritas_kulakan_selected_count'),
-            style: AppTextStyles.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              key: const Key('kulakan_buat_daftar_button'),
-              onPressed: checkedCount == 0 ? null : _buatDaftarKulakan,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00AA0D),
-              ),
-              child: const Text('Buat Daftar Kulakan', style: TextStyle(fontSize: 14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$checkedCount barang dipilih',
+              key: const Key('prioritas_kulakan_selected_count'),
+              style: AppTextStyles.bodyMedium,
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                key: const Key('kulakan_buat_daftar_button'),
+                onPressed: checkedCount == 0 ? null : _buatDaftarKulakan,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00AA0D),
+                ),
+                child: const Text('Buat Daftar Kulakan', style: TextStyle(fontSize: 14)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -375,13 +407,17 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          // Tight horizontal padding: the checkbox, product name and qty
+          // stepper all have to share a 360dp phone width, and the name is
+          // the first thing to get truncated away when they don't fit.
+          padding: const EdgeInsets.only(left: 4, right: 8, top: 14, bottom: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Checkbox(
                 key: Key('kulakan_checkbox_${product.id}'),
                 value: _checkedProductIds.contains(product.id),
+                visualDensity: VisualDensity.compact,
                 onChanged: isArchived ? null : (_) => _toggleChecked(product.id),
               ),
               Expanded(
@@ -410,7 +446,7 @@ class _PrioritasKulakanScreenState extends State<PrioritasKulakanScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.only(left: 4),
                 child: RestockQtyField(
                   key: ValueKey('qty_${product.id}_${_qtyFieldRevisionByProductId[product.id] ?? 0}'),
                   productId: product.id,

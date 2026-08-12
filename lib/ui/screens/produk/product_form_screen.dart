@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/models/product.dart';
@@ -12,8 +13,11 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/hpp_calculator.dart';
 import '../../../domain/unit_conversion.dart';
+import '../../../domain/unit_quantity_rules.dart';
 import '../../../services/photo_storage_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/category_picker_field.dart';
@@ -71,6 +75,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   String? _categoryError;
   String? _priceError;
   String? _unitError;
+
+  /// Both "Stok awal" and "Batas minimum stok" hold a quantity in the
+  /// canonical pcs unit, so they route through [UnitQuantityRules] like
+  /// every other quantity field rather than hardcoding `decimal: true` —
+  /// a countable product must not get a fractional opening stock. The
+  /// price fields above them are money, not quantities, and keep their own
+  /// always-decimal keyboard.
+  TextInputType get _stockKeyboardType => UnitQuantityRules.keyboardType(
+        unit: EnteredUnit.pcs,
+        productAllowsFractional: _allowsFractionalQuantity,
+      );
+
+  List<TextInputFormatter> get _stockInputFormatters => UnitQuantityRules.inputFormatters(
+        unit: EnteredUnit.pcs,
+        productAllowsFractional: _allowsFractionalQuantity,
+      );
   String? _unitsPerPackError;
   String? _unitsPerDusError;
 
@@ -181,11 +201,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
+              // TODO(ui-migration): fontSize 16 kept inline — AppTextStyles.subheading
+              // is the only size-16 token and would flip w400 -> w700.
               title: const Text('Ambil Foto', style: TextStyle(fontSize: 16)),
               onTap: () => Navigator.of(sheetContext).pop(PhotoPickSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
+              // TODO(ui-migration): fontSize 16 kept inline — AppTextStyles.subheading
+              // is the only size-16 token and would flip w400 -> w700.
               title: const Text('Pilih dari Galeri', style: TextStyle(fontSize: 16)),
               onTap: () => Navigator.of(sheetContext).pop(PhotoPickSource.gallery),
             ),
@@ -375,16 +399,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               // renders underneath it and taps land on the nav bar instead of
               // the button (reported as "tombol Simpan tidak bisa diklik").
               padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.of(context).padding.bottom,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg + MediaQuery.of(context).padding.bottom,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(child: _buildPhotoPicker()),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
                   TextField(
                     key: const Key('product_form_name'),
                     controller: _nameController,
@@ -395,7 +419,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       errorText: _nameError,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_code'),
                     controller: _codeController,
@@ -405,7 +429,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       errorText: _codeError,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   CategoryPickerField(
                     isar: widget.isar,
                     selectedCategoryId: _categoryId,
@@ -416,10 +440,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     }),
                   ),
                   if (widget.isEditing) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _buildReadOnlyHpp(),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_cost_price'),
                     controller: _costPriceController,
@@ -434,7 +458,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       prefixText: 'Rp ',
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_price'),
                     controller: _sellPriceController,
@@ -447,7 +471,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   ),
                   _buildMarginPanel(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_unit'),
                     controller: _unitController,
@@ -462,6 +486,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     key: const Key('product_form_allows_fractional_quantity'),
                     contentPadding: EdgeInsets.zero,
                     title: Text('Boleh jumlah pecahan', style: AppTextStyles.body),
+                    // TODO(ui-migration): subtitle has no style while the title
+                    // above uses AppTextStyles.body — a real inconsistency, not a
+                    // token swap. Deferred to a design pass.
                     subtitle: const Text(
                       'Aktifkan untuk barang timbang/ukur (kg, liter, dll) yang boleh '
                       'jumlahnya pecahan. Biarkan mati untuk barang satuan (pcs/pack/dus).',
@@ -469,7 +496,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     value: _allowsFractionalQuantity,
                     onChanged: (value) => setState(() => _allowsFractionalQuantity = value),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   TextField(
                     key: const Key('product_form_units_per_pack'),
                     controller: _unitsPerPackController,
@@ -481,7 +508,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       errorText: _unitsPerPackError,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_units_per_dus'),
                     controller: _unitsPerDusController,
@@ -502,36 +529,47 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   ),
                   _buildKemasanSummary(),
                   if (!widget.isEditing) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     TextField(
                       key: const Key('product_form_initial_stock'),
                       controller: _initialStockController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      // Stok awal is a quantity in the canonical pcs unit,
+                      // so it obeys the same discrete/continuous rule as
+                      // every other quantity field — driven by the
+                      // fractional-quantity switch further down this form.
+                      keyboardType: _stockKeyboardType,
+                      inputFormatters: _stockInputFormatters,
                       style: AppTextStyles.body,
                       decoration: const InputDecoration(labelText: 'Stok awal'),
                     ),
                   ],
                   if (widget.isEditing) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     _buildReadOnlyCurrentStock(),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     key: const Key('product_form_min_stock'),
                     controller: _minStockController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: _stockKeyboardType,
+                    inputFormatters: _stockInputFormatters,
                     style: AppTextStyles.body,
                     decoration: const InputDecoration(labelText: 'Batas minimum stok'),
                   ),
                   if (_minStockConversionCaption() case final caption?)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      padding: const EdgeInsets.only(top: AppSpacing.xs, left: AppSpacing.xs),
                       child: Text(
                         caption,
                         key: const Key('product_form_min_stock_conversion'),
+                        // TODO(ui-migration): AppTextStyles.caption matches size 12
+                        // but carries gray700 (#616161); grey[600] is #757575, so
+                        // the swap would darken the text. No #757575 token exists.
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ),
+                  // TODO(ui-migration): 28 is off the spacing scale (xl=20, xxl=24);
+                  // rounding either way would move the layout.
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
@@ -562,22 +600,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return Container(
       key: const Key('product_form_hpp_readonly'),
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.primary),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppDimensions.badgeRadius),
       ),
       child: Row(
         children: [
+          // TODO(ui-migration): icon size 20 left raw — no icon-size token exists.
           const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               avgCost == null
                   ? 'HPP saat ini: belum ada data harga modal'
                   : 'HPP saat ini: ${_formatCurrency(avgCost)}/unit '
                       '(diperbarui otomatis saat restock, atau koreksi manual di bawah)',
-              style: const TextStyle(fontSize: 14, color: AppColors.primary),
+              style: AppTextStyles.body.copyWith(color: AppColors.primary),
             ),
           ),
         ],
@@ -598,25 +637,28 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Container(
         key: const Key('product_form_margin_panel'),
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
+          // TODO(ui-migration): 8% translucent green composites to ~#F1F9F1 over
+          // white; AppColors.greenSubtle is the opaque #E8F5E9, a visibly darker
+          // fill. Not an identical swap.
           color: Colors.green.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppDimensions.badgeRadius),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Untung per unit: ${_formatCurrency(profit)}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: AppTextStyles.bodyMedium,
             ),
             Text(
               'Margin: ${margin.round()}%',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: AppTextStyles.bodyMedium,
             ),
           ],
         ),
@@ -665,14 +707,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: AppSpacing.md),
       child: Container(
         key: const Key('product_form_kemasan_summary'),
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
+          // TODO(ui-migration): teal is outside the palette entirely — mapping it
+          // to green/yellow would change the color. Design decision, not migration.
           color: Colors.teal.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppDimensions.badgeRadius),
+          // TODO(ui-migration): teal outside palette — see above.
           border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
         ),
         child: Column(
@@ -680,21 +725,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           children: [
             Row(
               children: [
+                // TODO(ui-migration): icon size 18 raw (no icon-size token); teal
+                // outside palette.
                 Icon(Icons.inventory_2, size: 18, color: Colors.teal[700]),
+                // TODO(ui-migration): 6 is off the spacing scale (xs=4, sm=8).
                 const SizedBox(width: 6),
                 Text(
                   'Ringkasan kemasan',
+                  // TODO(ui-migration): bodyMedium would flip w700 -> w600, and
+                  // teal[800] is outside the palette.
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal[800]),
                 ),
               ],
             ),
+            // TODO(ui-migration): 6 is off the spacing scale (xs=4, sm=8).
             const SizedBox(height: 6),
-            for (final line in lines) Text(line, style: const TextStyle(fontSize: 14)),
+            for (final line in lines) Text(line, style: AppTextStyles.body),
             if (stockLine != null) ...[
-              const Divider(height: 16),
-              Text(stockLine, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              if (stockConversion != null)
-                Text(stockConversion, style: const TextStyle(fontSize: 14)),
+              const Divider(height: AppSpacing.lg),
+              Text(stockLine, style: AppTextStyles.bodyMedium),
+              if (stockConversion != null) Text(stockConversion, style: AppTextStyles.body),
             ],
           ],
         ),
@@ -745,20 +795,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return Container(
       key: const Key('product_form_current_stock_readonly'),
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.primary),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppDimensions.badgeRadius),
       ),
       child: Row(
         children: [
+          // TODO(ui-migration): icon size 20 left raw — no icon-size token exists.
           const Icon(Icons.info_outline, size: 20, color: AppColors.primary),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'Stok saat ini: ${_formatNumberInput(existing.currentStock)} ${existing.unit} '
               '(gunakan menu Stok masuk/keluar untuk mengubah)',
-              style: const TextStyle(fontSize: 14, color: AppColors.primary),
+              style: AppTextStyles.body.copyWith(color: AppColors.primary),
             ),
           ),
         ],
@@ -772,20 +823,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       key: const Key('product_form_photo_picker'),
       onTap: _pickPhoto,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
         child: SizedBox(
           width: 140,
           height: 140,
           child: (photoPath == null || photoPath.isEmpty)
               ? Container(
-                  color: Colors.grey[300],
-                  child: Icon(Icons.add_a_photo, size: 40, color: Colors.grey[700]),
+                  color: AppColors.gray300,
+                  // TODO(ui-migration): icon size 40 left raw — no icon-size token.
+                  child: const Icon(Icons.add_a_photo, size: 40, color: AppColors.gray700),
                 )
               : Image.file(
                   File(photoPath),
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.grey[300],
+                    color: AppColors.gray300,
                     child: const Icon(Icons.broken_image),
                   ),
                 ),

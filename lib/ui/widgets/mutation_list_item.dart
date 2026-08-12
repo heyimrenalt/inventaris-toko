@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/stock_mutation.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 /// A single row for a stock mutation: product name, a clear green
 /// up-arrow (stock-in) or red down-arrow (stock-out) — an actual visual
@@ -70,7 +73,7 @@ class MutationListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _isIn ? Colors.green[700]! : Colors.red[700]!;
+    final color = _isIn ? AppColors.greenText : AppColors.redText;
     final icon = _isIn ? Icons.arrow_upward : Icons.arrow_downward;
     final sign = _isIn ? '+' : '-';
     final note = mutation.note;
@@ -78,7 +81,7 @@ class MutationListItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 10),
         child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -87,14 +90,14 @@ class MutationListItem extends StatelessWidget {
             backgroundColor: color.withValues(alpha: 0.15),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   productName,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.subheading,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -102,7 +105,7 @@ class MutationListItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     note,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    style: AppTextStyles.body.copyWith(color: AppColors.gray700),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -115,13 +118,13 @@ class MutationListItem extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '$sign${formatMutationQuantity(mutation.quantity)} $unit',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+                style: AppTextStyles.subheading.copyWith(color: color),
               ),
               if (_enteredUnitCaption != null) ...[
                 const SizedBox(height: 2),
@@ -133,7 +136,7 @@ class MutationListItem extends StatelessWidget {
             ],
           ),
           if (canCancel) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xs),
             IconButton(
               key: ValueKey('mutation_cancel_${mutation.id}'),
               icon: const Icon(Icons.undo),

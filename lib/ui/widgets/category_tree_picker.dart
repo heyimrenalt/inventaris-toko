@@ -5,6 +5,10 @@ import 'package:isar_community/isar.dart';
 
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimensions.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 import 'category_form_dialog.dart';
 
 enum _SelectionType { all, uncategorized, category }
@@ -37,9 +41,8 @@ class CategorySelection {
   bool get isCategory => _type == _SelectionType.category;
 }
 
-/// Opens [CategoryTreePicker] as a scrollable modal bottom sheet and
-/// returns the user's [CategorySelection], or `null` if dismissed without
-/// picking one.
+/// Opens [CategoryTreePicker] as a modal bottom sheet and returns the
+/// user's [CategorySelection], or `null` if dismissed without picking one.
 ///
 /// [includeAllOption] shows a fixed "Semua" row above the tree — used by
 /// the Produk tab's filter (which has 3 states: all/category/none) but
@@ -54,6 +57,7 @@ Future<CategorySelection?> showCategoryTreePicker({
   return showModalBottomSheet<CategorySelection>(
     context: context,
     isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (_) => CategoryTreePicker(
       isar: isar,
       includeAllOption: includeAllOption,
@@ -156,83 +160,178 @@ class _CategoryTreePickerState extends State<CategoryTreePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final childrenByParentId = _groupByParent();
+    final roots = childrenByParentId[null] ?? const <Category>[];
+
     return SafeArea(
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (context, scrollController) {
-          if (_loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final childrenByParentId = _groupByParent();
-          final roots = childrenByParentId[null] ?? const <Category>[];
-
-          return ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text(
-                  'Pilih Kategori',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimensions.cardRadius)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gray300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              if (widget.includeAllOption)
-                ListTile(
-                  key: const Key('category_picker_all'),
-                  title: const Text('Semua', style: TextStyle(fontSize: 16)),
-                  selected: widget.current?.isAll ?? false,
-                  onTap: () => _select(const CategorySelection.all()),
-                ),
-              ListTile(
-                key: const Key('category_picker_uncategorized'),
-                title: Text(
-                  widget.includeAllOption ? 'Lainnya' : 'Lainnya (tanpa kategori)',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                selected: widget.current?.isUncategorized ?? false,
-                onTap: () => _select(const CategorySelection.uncategorized()),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.sm,
               ),
-              const Divider(),
-              if (roots.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Belum ada kategori.',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Pilih Kategori', style: AppTextStyles.heading),
+              ),
+            ),
+            Flexible(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(AppSpacing.xxl),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    )
+                  : ListView(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      children: [
+                        if (widget.includeAllOption)
+                          _SpecialPickerRow(
+                            key: const Key('category_picker_all'),
+                            label: 'Semua',
+                            selected: widget.current?.isAll ?? false,
+                            onTap: () => _select(const CategorySelection.all()),
+                          ),
+                        _SpecialPickerRow(
+                          key: const Key('category_picker_uncategorized'),
+                          label: widget.includeAllOption
+                              ? 'Lainnya'
+                              : 'Lainnya (tanpa kategori)',
+                          selected: widget.current?.isUncategorized ?? false,
+                          onTap: () => _select(const CategorySelection.uncategorized()),
+                        ),
+                        if (roots.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.md,
+                            ),
+                            child: Text(
+                              'Belum ada kategori.',
+                              style: AppTextStyles.body,
+                            ),
+                          ),
+                        for (final root in roots)
+                          _CategoryPickerNode(
+                            category: root,
+                            depth: 0,
+                            childrenByParentId: childrenByParentId,
+                            expandedIds: _expandedIds,
+                            selectedCategoryId: widget.current?.categoryId,
+                            onToggleExpand: (id) => setState(() {
+                              if (!_expandedIds.add(id)) _expandedIds.remove(id);
+                            }),
+                            onSelect: (category) => _select(
+                              CategorySelection.category(category.id, _breadcrumbFor(category)),
+                            ),
+                            onAddChild: (parent) => _addCategory(parentId: parent.id),
+                          ),
+                      ],
+                    ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('category_picker_add_root'),
+                    onPressed: () => _addCategory(),
+                    icon: const Icon(Icons.add, color: AppColors.primary),
+                    label: const Text(
+                      'Tambah kategori',
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
                 ),
-              for (final root in roots)
-                _CategoryPickerNode(
-                  category: root,
-                  depth: 0,
-                  childrenByParentId: childrenByParentId,
-                  expandedIds: _expandedIds,
-                  selectedCategoryId: widget.current?.categoryId,
-                  onToggleExpand: (id) => setState(() {
-                    if (!_expandedIds.add(id)) _expandedIds.remove(id);
-                  }),
-                  onSelect: (category) =>
-                      _select(CategorySelection.category(category.id, _breadcrumbFor(category))),
-                  onAddChild: (parent) => _addCategory(parentId: parent.id),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: TextButton.icon(
-                  key: const Key('category_picker_add_root'),
-                  onPressed: () => _addCategory(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Tambah kategori', style: TextStyle(fontSize: 16)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A fixed row for "Semua" / "Lainnya" — styled like a depth-0
+/// [_CategoryPickerNode] (same leading gutter and label padding) so the
+/// whole list reads as one consistent set of rows, with the green
+/// selected-state text/check shared with tree nodes.
+class _SpecialPickerRow extends StatelessWidget {
+  const _SpecialPickerRow({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.sm),
+          child: Row(
+            children: [
+              const SizedBox(width: 28),
+              Expanded(
+                child: InkWell(
+                  onTap: onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Text(
+                      label,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: selected ? AppColors.primary : AppColors.darkText,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ),
+              if (selected)
+                const Icon(Icons.check, color: AppColors.primary, size: 20),
             ],
-          );
-        },
-      ),
+          ),
+        ),
+        const Divider(height: 1, color: AppColors.gray100),
+      ],
     );
   }
 }
@@ -267,26 +366,60 @@ class _CategoryPickerNode extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          key: Key('category_picker_node_${category.id}'),
-          contentPadding: EdgeInsets.only(left: 16.0 + depth * 20, right: 4),
-          selected: selected,
-          leading: children.isEmpty
-              ? const SizedBox(width: 32)
-              : IconButton(
-                  key: Key('category_picker_expand_${category.id}'),
-                  icon: Icon(expanded ? Icons.expand_more : Icons.chevron_right),
-                  onPressed: () => onToggleExpand(category.id),
+        Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.sm),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < depth; i++) _buildIndentGuide(),
+                SizedBox(
+                  width: 28,
+                  child: children.isEmpty
+                      ? null
+                      : IconButton(
+                          key: Key('category_picker_expand_${category.id}'),
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            expanded ? Icons.expand_more : Icons.chevron_right,
+                            color: AppColors.gray700,
+                          ),
+                          onPressed: () => onToggleExpand(category.id),
+                        ),
                 ),
-          title: Text(category.name, style: const TextStyle(fontSize: 16)),
-          onTap: () => onSelect(category),
-          trailing: IconButton(
-            key: Key('category_picker_add_child_${category.id}'),
-            icon: const Icon(Icons.add, size: 20),
-            tooltip: 'Tambah sub-kategori',
-            onPressed: () => onAddChild(category),
+                Expanded(
+                  child: InkWell(
+                    key: Key('category_picker_node_${category.id}'),
+                    onTap: () => onSelect(category),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      child: Text(
+                        category.name,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: selected ? AppColors.primary : AppColors.darkText,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: AppSpacing.sm),
+                    child: Icon(Icons.check, color: AppColors.primary, size: 20),
+                  ),
+                IconButton(
+                  key: Key('category_picker_add_child_${category.id}'),
+                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                  color: AppColors.primary,
+                  tooltip: 'Tambah sub-kategori',
+                  onPressed: () => onAddChild(category),
+                ),
+              ],
+            ),
           ),
         ),
+        const Divider(height: 1, color: AppColors.gray100),
         if (expanded)
           for (final child in children)
             _CategoryPickerNode(
@@ -300,6 +433,16 @@ class _CategoryPickerNode extends StatelessWidget {
               onAddChild: onAddChild,
             ),
       ],
+    );
+  }
+
+  Widget _buildIndentGuide() {
+    return SizedBox(
+      width: AppSpacing.xl,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(width: 1.5, color: AppColors.gray300),
+      ),
     );
   }
 }
