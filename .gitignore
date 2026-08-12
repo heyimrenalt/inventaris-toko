@@ -50,3 +50,6 @@ app.*.map.json
 /libisar.dylib
 /libisar.so
 /isar.dll
+
+# Local Claude Code settings (per-machine permissions, not shared)
+.claude/settings.local.json
