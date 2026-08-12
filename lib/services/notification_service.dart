@@ -51,6 +51,11 @@ const criticalStockAlarmWakeup = true;
 const criticalStockAlarmAllowWhileIdle = true;
 const criticalStockAlarmRescheduleOnReboot = true;
 
+/// Where tapping a notification takes the user. Both notification kinds
+/// this app sends are about restocking, so both land on the same screen;
+/// anything else (an unknown or missing payload) just opens the app.
+enum NotificationTapDestination { prioritasKulakan, home }
+
 /// Thin seam over [FlutterLocalNotificationsPlugin] so the pure
 /// content-building logic in [NotificationService] can be unit-tested by
 /// swapping [NotificationService.sender] for a fake, without touching a
@@ -242,7 +247,11 @@ class NotificationService {
     const initSettings = InitializationSettings(android: androidInit);
 
     final plugin = FlutterLocalNotificationsPlugin();
-    await plugin.initialize(initSettings, onDidReceiveNotificationResponse: _onNotificationTap);
+    await plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
+      onDidReceiveBackgroundNotificationResponse: notificationBackgroundTapHandler,
+    );
 
     final androidPlugin =
         plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -281,17 +290,59 @@ class NotificationService {
   /// per Play policy on requesting sensitive permissions.
   static Future<void> requestExactAlarmsPermission() => exactAlarmPermission.requestExactAlarmsPermission();
 
-  static void _onNotificationTap(NotificationResponse response) {
+  /// Where a notification tap should land, derived purely from its
+  /// payload. Split out from the navigation itself so the warm path
+  /// ([_onNotificationTap]) and the cold-start path
+  /// ([handleNotificationLaunch]) can't drift apart, and so the mapping is
+  /// unit-testable without a real notifications plugin.
+  static NotificationTapDestination resolveTapDestination(String? payload) {
+    switch (payload) {
+      case _payloadCriticalStock:
+      case _payloadDailySummary:
+        return NotificationTapDestination.prioritasKulakan;
+      default:
+        return NotificationTapDestination.home;
+    }
+  }
+
+  /// Performs the navigation [resolveTapDestination] selects. No-op when
+  /// no navigator is mounted yet — the cold-start path re-runs this after
+  /// the first frame instead (see [handleNotificationLaunch]).
+  static void navigateForPayload(String? payload) {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
-    if (response.payload == _payloadCriticalStock) {
-      navigator.push(
-        MaterialPageRoute(builder: (_) => PrioritasKulakanScreen(isar: IsarService.instance)),
-      );
-    } else {
-      navigator.popUntil((route) => route.isFirst);
+    switch (resolveTapDestination(payload)) {
+      case NotificationTapDestination.prioritasKulakan:
+        navigator.push(
+          MaterialPageRoute(builder: (_) => PrioritasKulakanScreen(isar: IsarService.instance)),
+        );
+      case NotificationTapDestination.home:
+        navigator.popUntil((route) => route.isFirst);
     }
+  }
+
+  static void _onNotificationTap(NotificationResponse response) {
+    navigateForPayload(response.payload);
+  }
+
+  /// Replays the routing for the notification that cold-started the app.
+  /// Tapping a notification while the process is dead launches the app
+  /// without ever invoking `onDidReceiveNotificationResponse`, so without
+  /// this the tap silently lands on the default screen.
+  ///
+  /// MUST be called after [IsarService.open] has completed —
+  /// [navigateForPayload] builds a screen from `IsarService.instance`.
+  /// Routing is deferred to the next frame because at this point the
+  /// app's `home` is still the loading indicator; by the post-frame
+  /// callback the navigator exists and MainScaffold is the route
+  /// underneath.
+  static Future<void> handleNotificationLaunch() async {
+    final launchDetails = await FlutterLocalNotificationsPlugin().getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp != true) return;
+
+    final payload = launchDetails?.notificationResponse?.payload;
+    WidgetsBinding.instance.addPostFrameCallback((_) => navigateForPayload(payload));
   }
 
   /// Registers (or cancels) the periodic daily-summary background task
@@ -416,12 +467,52 @@ class NotificationService {
     );
   }
 
+  /// How many product names the critical-stock body names outright before
+  /// collapsing the rest into "dan N lainnya". Android ellipsizes a long
+  /// body anyway, so an unbounded comma-joined list just loses the tail
+  /// silently — better to cut it deliberately and keep the real total
+  /// visible in the count.
+  static const criticalStockAlertNamedProductLimit = 3;
+
+  /// Severity score for ordering the critical list, lowest = most critical.
+  /// Uses `currentStock / minStockThreshold` (how deep below minimum, as a
+  /// fraction) rather than the absolute gap, so a product's severity is
+  /// judged against its own threshold: 0 of 5 outranks 3 of 50, even
+  /// though the latter's absolute gap is far larger.
+  ///
+  /// Deliberately computed from fields already on [Product] — no extra
+  /// queries. The richer [PrioritasKulakanCalculator] urgency signal would
+  /// need one stock-out history query per product, which is too much work
+  /// for an alarm-fire callback.
+  static double _criticalStockSeverity(Product product) {
+    if (product.currentStock <= 0) return 0;
+    if (product.minStockThreshold <= 0) return double.maxFinite;
+    return product.currentStock / product.minStockThreshold;
+  }
+
   static String buildCriticalStockAlertBody(List<Product> products) {
-    if (products.length == 1) {
-      return '⚠️ Stok kritis: ${products.first.name} habis — segera kulakan';
+    // Most critical first, so a truncated list names the products that
+    // actually need attention rather than whatever order the DB returned.
+    // Ties break on lower absolute stock, then name, to keep the body
+    // stable across fires instead of shuffling between equal products.
+    final ordered = List<Product>.of(products)
+      ..sort((a, b) {
+        final bySeverity = _criticalStockSeverity(a).compareTo(_criticalStockSeverity(b));
+        if (bySeverity != 0) return bySeverity;
+        final byStock = a.currentStock.compareTo(b.currentStock);
+        if (byStock != 0) return byStock;
+        return a.name.compareTo(b.name);
+      });
+
+    if (ordered.length == 1) {
+      return '⚠️ Stok kritis: ${ordered.first.name} habis — segera kulakan, cek sekarang';
     }
-    final names = products.map((p) => p.name).join(', ');
-    return '⚠️ ${products.length} barang stok kritis: $names — segera kulakan';
+
+    final shown = ordered.take(criticalStockAlertNamedProductLimit);
+    final names = shown.map((p) => p.name).join(', ');
+    final remaining = ordered.length - criticalStockAlertNamedProductLimit;
+    final tail = remaining > 0 ? '$names dan $remaining lainnya' : names;
+    return '⚠️ ${ordered.length} barang stok kritis: $tail — segera kulakan, cek sekarang';
   }
 
   static String buildDailySummaryBody({required int soldToday, required int needRestockCount}) {
@@ -501,6 +592,17 @@ class NotificationService {
     );
   }
 }
+
+/// Notification-tap entry point for taps delivered while the app process
+/// isn't in the foreground. Runs in its own background isolate, which has
+/// neither the main isolate's navigator nor its [IsarService] cache, so it
+/// deliberately does nothing: the tap brings the app up, and
+/// [NotificationService.handleNotificationLaunch] does the actual routing
+/// once Isar is open. Registering it is still required — without a
+/// background handler the plugin can drop the response instead of
+/// recording it in the launch details.
+@pragma('vm:entry-point')
+void notificationBackgroundTapHandler(NotificationResponse response) {}
 
 /// Workmanager entry point: runs in a separate background isolate with no
 /// access to the main isolate's [IsarService] cache, so it reopens Isar

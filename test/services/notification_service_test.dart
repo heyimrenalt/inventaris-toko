@@ -108,18 +108,33 @@ class _FakeExactAlarmPermission implements ExactAlarmPermission {
   }
 }
 
-Product _buildProduct({required int id, required String name}) {
+Product _buildProduct({
+  required int id,
+  required String name,
+  double currentStock = 0,
+  double minStockThreshold = 5,
+}) {
   final now = DateTime.now();
   return Product()
     ..id = id
     ..name = name
     ..sellPrice = 1000
     ..unit = 'pcs'
-    ..currentStock = 0
-    ..minStockThreshold = 5
+    ..currentStock = currentStock
+    ..minStockThreshold = minStockThreshold
     ..createdAt = now
     ..updatedAt = now;
 }
+
+/// [count] distinct critical products, named `Barang A`, `Barang B`, ...
+/// All equally severe (stock 0), so they fall through to the name
+/// tie-break — lettered rather than numbered precisely so that tie-break
+/// is alphabetical *and* insertion order, keeping the truncation
+/// assertions below about truncation and not about ordering.
+List<Product> _buildProducts(int count) => [
+      for (var i = 0; i < count; i++)
+        _buildProduct(id: i + 1, name: 'Barang ${String.fromCharCode(0x41 + i)}'),
+    ];
 
 void main() {
   late _FakeNotificationSender fakeSender;
@@ -184,21 +199,89 @@ void main() {
 
       expect(
         NotificationService.buildCriticalStockAlertBody([product]),
-        '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan',
+        '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan, cek sekarang',
       );
     });
 
-    test('multiple products lists every name in the plural template', () {
+    test('two products list both names with no overflow suffix', () {
+      expect(
+        NotificationService.buildCriticalStockAlertBody(_buildProducts(2)),
+        '⚠️ 2 barang stok kritis: Barang A, Barang B — segera kulakan, cek sekarang',
+      );
+    });
+
+    test('three products list every name with no overflow suffix', () {
+      expect(
+        NotificationService.buildCriticalStockAlertBody(_buildProducts(3)),
+        '⚠️ 3 barang stok kritis: Barang A, Barang B, Barang C — segera kulakan, cek sekarang',
+      );
+    });
+
+    test('four products name only the first three plus "dan 1 lainnya"', () {
+      expect(
+        NotificationService.buildCriticalStockAlertBody(_buildProducts(4)),
+        '⚠️ 4 barang stok kritis: Barang A, Barang B, Barang C dan 1 lainnya — segera kulakan, cek sekarang',
+      );
+    });
+
+    test('many products keep the real total in the count and overflow the rest', () {
+      final body = NotificationService.buildCriticalStockAlertBody(_buildProducts(13));
+
+      expect(
+        body,
+        '⚠️ 13 barang stok kritis: Barang A, Barang B, Barang C dan 10 lainnya — segera kulakan, cek sekarang',
+      );
+      expect(body, contains('13 barang'), reason: 'the count must be the real total, not the shown 3');
+      expect(body, contains('dan 10 lainnya'), reason: 'overflow is total - 3');
+    });
+
+    test('the three named products are the most critical, not the input order', () {
+      // Ordering is by currentStock / minStockThreshold, so severity is
+      // judged relative to each product's own threshold rather than by
+      // absolute gap: "Nyaris" (8 of 100) beats "Aman-ish" (4 of 5) even
+      // though its absolute gap is far larger.
       final products = [
-        _buildProduct(id: 1, name: 'Buku'),
-        _buildProduct(id: 2, name: 'Pulpen'),
-        _buildProduct(id: 3, name: 'Pensil'),
+        _buildProduct(id: 1, name: 'Setengah', currentStock: 5, minStockThreshold: 10), // 0.50
+        _buildProduct(id: 2, name: 'Habis', currentStock: 0, minStockThreshold: 10), // 0.00
+        _buildProduct(id: 3, name: 'Aman-ish', currentStock: 4, minStockThreshold: 5), // 0.80
+        _buildProduct(id: 4, name: 'Nyaris', currentStock: 8, minStockThreshold: 100), // 0.08
+        _buildProduct(id: 5, name: 'Seperempat', currentStock: 5, minStockThreshold: 20), // 0.25
       ];
 
       expect(
         NotificationService.buildCriticalStockAlertBody(products),
-        '⚠️ 3 barang stok kritis: Buku, Pulpen, Pensil — segera kulakan',
+        '⚠️ 5 barang stok kritis: Habis, Nyaris, Seperempat dan 2 lainnya — segera kulakan, cek sekarang',
       );
+    });
+
+    test('does not reorder the caller\'s list in place', () {
+      final products = [
+        _buildProduct(id: 1, name: 'Setengah', currentStock: 5, minStockThreshold: 10),
+        _buildProduct(id: 2, name: 'Habis', currentStock: 0, minStockThreshold: 10),
+      ];
+
+      NotificationService.buildCriticalStockAlertBody(products);
+
+      expect(products.map((p) => p.name), ['Setengah', 'Habis']);
+    });
+  });
+
+  group('resolveTapDestination', () {
+    test('both notification kinds land on Prioritas Kulakan', () {
+      expect(
+        NotificationService.resolveTapDestination('critical_stock'),
+        NotificationTapDestination.prioritasKulakan,
+      );
+      expect(
+        NotificationService.resolveTapDestination('daily_summary'),
+        NotificationTapDestination.prioritasKulakan,
+      );
+    });
+
+    test('an unknown or absent payload falls back to just opening the app', () {
+      expect(NotificationService.resolveTapDestination(null), NotificationTapDestination.home);
+      expect(NotificationService.resolveTapDestination(''), NotificationTapDestination.home);
+      expect(NotificationService.resolveTapDestination('something_else'), NotificationTapDestination.home);
     });
   });
 
@@ -373,7 +456,7 @@ void main() {
       expect(fakeSender.calls, hasLength(1));
       final sent = fakeSender.calls.single;
       expect(sent.id, criticalStockAlertNotificationId(1));
-      expect(sent.body, '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan');
+      expect(sent.body, '⚠️ Stok kritis: Indomie Goreng habis — segera kulakan, cek sekarang');
       expect(sent.channelId, stockCriticalChannelId);
       expect(sent.highImportance, isTrue);
     });

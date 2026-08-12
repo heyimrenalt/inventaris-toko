@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:isar_community/isar.dart';
 
 import 'data/isar_service.dart';
+import 'data/migrations/mutation_snapshot_backfill.dart';
 import 'data/repositories/app_settings_repository.dart';
 import 'services/notification_service.dart';
 import 'ui/navigation/main_scaffold.dart';
@@ -77,12 +78,22 @@ class MyApp extends StatelessWidget {
 
   Future<Isar> _openAndInitialize() async {
     final isar = await IsarService.open();
+    // Awaited, unlike the notification reschedule below: profit figures
+    // read straight off the mutation ledger, so the first frame must not
+    // render numbers computed from half-backfilled snapshots. It's a
+    // guarded one-shot pass — a no-op on every launch after the first.
+    await MutationSnapshotBackfill(isar).runIfNeeded();
     await NotificationService.initialize();
     // Fire-and-forget: restores any notifications lost to a force-stop or
     // reboot since the app was last opened. Not awaited so it never
     // delays the first frame — cancel+reschedule is a handful of cheap
     // OS alarm/work-manager calls, not a heavy Isar query.
     unawaited(_rescheduleNotifications(isar));
+    // Ordering matters: this routes to a screen built from
+    // IsarService.instance, so it must run after IsarService.open() above.
+    // Fire-and-forget for the same reason as the reschedule — it defers
+    // its own navigation to the next frame anyway.
+    unawaited(NotificationService.handleNotificationLaunch());
     return isar;
   }
 
