@@ -12,8 +12,13 @@ import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/profit_report.dart';
 import '../../../services/recap_pdf_builder.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
+import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/primary_button.dart';
 import '../../widgets/report_period_filter.dart';
+import '../../widgets/secondary_button.dart';
 
 /// Shown instead of a screen full of zeroes when the selected period
 /// contains no sales — "no transactions" and "zero profit" are different
@@ -55,11 +60,19 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
   late ReportPeriod _period = widget.initialPeriod;
 
   ProfitReport? _report;
+
+  /// The real span of sales behind an all-time report, resolved once per
+  /// load and shared by every output this screen produces — the "Periode:"
+  /// line, the copied text, the share subject and the PDF header. `null`
+  /// while a bounded period is selected (it carries its own dates) and
+  /// when no sale qualifies for the profit calculation.
+  ProfitDateRange? _allTimeRange;
+
   bool _loading = true;
 
-  /// True while a PDF is being generated and shared. Disables the Share
-  /// button and swaps its label for a spinner so a double-tap can't kick
-  /// off two concurrent generations.
+  /// True while a PDF is being generated and shared. Disables the Bagikan
+  /// button and swaps its label for progress text so a double-tap can't
+  /// kick off two concurrent generations.
   bool _sharing = false;
 
   /// Guards against an out-of-order response overwriting a newer one when
@@ -89,9 +102,17 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
 
     try {
       final report = await widget.mutationRepository.buildProfitReport(period);
+      // Only "Semua" needs the resolved span, so the query is skipped
+      // entirely for a bounded period. Fetched here, in the one load path,
+      // rather than at share time: the label is now on screen too, and
+      // every output must read the same value.
+      final allTimeRange = period.isAllTime
+          ? await widget.mutationRepository.getProfitableStockOutDateRange()
+          : null;
       if (!mounted || requestId != _requestId) return;
       setState(() {
         _report = report;
+        _allTimeRange = allTimeRange;
         _loading = false;
       });
     } catch (e) {
@@ -108,7 +129,22 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     return 'Rp ${formatter.format(value.toInt())}';
   }
 
-  String _getPeriodLabel() => formatReportPeriod(_period);
+  /// The single period string this screen renders. Read by the "Periode:"
+  /// line, [_copyToClipboard], [shareSubject] and the PDF header, so all
+  /// four are byte-identical by construction — there is no second
+  /// derivation any of them could drift away from.
+  ///
+  /// Exposed (on an otherwise private State) so a test can assert that
+  /// identity against the strings the other surfaces actually render.
+  @visibleForTesting
+  String get periodLabel =>
+      buildPeriodLabel(_period, allTimeRange: _allTimeRange);
+
+  /// The subject line attached to the shared PDF. Split out from the
+  /// share call so it is assertable without mocking the platform share
+  /// sheet, the temp directory and the font bundle.
+  @visibleForTesting
+  String get shareSubject => 'Rekap Keuntungan - $periodLabel';
 
   String _formatQty(double value) =>
       value == value.roundToDouble() ? value.toInt().toString() : value.toString();
@@ -118,7 +154,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       final buffer = StringBuffer();
       buffer.writeln('📊 REKAP KEUNTUNGAN TOKO');
       buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      buffer.writeln('Periode: ${_getPeriodLabel()}');
+      buffer.writeln('Periode: $periodLabel');
       buffer.writeln('');
       final report = _report;
       if (report == null || report.isEmpty) {
@@ -156,7 +192,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
         const SnackBar(
           content: Text('✓ Rekap berhasil disalin ke clipboard'),
           duration: Duration(seconds: 3),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.primary,
         ),
       );
     } catch (e) {
@@ -164,7 +200,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.redPrimary,
         ),
       );
     }
@@ -191,16 +227,12 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
 
     setState(() => _sharing = true);
     try {
-      // Only an all-time report needs the earliest mutation, so the query
-      // is skipped entirely for a bounded period — which already carries
-      // its own dates.
-      final earliestMutationAt = report.period.isAllTime
-          ? await widget.mutationRepository.getEarliestMutationDate()
-          : null;
       final fonts = await loadRecapPdfFonts();
       final bytes = await buildRecapPdf(
         report: report,
-        earliestMutationAt: earliestMutationAt,
+        // The same string the user is looking at, not a second derivation
+        // of it. The PDF's own "Dibuat:" line still carries today's date.
+        periodLabel: periodLabel,
         fonts: fonts,
       );
 
@@ -229,7 +261,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/pdf')],
-          subject: 'Rekap Keuntungan - ${_getPeriodLabel()}',
+          subject: shareSubject,
         ),
       );
     } catch (e) {
@@ -237,7 +269,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal membuat PDF: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.redPrimary,
         ),
       );
     } finally {
@@ -256,15 +288,15 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       backgroundColor: AppColors.scaffoldBackground,
       appBar: AppHeader.withBack(title: 'Rekap Keuntungan'),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPeriodSelection(),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             if (_loading)
               const Padding(
-                padding: EdgeInsets.all(40),
+                padding: EdgeInsets.all(AppSpacing.xxl),
                 child: Center(child: CircularProgressIndicator()),
               )
             // An empty period gets its own explicit message rather than a
@@ -272,19 +304,19 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
             // "nothing was sold then".
             else if (report == null || report.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                 child: Center(
                   child: Text(
                     _emptyPeriodMessage,
                     key: const Key('recap_empty_period'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    style: AppTextStyles.body.copyWith(color: AppColors.gray600),
                   ),
                 ),
               )
             else ...[
               _buildSummary(report),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               _buildProductDetails(report),
             ],
           ],
@@ -300,43 +332,24 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     return SafeArea(
       child: Container(
         color: AppColors.white,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
             Expanded(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.copy, size: 18),
-                label: const Text('Copy'),
+              child: SecondaryButton(
+                label: 'Salin',
+                icon: Icons.copy,
                 onPressed: _copyToClipboard,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[100],
-                  foregroundColor: Colors.blue[900],
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: ElevatedButton.icon(
-                icon: _sharing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.share, size: 18),
-                label: Text(_sharing ? 'Membuat PDF...' : 'Share'),
+              // No spinner: [PrimaryButton] has no busy state, so the
+              // in-progress cue is the disabled style plus the label swap.
+              child: PrimaryButton(
+                label: _sharing ? 'Membuat PDF...' : 'Bagikan',
+                icon: Icons.share,
                 onPressed: _sharing ? null : _shareRecap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.green.shade300,
-                  disabledForegroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
               ),
             ),
           ],
@@ -349,22 +362,21 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.gray300),
+        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Pilih Periode',
-            style: TextStyle(
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              fontSize: 13,
+              color: AppColors.gray700,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           // The exact same widget Detail Keuntungan uses, so the two
           // filters cannot drift apart again.
           ReportPeriodFilter(
@@ -373,18 +385,24 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
             onChanged: _applyPeriod,
             enabled: !_loading,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           // The active period is always visible, so the numbers below can
           // never be mistaken for a different period's.
           Row(
             children: [
-              const Icon(Icons.event, size: 16, color: Colors.grey),
-              const SizedBox(width: 6),
+              const Icon(
+                Icons.event,
+                size: AppDimensions.iconXs,
+                color: AppColors.gray500,
+              ),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'Periode: ${_getPeriodLabel()}',
+                  'Periode: $periodLabel',
                   key: const Key('recap_active_period_label'),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: AppTextStyles.caption.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -397,23 +415,22 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
   Widget _buildSummary(ProfitReport report) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.gray50,
+        border: Border.all(color: AppColors.gray300),
+        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Ringkasan Total',
-            style: TextStyle(
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              fontSize: 13,
+              color: AppColors.gray700,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildSummaryItem('Total Penjualan', _formatCurrency(report.totalRevenue)),
           _buildSummaryItem('Total Modal', _formatCurrency(report.totalCost)),
           _buildSummaryItem(
@@ -436,24 +453,22 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
 
   Widget _buildSummaryItem(String label, String value, {bool highlight = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.gray700,
               fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 12,
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: highlight ? Colors.green.shade600 : Colors.black,
+              color: highlight ? AppColors.primary : AppColors.darkText,
             ),
           ),
         ],
@@ -464,28 +479,28 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
   Widget _buildProductDetails(ProfitReport report) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.gray50,
+        border: Border.all(color: AppColors.gray300),
+        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Detail Per Produk (${report.lines.length})',
-            style: TextStyle(
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-              fontSize: 13,
+              color: AppColors.gray700,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: report.lines.length,
-            separatorBuilder: (context, index) => const Divider(height: 12),
+            separatorBuilder: (context, index) =>
+                const Divider(height: AppSpacing.md),
             itemBuilder: (context, index) {
               final item = report.lines[index];
               return Column(
@@ -493,22 +508,21 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
                 children: [
                   Text(
                     '${index + 1}. ${item.name}',
-                    style: const TextStyle(
+                    style: AppTextStyles.caption.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontSize: 12,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Harga Jual: ${_formatCurrency(item.averageSellPrice)}',
-                        style: const TextStyle(fontSize: 11),
+                        style: AppTextStyles.caption,
                       ),
                       Text(
                         'Terjual: ${_formatQty(item.quantitySold)} pcs',
-                        style: const TextStyle(fontSize: 11),
+                        style: AppTextStyles.caption,
                       ),
                     ],
                   ),
@@ -517,14 +531,13 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
                     children: [
                       Text(
                         'Modal: ${_formatCurrency(item.averageCostPrice)}',
-                        style: const TextStyle(fontSize: 11),
+                        style: AppTextStyles.caption,
                       ),
                       Text(
                         'Profit: ${_formatCurrency(item.profit)}',
-                        style: TextStyle(
-                          fontSize: 11,
+                        style: AppTextStyles.caption.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.green.shade600,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
