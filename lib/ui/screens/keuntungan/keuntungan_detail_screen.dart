@@ -7,6 +7,8 @@ import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/profit_report.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_dimensions.dart';
+import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/report_period_filter.dart';
@@ -113,26 +115,21 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
   }
 
   /// "3 Jan 2026 - 11 Agu 2026 (Semua)" — the span the all-time total is
-  /// actually made of, followed by the filter the user selected. `null`
-  /// when there is nothing to describe, in which case no sub-text renders
-  /// at all (no placeholder, no epoch date).
+  /// actually made of, followed by the filter the user selected. Built by
+  /// the shared [buildPeriodLabel], so this sub-text is byte-identical to
+  /// the period Rekap Keuntungan shows, copies, shares and prints.
   ///
-  /// The dates go through [formatReportPeriod] rather than a second
-  /// formatter of their own, so they read exactly like every other period
-  /// label in the app — including its collapse to a single date when the
-  /// two ends fall on the same day (one qualifying sale). [ReportPeriod]'s
-  /// future-end clamping is neutralised by passing the latest sale as
-  /// `today`: these are recorded dates, not a range to be sanity-checked.
+  /// `null` — meaning no sub-text renders at all — in the two cases where
+  /// this screen has nothing to add: a bounded period (its dates are
+  /// already in the title right above) and an all-time period with no
+  /// qualifying sale (the title stands alone rather than carrying a
+  /// placeholder). The latter is why the empty case is handled here and
+  /// not by [buildPeriodLabel]'s [kRecapNoTransactionsPeriod], which the
+  /// other surfaces do render.
   String? _allTimeRangeLabel() {
     final range = _allTimeRange;
     if (!_period.isAllTime || range == null) return null;
-
-    final span = ReportPeriod.days(
-      range.earliest,
-      range.latest,
-      today: range.latest,
-    );
-    return '${formatReportPeriod(span)} (${formatReportPeriod(const ReportPeriod.allTime())})';
+    return buildPeriodLabel(_period, allTimeRange: range);
   }
 
   String _formatCurrency(double value) {
@@ -199,12 +196,12 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                   SingleChildScrollView(
                     physics: const NeverScrollableScrollPhysics(),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildTotalSection(),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: AppSpacing.xl),
                           _buildFilterSection(),
                         ],
                       ),
@@ -214,7 +211,12 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        AppSpacing.lg,
+                        AppSpacing.lg,
+                        AppSpacing.lg,
+                      ),
                       child: _buildMonthlySection(),
                     ),
                   ),
@@ -228,10 +230,10 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
     final rangeLabel = _allTimeRangeLabel();
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: Colors.green.shade600,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
       ),
       child: Stack(
         children: [
@@ -243,28 +245,25 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                     ? 'Total Keuntungan Keseluruhan'
                     : 'Total Keuntungan ${formatReportPeriod(_period)}',
                 style: AppTextStyles.caption.copyWith(
-                  color: Colors.white,
+                  color: AppColors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               if (rangeLabel != null) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
                   rangeLabel,
                   key: const Key('keuntungan_all_time_range'),
                   style: AppTextStyles.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 11,
+                    color: AppColors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 _formatCurrency(_totalProfit),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                style: AppTextStyles.displayNumber.copyWith(
+                  color: AppColors.white,
                 ),
               ),
             ],
@@ -273,7 +272,7 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
             top: 0,
             right: 0,
             child: IconButton(
-              icon: const Icon(Icons.file_download, color: Colors.white),
+              icon: const Icon(Icons.file_download, color: AppColors.white),
               tooltip: 'Lihat Rekap',
               onPressed: _openRekapScreen,
             ),
@@ -353,7 +352,7 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
           final daysInMonth = _getDaysInMonth(month, filteredDates);
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: Column(
               children: [
                 GestureDetector(
@@ -363,16 +362,20 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                     });
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.white,
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(12),
-                        topRight: const Radius.circular(12),
-                        bottomLeft: Radius.circular(isExpanded ? 0 : 12),
-                        bottomRight: Radius.circular(isExpanded ? 0 : 12),
+                        topLeft: const Radius.circular(AppDimensions.inputRadius),
+                        topRight: const Radius.circular(AppDimensions.inputRadius),
+                        bottomLeft: Radius.circular(
+                          isExpanded ? 0 : AppDimensions.inputRadius,
+                        ),
+                        bottomRight: Radius.circular(
+                          isExpanded ? 0 : AppDimensions.inputRadius,
+                        ),
                       ),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppColors.gray300),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -382,17 +385,13 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                           children: [
                             Text(
                               month,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: AppTextStyles.subheading,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
                               '${daysInMonth.length} hari transaksi',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.gray600,
                               ),
                             ),
                           ],
@@ -401,16 +400,14 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                           children: [
                             Text(
                               _formatCurrency(profit),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                              style: AppTextStyles.subheading.copyWith(
+                                color: AppColors.primary,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.md),
                             Icon(
                               isExpanded ? Icons.expand_less : Icons.expand_more,
-                              color: Colors.grey,
+                              color: AppColors.gray500,
                             ),
                           ],
                         ),
@@ -421,21 +418,24 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                 if (isExpanded)
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: AppColors.gray50,
                       borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
+                        bottomLeft: Radius.circular(AppDimensions.inputRadius),
+                        bottomRight: Radius.circular(AppDimensions.inputRadius),
                       ),
-                      border: Border(
-                        left: BorderSide(color: Colors.grey.shade300),
-                        right: BorderSide(color: Colors.grey.shade300),
-                        bottom: BorderSide(color: Colors.grey.shade300),
+                      border: const Border(
+                        left: BorderSide(color: AppColors.gray300),
+                        right: BorderSide(color: AppColors.gray300),
+                        bottom: BorderSide(color: AppColors.gray300),
                       ),
                     ),
                     constraints: const BoxConstraints(maxHeight: 350),
                     child: ListView.builder(
                       shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.md,
+                      ),
                       itemCount: daysInMonth.length,
                       itemBuilder: (context, dayIndex) {
                         final dayEntry = daysInMonth[dayIndex];
@@ -444,21 +444,22 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
 
                         return Padding(
                           padding: EdgeInsets.only(
-                            bottom: dayIndex == daysInMonth.length - 1 ? 0 : 12,
+                            bottom: dayIndex == daysInMonth.length - 1
+                                ? 0
+                                : AppSpacing.md,
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 _formatDate(date),
-                                style: const TextStyle(fontSize: 13),
+                                style: AppTextStyles.body,
                               ),
                               Text(
                                 _formatCurrency(dayProfit),
-                                style: const TextStyle(
-                                  fontSize: 13,
+                                style: AppTextStyles.caption.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.green,
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ],
