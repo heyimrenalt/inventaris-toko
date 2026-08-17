@@ -480,4 +480,85 @@ void main() {
       expect(restoredCategory, isNotNull);
     });
   });
+
+  /// Restore used to run seven separate write transactions (one wipe plus
+  /// one per collection). Every commit wakes every live `watchLazy`
+  /// listener, so screens that reload on change — `BerandaScreen` watches
+  /// products, mutations and appSettings — fired a burst of concurrent full
+  /// reloads *while* the database was still being bulk-written, which
+  /// segfaulted IsarCore. These tests pin the commit count directly,
+  /// because it is the commit count, not the screen, that is the cause.
+  group('restore commits exactly once', () {
+    /// Counts `watchLazy` notifications on the three collections
+    /// `BerandaScreen` subscribes to, for the duration of [action].
+    Future<Map<String, int>> countNotifications(Future<void> Function() action) async {
+      final counts = {'products': 0, 'mutations': 0, 'appSettings': 0};
+      final subscriptions = [
+        isar.products.watchLazy().listen((_) => counts['products'] = counts['products']! + 1),
+        isar.stockMutations
+            .watchLazy()
+            .listen((_) => counts['mutations'] = counts['mutations']! + 1),
+        isar.appSettings
+            .watchLazy()
+            .listen((_) => counts['appSettings'] = counts['appSettings']! + 1),
+      ];
+      // watchLazy delivers on the event loop, so give already-queued events
+      // from the seeding above a chance to land before we start counting.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      counts.updateAll((_, _) => 0);
+
+      try {
+        await action();
+      } finally {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      }
+      return counts;
+    }
+
+    test('a successful restore notifies each watched collection exactly once', () async {
+      final category = await seedCategory();
+      await seedProduct(categoryId: category.id);
+      final backup = await backupService.buildBackupData();
+
+      final counts = await countNotifications(() => backupService.importBackup(backup));
+
+      expect(counts['products'], 1);
+      expect(counts['mutations'], 1);
+      expect(counts['appSettings'], 1);
+    });
+
+    test('a failed restore commits only its rollback, never a bare wipe', () async {
+      final category = await seedCategory();
+      await seedProduct(categoryId: category.id);
+
+      final corrupt = await backupService.buildBackupData();
+      ((corrupt['data'] as Map)['products'] as List)
+          .add({'id': 'not-a-valid-id-field-type'});
+
+      final counts = await countNotifications(() async {
+        await expectLater(
+          backupService.importBackup(corrupt),
+          throwsA(isA<BackupRestoreException>()),
+        );
+      });
+
+      // Exactly one commit, and it is the rollback's. This is the
+      // discriminating measurement: the failed attempt contributes *zero*
+      // commits, because its wipe and its puts share one transaction that
+      // aborted together. Under the old multi-transaction restore the same
+      // failure committed a bare wipe first, then wiped and re-imported
+      // again to roll back — three or more notifications per collection,
+      // with a window in between where the database was observably empty.
+      expect(counts['products'], 1);
+      expect(counts['mutations'], 1);
+      expect(counts['appSettings'], 1);
+
+      // And the data really is still there, untouched.
+      expect(await isar.products.count(), 1);
+      expect(await isar.categories.get(category.id), isNotNull);
+    });
+  });
 }

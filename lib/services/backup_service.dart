@@ -157,13 +157,19 @@ class BackupService {
   /// settings on success, or the rolled-back original settings if the
   /// import failed and rollback succeeded).
   ///
-  /// On failure partway through, attempts to roll back to the pre-restore
-  /// state using a lightweight snapshot taken up front (see
-  /// [buildBackupData]'s `includePhotos: false` mode — the original photo
-  /// files are never touched by this method, so rollback never needs to
-  /// re-decode/rewrite them). Always throws [BackupRestoreException] on
-  /// any import failure, with `rollbackSucceeded` telling the caller
-  /// whether the original data is safe.
+  /// The wipe and the import are a single write transaction (see
+  /// [_wipeAndImport]), so a failed restore leaves the database untouched on
+  /// its own. The app-level rollback below — re-importing a lightweight
+  /// snapshot taken up front (see [buildBackupData]'s `includePhotos: false`
+  /// mode; the original photo files are never touched by this method, so
+  /// rollback never needs to re-decode/rewrite them) — is therefore a
+  /// belt-and-braces second line of defence rather than the only one, and
+  /// covers the case where the transaction itself cannot be relied on (a
+  /// half-applied commit, a corrupted instance). It is deliberately kept:
+  /// restoring the wrong data silently is the one failure mode this feature
+  /// must never have. Always throws [BackupRestoreException] on any import
+  /// failure, with `rollbackSucceeded` telling the caller whether the
+  /// original data is safe.
   Future<void> importBackup(Map<String, dynamic> backup) async {
     final data = (backup['data'] as Map).cast<String, dynamic>();
     final rollbackSnapshot = await buildBackupData(includePhotos: false);
@@ -172,8 +178,7 @@ class BackupService {
 
     Object? importError;
     try {
-      await _wipeAllCollections();
-      await _importInto(data, useRawPhotoPath: false);
+      await _wipeAndImport(data, useRawPhotoPath: false);
     } catch (cause) {
       importError = cause;
     }
@@ -182,8 +187,7 @@ class BackupService {
       var rollbackSucceeded = false;
       try {
         final rollbackData = (rollbackSnapshot['data'] as Map).cast<String, dynamic>();
-        await _wipeAllCollections();
-        await _importInto(rollbackData, useRawPhotoPath: true);
+        await _wipeAndImport(rollbackData, useRawPhotoPath: true);
         rollbackSucceeded = true;
       } catch (_) {
         rollbackSucceeded = false;
@@ -204,7 +208,65 @@ class BackupService {
     await NotificationService.scheduleCriticalStockAlerts(settings);
   }
 
-  Future<void> _wipeAllCollections() async {
+  /// Wipes every collection and imports one `data` map in its place, as a
+  /// **single** Isar write transaction.
+  ///
+  /// Everything that can fail — photo decode/write (real file I/O) and JSON
+  /// decoding of every row — is done up front, outside the transaction, so
+  /// that by the time the transaction opens all that remains is `clear()`
+  /// plus `put()`s, which do not fail on well-formed objects. That ordering
+  /// buys two things:
+  ///
+  /// * **Atomicity.** The wipe used to commit before the import started, so
+  ///   a failure partway through left a genuinely half-imported database
+  ///   that only the app-level rollback in [importBackup] could repair. Now
+  ///   a failure either happens before the transaction opens (database
+  ///   untouched) or aborts it (Isar rolls the wipe back with it).
+  /// * **One `watchLazy` notification.** Restore used to commit seven times
+  ///   (one wipe + six per-collection imports); every commit woke every live
+  ///   listener, and screens like `BerandaScreen` reloaded on each one —
+  ///   running full read queries concurrently against a database still being
+  ///   bulk-written. That is what segfaulted IsarCore. One commit means one
+  ///   notification, delivered after the database is already consistent.
+  ///
+  /// Rows are put in dependency order (products reference categories,
+  /// mutations/adjustments/restock items reference products) purely to match
+  /// the repo's "no orphan references" convention; Isar has no foreign keys.
+  ///
+  /// [useRawPhotoPath] selects which of a product's two mutually-exclusive
+  /// photo fields to trust — see [buildBackupData]'s doc comment on
+  /// `includePhotos`.
+  Future<void> _wipeAndImport(
+    Map<String, dynamic> data, {
+    required bool useRawPhotoPath,
+  }) async {
+    // ---- Phase 1: decode everything. No writes yet, so anything that
+    // throws here leaves the database exactly as it was.
+    final categoryObjects = [
+      for (final json in _listOf(data['categories'])) _categoryFromJson(json),
+    ];
+
+    final productObjects = <Product>[];
+    for (final json in _listOf(data['products'])) {
+      productObjects.add(await _productFromJson(json, useRawPhotoPath: useRawPhotoPath));
+    }
+
+    final mutationObjects = [
+      for (final json in _listOf(data['mutations'])) _mutationFromJson(json),
+    ];
+    final costPriceAdjustmentObjects = [
+      for (final json in _listOf(data['costPriceAdjustments']))
+        _costPriceAdjustmentFromJson(json),
+    ];
+    final restockListObjects = [
+      for (final json in _listOf(data['restockLists'])) _restockListFromJson(json),
+    ];
+    final appSettingsJson = data['appSettings'] as Map?;
+    final appSettingsObject = appSettingsJson == null
+        ? null
+        : _appSettingsFromJson(appSettingsJson.cast<String, dynamic>());
+
+    // ---- Phase 2: one transaction, one commit, one notification.
     await _isar.writeTxn(() async {
       await _isar.categories.clear();
       await _isar.products.clear();
@@ -212,62 +274,16 @@ class BackupService {
       await _isar.appSettings.clear();
       await _isar.costPriceAdjustments.clear();
       await _isar.restockLists.clear();
-    });
-  }
 
-  /// Imports one `data` map's collections into (already-wiped) Isar, in
-  /// dependency order. [useRawPhotoPath] selects which of a product's two
-  /// mutually-exclusive photo fields to trust — see [buildBackupData]'s
-  /// doc comment on `includePhotos`.
-  Future<void> _importInto(Map<String, dynamic> data, {required bool useRawPhotoPath}) async {
-    final categories = _listOf(data['categories']);
-    final products = _listOf(data['products']);
-    final mutations = _listOf(data['mutations']);
-    final costPriceAdjustments = _listOf(data['costPriceAdjustments']);
-    final restockLists = _listOf(data['restockLists']);
-    final appSettingsJson = data['appSettings'] as Map?;
-
-    await _isar.writeTxn(() async {
-      for (final json in categories) {
-        await _isar.categories.put(_categoryFromJson(json));
+      await _isar.categories.putAll(categoryObjects);
+      await _isar.products.putAll(productObjects);
+      await _isar.stockMutations.putAll(mutationObjects);
+      await _isar.costPriceAdjustments.putAll(costPriceAdjustmentObjects);
+      await _isar.restockLists.putAll(restockListObjects);
+      if (appSettingsObject != null) {
+        await _isar.appSettings.put(appSettingsObject);
       }
     });
-
-    // Photo decode/write is real file I/O — built up front, outside any
-    // writeTxn, so the transaction below is just fast Isar puts.
-    final productObjects = <Product>[];
-    for (final json in products) {
-      productObjects.add(await _productFromJson(json, useRawPhotoPath: useRawPhotoPath));
-    }
-    await _isar.writeTxn(() async {
-      for (final product in productObjects) {
-        await _isar.products.put(product);
-      }
-    });
-
-    await _isar.writeTxn(() async {
-      for (final json in mutations) {
-        await _isar.stockMutations.put(_mutationFromJson(json));
-      }
-    });
-
-    await _isar.writeTxn(() async {
-      for (final json in costPriceAdjustments) {
-        await _isar.costPriceAdjustments.put(_costPriceAdjustmentFromJson(json));
-      }
-    });
-
-    await _isar.writeTxn(() async {
-      for (final json in restockLists) {
-        await _isar.restockLists.put(_restockListFromJson(json));
-      }
-    });
-
-    if (appSettingsJson != null) {
-      await _isar.writeTxn(() async {
-        await _isar.appSettings.put(_appSettingsFromJson(appSettingsJson.cast<String, dynamic>()));
-      });
-    }
   }
 
   List<Map<String, dynamic>> _listOf(Object? value) =>

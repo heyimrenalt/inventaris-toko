@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/data/models/app_settings.dart';
 import 'package:inventaris_toko/data/models/product.dart';
 import 'package:inventaris_toko/data/models/stock_mutation.dart';
 import 'package:inventaris_toko/data/repositories/app_settings_repository.dart';
@@ -29,6 +30,26 @@ class _CountingProductRepository extends ProductRepository {
   Future<List<Product>> getAll({bool includeArchived = false}) {
     getAllCallCount++;
     return super.getAll(includeArchived: includeArchived);
+  }
+}
+
+/// Makes the *first* [getAll] slow and every later one fast, so a load that
+/// started earlier is guaranteed to finish later — the exact ordering that a
+/// stale-response guard has to survive, and which is otherwise very hard to
+/// provoke deterministically against a local Isar.
+class _SlowFirstProductRepository extends ProductRepository {
+  _SlowFirstProductRepository(super.isar, super.mutationRepository, super.settingsRepository);
+
+  int getAllCallCount = 0;
+
+  @override
+  Future<List<Product>> getAll({bool includeArchived = false}) async {
+    final isFirstCall = ++getAllCallCount == 1;
+    final products = await super.getAll(includeArchived: includeArchived);
+    if (isFirstCall) {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+    }
+    return products;
   }
 }
 
@@ -519,6 +540,184 @@ void main() {
       await triggerRefresh(tester);
 
       expect(find.byKey(const Key('beranda_priority_empty_state')), findsOneWidget);
+    });
+  });
+
+  group('reload coalescing', () {
+    testWidgets(
+      'one write touching all three watched collections causes one reload, not three',
+      (tester) async {
+        await tester.runAsync(() async {
+          final category = await categoryRepository.create('Umum');
+          await seedEligibleProduct(category.id, 'Produk 1 Hari', 1);
+
+          final countingRepository = _CountingProductRepository(
+            isar,
+            stockMutationRepository,
+            AppSettingsRepository(isar),
+          );
+
+          await tester.pumpWidget(MaterialApp(
+            locale: const Locale('id'),
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale('id')],
+            home: BerandaScreen(isar: isar, productRepository: countingRepository),
+          ));
+          await settleAfterAsyncWork(tester);
+
+          final callsBefore = countingRepository.getAllCallCount;
+
+          // Exactly what a restore's single transaction looks like from this
+          // screen's side: one commit, three watched collections notified.
+          await isar.writeTxn(() async {
+            final products = await isar.products.where().findAll();
+            await isar.products.putAll(products);
+            final mutations = await isar.stockMutations.where().findAll();
+            await isar.stockMutations.putAll(mutations);
+            final settings = await AppSettingsRepository(isar).get();
+            await isar.appSettings.put(settings);
+          });
+
+          await settleAfterAsyncWork(tester);
+
+          // Without the debounce this is three: one per watchLazy listener,
+          // all three running a full catalogue re-query concurrently.
+          expect(
+            countingRepository.getAllCallCount - callsBefore,
+            1,
+            reason: 'a burst of watchLazy events must coalesce into a single _load()',
+          );
+        });
+      },
+    );
+
+    testWidgets('a burst of separate writes still coalesces into one reload', (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Umum');
+        await seedEligibleProduct(category.id, 'Produk 1 Hari', 1);
+
+        final countingRepository = _CountingProductRepository(
+          isar,
+          stockMutationRepository,
+          AppSettingsRepository(isar),
+        );
+
+        await tester.pumpWidget(MaterialApp(
+          locale: const Locale('id'),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('id')],
+          home: BerandaScreen(isar: isar, productRepository: countingRepository),
+        ));
+        await settleAfterAsyncWork(tester);
+
+        final callsBefore = countingRepository.getAllCallCount;
+
+        // Five rapid commits, back to back, with no pump in between. Each
+        // one re-puts the row exactly as it is: the point is the commit
+        // notification, not a data change.
+        for (var i = 0; i < 5; i++) {
+          await isar.writeTxn(() async {
+            final fresh = await isar.products.where().findAll();
+            await isar.products.putAll(fresh);
+          });
+        }
+
+        await settleAfterAsyncWork(tester);
+
+        expect(countingRepository.getAllCallCount - callsBefore, 1);
+      });
+    });
+
+    testWidgets('a reload still happens after the burst — coalescing is not swallowing',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Umum');
+        await seedEligibleProduct(category.id, 'Produk 1 Hari', 1);
+
+        await pumpScreen(tester);
+        expect(find.text('1'), findsWidgets);
+
+        // Adding a product must still be reflected: the debounce delays the
+        // reload, it must never cancel the last one.
+        await productRepository.create(
+          name: 'Produk Baru',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+        await settleAfterAsyncWork(tester);
+
+        expect(find.text('2'), findsWidgets);
+      });
+    });
+  });
+
+  group('stale response guard', () {
+    testWidgets('a slow load finishing after a newer one cannot overwrite fresher data',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Umum');
+        await seedEligibleProduct(category.id, 'Produk 1 Hari', 1);
+
+        final slowRepository = _SlowFirstProductRepository(
+          isar,
+          stockMutationRepository,
+          AppSettingsRepository(isar),
+        );
+
+        await tester.pumpWidget(MaterialApp(
+          locale: const Locale('id'),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('id')],
+          home: BerandaScreen(isar: isar, productRepository: slowRepository),
+        ));
+
+        // The initState load is in flight and deliberately stuck: it has
+        // already read a one-product catalogue.
+        await tester.pump();
+
+        // A second product lands while that first load is still parked,
+        // which triggers a second, fast load that sees two products and
+        // paints first.
+        await productRepository.create(
+          name: 'Produk Baru',
+          categoryId: category.id,
+          sellPrice: 1000,
+          unit: 'pcs',
+          initialStock: 10,
+        );
+
+        // Long enough for the stalled first load to finish last and try to
+        // write its one-product result over the two-product one.
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        await settleAfterAsyncWork(tester);
+
+        expect(slowRepository.getAllCallCount, greaterThanOrEqualTo(2));
+        // Scoped to the total-products card specifically: the "perlu
+        // kulakan" card legitimately still reads 1, since the newly added
+        // product has no sales history and so isn't a restock candidate.
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('beranda_summary_total_produk')),
+            matching: find.text('2'),
+          ),
+          findsOneWidget,
+          reason: 'the stale one-product response must be discarded, not painted',
+        );
+      });
     });
   });
 }
