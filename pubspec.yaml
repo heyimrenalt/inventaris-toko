@@ -89,6 +89,13 @@ dev_dependencies:
 
   flutter_native_splash: ^2.4.6
 
+  # Test-only: used by test/ui/screens/splash_min_duration_test.dart to
+  # advance virtual time past the splash's minimum-duration gate without
+  # spending real wall-clock seconds. Already present transitively (
+  # flutter_test depends on it); declared here so the import is explicit,
+  # same as `archive` above.
+  fake_async: ^1.3.0
+
 # Generates the Android launcher icons from the brand PNGs. Regenerate
 # with `dart run flutter_launcher_icons` after changing anything here.
 flutter_launcher_icons:

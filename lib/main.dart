@@ -10,6 +10,8 @@ import 'data/migrations/mutation_snapshot_backfill.dart';
 import 'data/repositories/app_settings_repository.dart';
 import 'services/notification_service.dart';
 import 'ui/navigation/main_scaffold.dart';
+import 'ui/screens/splash_min_duration.dart';
+import 'ui/screens/splash_screen.dart';
 import 'ui/theme/app_theme.dart';
 
 void main() {
@@ -33,8 +35,28 @@ void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  /// Floor on how long the splash stays up. See [withMinimumDuration] for
+  /// why startup is deliberately not allowed to be instant.
+  static const minimumSplashDuration = Duration(milliseconds: 1500);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  /// Created once here rather than in `build()`: a FutureBuilder whose
+  /// future is rebuilt on every MaterialApp rebuild would re-run the whole
+  /// open-and-migrate sequence and throw the app back to the splash.
+  late final Future<Isar> _initFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture = _initWithMinDuration();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +78,10 @@ class MyApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('id')],
       home: FutureBuilder<Isar>(
-        future: _openAndInitialize(),
+        future: _initFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const SplashScreen();
           }
           if (snapshot.hasError) {
             return Scaffold(
@@ -74,6 +94,24 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+
+  /// Runs startup behind the splash's minimum-duration floor, and reports
+  /// how long the real work actually took. The timing is console-only
+  /// observability — nothing branches on it — and the case worth watching
+  /// (the post-upgrade backfill on a real device with real data) is one no
+  /// dev-machine run can reproduce.
+  Future<Isar> _initWithMinDuration() async {
+    final stopwatch = Stopwatch()..start();
+    // Timed around the real work only, not around the gate — a number that
+    // reads 1500ms on every fast launch would tell us nothing.
+    final init = _openAndInitialize().whenComplete(() {
+      stopwatch.stop();
+      debugPrint(
+        '[splash] init completed in ${stopwatch.elapsedMilliseconds}ms',
+      );
+    });
+    return withMinimumDuration(init, MyApp.minimumSplashDuration);
   }
 
   Future<Isar> _openAndInitialize() async {
