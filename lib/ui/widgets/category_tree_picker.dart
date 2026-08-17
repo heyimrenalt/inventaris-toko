@@ -13,6 +13,12 @@ import 'category_form_dialog.dart';
 
 enum _SelectionType { all, uncategorized, category }
 
+/// Leading gutter width for special picker rows ("Semua" / "Lainnya" —
+/// see [_SpecialPickerRow]) that must align with the chevron slot inside
+/// [_CategoryPickerNode]. Deliberately off the spacing scale: if you
+/// change one site, change both, or the tree rows stop lining up.
+const double _kLeadingGutterWidth = 28.0;
+
 /// What the user picked from a [CategoryTreePicker]: either "Semua" (all
 /// products, filter-only), "Lainnya" (uncategorized), or a specific
 /// category node (identified by [categoryId], with [breadcrumb] as its
@@ -309,7 +315,7 @@ class _SpecialPickerRow extends StatelessWidget {
           padding: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.sm),
           child: Row(
             children: [
-              const SizedBox(width: 28),
+              const SizedBox(width: _kLeadingGutterWidth),
               Expanded(
                 child: InkWell(
                   onTap: onTap,
@@ -374,7 +380,7 @@ class _CategoryPickerNode extends StatelessWidget {
               children: [
                 for (var i = 0; i < depth; i++) _buildIndentGuide(),
                 SizedBox(
-                  width: 28,
+                  width: _kLeadingGutterWidth,
                   child: children.isEmpty
                       ? null
                       : IconButton(

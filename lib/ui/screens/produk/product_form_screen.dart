@@ -568,8 +568,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ),
-                  // TODO(ui-migration): 28 is off the spacing scale (xl=20, xxl=24);
-                  // rounding either way would move the layout.
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
