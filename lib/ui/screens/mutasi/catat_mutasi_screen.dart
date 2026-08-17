@@ -86,11 +86,8 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
     final settings = await _appSettingsRepository.get();
     final products = await _productRepository.getAll();
 
-    final stockOutByProduct = <int, List<StockMutation>>{};
-    for (final product in products) {
-      stockOutByProduct[product.id] =
-          await _mutationRepository.getStockOutHistoryForProduct(product.id);
-    }
+    final stockOutByProduct = await _mutationRepository
+        .getStockOutHistoryForProducts(products.map((product) => product.id));
 
     final results = _calculator.calculateAll(
       products: products,

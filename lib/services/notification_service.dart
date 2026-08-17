@@ -7,7 +7,6 @@ import 'package:workmanager/workmanager.dart';
 import '../data/isar_service.dart';
 import '../data/models/app_settings.dart';
 import '../data/models/product.dart';
-import '../data/models/stock_mutation.dart';
 import '../data/repositories/app_settings_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/repositories/stock_mutation_repository.dart';
@@ -564,11 +563,8 @@ class NotificationService {
     final totals = await mutationRepository.getTotalsSince(startOfDay);
     final soldToday = totals.stockOut.round();
 
-    final stockOutByProduct = <int, List<StockMutation>>{};
-    for (final product in products) {
-      stockOutByProduct[product.id] =
-          await mutationRepository.getStockOutHistoryForProduct(product.id);
-    }
+    final stockOutByProduct = await mutationRepository
+        .getStockOutHistoryForProducts(products.map((product) => product.id));
 
     const calculator = PrioritasKulakanCalculator();
     final results = calculator.calculateAll(

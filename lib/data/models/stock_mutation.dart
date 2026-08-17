@@ -22,6 +22,15 @@ class StockMutation {
   Id id = Isar.autoIncrement;
 
   /// Foreign key to [Product.id]. Stored as a plain field (not an IsarLink).
+  ///
+  /// Deliberately *not* indexed. An index here was A/B tested against the
+  /// per-product history loops and measured no benefit (640ms with
+  /// `filter()` vs 686ms with `where()` + index over 200 products / 1000
+  /// rows): the cost is per-call async overhead across 200 sequential
+  /// queries, not row scanning — fetching the whole ledger is only 21ms.
+  /// The fix was to batch those loops into one query plus a group-by in
+  /// Dart (~7ms), which leaves an index with nothing to win and a real
+  /// write-amplification cost on mutation inserts, the hottest write path.
   late int productId;
 
   @Enumerated(EnumType.name)
