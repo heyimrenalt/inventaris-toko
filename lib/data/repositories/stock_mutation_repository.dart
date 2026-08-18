@@ -475,18 +475,6 @@ class StockMutationRepository {
   }
 }
 
-/// The span of sale dates behind a profit figure — see
-/// [StockMutationRepository.getProfitableStockOutDateRange]. Both ends are
-/// real `createdAt` instants of qualifying mutations, in local time;
-/// [earliest] and [latest] are the same instant when only one sale
-/// qualifies.
-class ProfitDateRange {
-  const ProfitDateRange({required this.earliest, required this.latest});
-
-  final DateTime earliest;
-  final DateTime latest;
-}
-
 class StockMutationTotals {
   const StockMutationTotals({required this.stockIn, required this.stockOut});
 

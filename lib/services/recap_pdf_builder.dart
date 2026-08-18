@@ -29,56 +29,6 @@ String formatRecapCurrency(num value) {
 String _formatQty(double value) =>
     value == value.roundToDouble() ? value.toInt().toString() : value.toString();
 
-/// Printed as the period when the report covers all time but the ledger
-/// holds no mutations at all — there is no earliest date to report, and
-/// inventing one (or falling back to the epoch) would be a lie. Public so
-/// the PDF and its tests refer to the same string.
-const String kRecapNoTransactionsPeriod = 'Belum ada transaksi';
-
-/// The reporting-period label used in the PDF header.
-///
-/// A bounded window prints exactly the range that was selected, formatted
-/// as a `d MMM yyyy` range (collapsed to a single date when start and end
-/// fall on the same day) — the same format the on-screen filter uses.
-///
-/// "Semua" (all-time) is **resolved to a real range** rather than printed
-/// as the uninformative "Semua Periode": it runs from
-/// [earliestMutationAt]'s calendar day — the `createdAt` of the oldest
-/// mutation in the database, see
-/// `StockMutationRepository.getEarliestMutationDate` — through [today],
-/// the day the PDF is generated. Both ends are reduced to their *local*
-/// calendar day, matching how [ReportPeriod] computes filter boundaries,
-/// so a mutation recorded late in the evening still reports its own day.
-///
-/// With no mutations at all ([earliestMutationAt] is null) there is no
-/// honest range, so [kRecapNoTransactionsPeriod] is printed instead.
-/// A single mutation — or one recorded today — yields start == end, which
-/// is valid and collapses to that one date.
-String recapPeriodLabel(
-  ReportPeriod period, {
-  DateTime? earliestMutationAt,
-  DateTime? today,
-}) {
-  final format = DateFormat('d MMM yyyy', 'id_ID');
-
-  if (period.isAllTime) {
-    if (earliestMutationAt == null) return kRecapNoTransactionsPeriod;
-    final start = _dayOf(earliestMutationAt);
-    final end = _dayOf(today ?? DateTime.now());
-    return _range(format, start, end);
-  }
-
-  return _range(format, period.startDay!, period.endDay!);
-}
-
-DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
-
-String _range(DateFormat format, DateTime startDay, DateTime endDay) {
-  final start = format.format(startDay);
-  final end = format.format(endDay);
-  return start == end ? start : '$start - $end';
-}
-
 /// The fonts embedded in the recap PDF. Bundling a TrueType font (rather
 /// than relying on the PDF standard Type1 Helvetica, which only covers
 /// Latin-1) is what lets non-ASCII product names render correctly.
@@ -116,13 +66,15 @@ Future<RecapPdfFonts> loadRecapPdfFonts() async {
 /// - [report]     the profit figures to render (totals + per-product lines).
 /// - [shopName]   shown as the header title when non-empty; otherwise a
 ///                generic "Rekap Keuntungan Toko" title is used.
-/// - [generatedAt] the "dibuat" timestamp; defaults to [DateTime.now]. It
-///                is also the end of the resolved range for an all-time
-///                report ("today").
-/// - [earliestMutationAt] the `createdAt` of the oldest mutation in the
-///                database, used only to resolve an all-time period into a
-///                real date range. Null (or omitted) for a bounded period,
-///                and null for an empty ledger — see [recapPeriodLabel].
+/// - [generatedAt] the "Dibuat:" timestamp; defaults to [DateTime.now].
+///                It says when the document was printed and nothing more —
+///                it is deliberately *not* an end date for [periodLabel].
+/// - [periodLabel] the finished "Periode:" string, built by the caller
+///                with `buildPeriodLabel`. Taken as a string rather than
+///                re-derived here so the PDF header cannot say anything
+///                different from the screen the user pressed Share on;
+///                it also keeps this builder free of any dependency on
+///                the UI layer or the repository.
 /// - [fonts]      embedded font faces; when null the PDF falls back to the
 ///                built-in Helvetica (Latin-1 only).
 ///
@@ -131,9 +83,9 @@ Future<RecapPdfFonts> loadRecapPdfFonts() async {
 /// message below.
 Future<Uint8List> buildRecapPdf({
   required ProfitReport report,
+  required String periodLabel,
   String? shopName,
   DateTime? generatedAt,
-  DateTime? earliestMutationAt,
   RecapPdfFonts? fonts,
 }) async {
   final timestamp = generatedAt ?? DateTime.now();
@@ -149,11 +101,6 @@ Future<Uint8List> buildRecapPdf({
 
   final timestampLabel =
       DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(timestamp);
-  final periodLabel = recapPeriodLabel(
-    report.period,
-    earliestMutationAt: earliestMutationAt,
-    today: timestamp,
-  );
 
   doc.addPage(
     pw.MultiPage(

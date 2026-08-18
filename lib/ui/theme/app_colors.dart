@@ -20,9 +20,17 @@ abstract final class AppColors {
 
   static const darkText = Color(0xFF1C1C1C);
   static const gray700 = Color(0xFF616161);
+
+  /// #757575 — Material grey 600, for medium-emphasis secondary text.
+  static const gray600 = Color(0xFF757575);
+
   static const gray500 = Color(0xFF9E9E9E);
   static const gray300 = Color(0xFFE0E0E0);
   static const gray100 = Color(0xFFF5F5F5);
+
+  /// #FAFAFA — near-white, for subtle secondary container fills.
+  static const gray50 = Color(0xFFFAFAFA);
+
   static const white = Color(0xFFFFFFFF);
 
   /// The page background behind white cards — deliberately a shade darker

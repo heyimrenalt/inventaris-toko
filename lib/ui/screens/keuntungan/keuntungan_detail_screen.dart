@@ -453,7 +453,14 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
                             children: [
                               Text(
                                 _formatDate(date),
-                                style: AppTextStyles.body,
+                                // caption (12) rather than body (14) so this
+                                // row matches the amount beside it and stays
+                                // below the header's own "N hari transaksi"
+                                // subtitle. caption carries gray700, so the
+                                // original dark label colour is restored.
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.darkText,
+                                ),
                               ),
                               Text(
                                 _formatCurrency(dayProfit),

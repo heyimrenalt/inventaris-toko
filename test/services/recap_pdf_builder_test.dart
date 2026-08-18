@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:inventaris_toko/domain/profit_report.dart';
 import 'package:inventaris_toko/services/recap_pdf_builder.dart';
+import 'package:inventaris_toko/ui/widgets/report_period_filter.dart';
 
 /// Builds a [ProfitReport] with [count] synthetic product lines. Each line
 /// carries plausible revenue/cost so totals and per-line averages are
@@ -50,6 +51,7 @@ void main() {
     test('returns non-empty bytes beginning with the %PDF header', () async {
       final bytes = await buildRecapPdf(
         report: _report(count: 3),
+        periodLabel: '3 Jan 2026 - 11 Agu 2026 (Semua)',
         generatedAt: _fixedDate,
       );
       expect(bytes, isNotEmpty);
@@ -59,6 +61,7 @@ void main() {
     test('handles an empty product list without throwing', () async {
       final bytes = await buildRecapPdf(
         report: const ProfitReport.empty(ReportPeriod.allTime()),
+        periodLabel: kRecapNoTransactionsPeriod,
         generatedAt: _fixedDate,
       );
       expect(bytes, isNotEmpty);
@@ -68,6 +71,7 @@ void main() {
     test('handles 60+ products without throwing (pagination path)', () async {
       final bytes = await buildRecapPdf(
         report: _report(count: 75),
+        periodLabel: '3 Jan 2026 - 11 Agu 2026 (Semua)',
         generatedAt: _fixedDate,
       );
       expect(bytes, isNotEmpty);
@@ -78,6 +82,7 @@ void main() {
       final longName = 'A' * 200;
       final bytes = await buildRecapPdf(
         report: _report(count: 1, name: (_) => longName),
+        periodLabel: '3 Jan 2026 - 11 Agu 2026 (Semua)',
         generatedAt: _fixedDate,
       );
       expect(bytes, isNotEmpty);
@@ -92,6 +97,7 @@ void main() {
       );
       final bytes = await buildRecapPdf(
         report: _report(count: 5, period: period),
+        periodLabel: buildPeriodLabel(period),
         generatedAt: _fixedDate,
       );
       expect(bytes.sublist(0, 4), equals(_pdfMagic));

@@ -50,6 +50,16 @@ abstract final class AppTextStyles {
     color: AppColors.darkText,
   );
 
+  /// 28px bold — display number for prominent headline figures (e.g. the
+  /// profit headline), sitting between [heading] (20) and [statNumber] (32).
+  /// Structured like [statNumber] so call sites can move between the two.
+  static const displayNumber = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: AppColors.darkText,
+  );
+
   static const stockNumber = TextStyle(
     fontFamily: fontFamily,
     fontSize: 17,

@@ -276,3 +276,20 @@ class ProfitReportBuilder {
     );
   }
 }
+
+/// The span of sale dates behind a profit figure — see
+/// [StockMutationRepository.getProfitableStockOutDateRange]. Both ends are
+/// real `createdAt` instants of qualifying mutations, in local time;
+/// [earliest] and [latest] are the same instant when only one sale
+/// qualifies.
+///
+/// Lives in the domain layer rather than beside the repository that
+/// produces it because the *label* built from it is rendered by the UI and
+/// by the PDF, neither of which should have to import Isar to name a date
+/// range.
+class ProfitDateRange {
+  const ProfitDateRange({required this.earliest, required this.latest});
+
+  final DateTime earliest;
+  final DateTime latest;
+}

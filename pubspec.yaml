@@ -77,6 +77,13 @@ dev_dependencies:
   isar_community_generator: ^3.3.2
   build_runner: ^2.15.1
 
+  # Test-only: the `pdf` package deflates its content streams, so asserting
+  # on the text a generated PDF actually contains means inflating them
+  # first. Already present transitively (pdf depends on it); declared here
+  # so the import in test/services/recap_period_label_test.dart is explicit
+  # rather than relying on another package's dependency.
+  archive: ^4.0.0
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

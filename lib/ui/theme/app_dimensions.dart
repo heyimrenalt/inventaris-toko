@@ -14,6 +14,13 @@ abstract final class AppDimensions {
   /// between [badgeRadius] and [inputRadius].
   static const stockBadgeRadius = 10.0;
 
+  // Icon sizes — Material standard scale.
+  static const iconXs = 16.0;
+  static const iconSm = 18.0;
+  static const iconMd = 20.0;
+  static const iconLg = 24.0;
+  static const iconXl = 32.0;
+
   static const cardShadow = [
     BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, 2)),
     BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),

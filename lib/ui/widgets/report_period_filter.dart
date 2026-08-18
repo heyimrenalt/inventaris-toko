@@ -6,12 +6,65 @@ import 'date_range_picker_sheet.dart';
 
 /// Formats a [ReportPeriod] for display. Shared with any caller that
 /// needs to label which period a set of numbers belongs to.
+///
+/// For an all-time period this returns the bare word "Semua", which says
+/// nothing about *which* dates the numbers cover. Prefer
+/// [buildPeriodLabel]: it is the label every output actually renders, and
+/// it resolves "Semua" into the real span of the sales behind the figures.
 String formatReportPeriod(ReportPeriod period) {
   if (period.isAllTime) return 'Semua';
   final format = DateFormat('d MMM yyyy', 'id_ID');
   final start = format.format(period.startDay!);
   final end = format.format(period.endDay!);
   return start == end ? start : '$start - $end';
+}
+
+/// Printed as the period when the report covers all time but no sale
+/// qualifies for the profit calculation — there is no date range to
+/// report, and inventing one (or falling back to the epoch) would be a
+/// lie. Public so every renderer and its tests refer to the same string.
+const String kRecapNoTransactionsPeriod = 'Belum ada transaksi';
+
+/// **The** period label. Every surface that names the period of a profit
+/// report — the Detail Keuntungan sub-text, the Rekap Keuntungan
+/// "Periode:" line, the copied recap text, the share subject and the PDF
+/// header — renders the string this function returns, so they cannot
+/// disagree about the same report.
+///
+/// * A bounded period prints exactly the range that was selected
+///   ([formatReportPeriod], collapsed to one date when start == end).
+///   [allTimeRange] is ignored: a selected window must never be widened by
+///   the data that happens to sit outside it.
+/// * All-time resolves to `"<earliest sale> - <latest sale> (Semua)"`,
+///   collapsing to `"<date> (Semua)"` for a single sale. [allTimeRange]
+///   must come from `StockMutationRepository.getProfitableStockOutDateRange`,
+///   whose predicate — a stock-out whose sell *and* cost price both
+///   resolve — is deliberately the same one the profit total uses. Any
+///   looser source (the oldest mutation of any type, say, or "today")
+///   would put dates in the label that contributed nothing to the figure
+///   printed beside it.
+/// * All-time with no qualifying sale yields [kRecapNoTransactionsPeriod].
+///
+/// Note what is *absent*: the clock. The end of an all-time range is the
+/// latest sale, never `DateTime.now()` — the period describes the data,
+/// not the moment the report was printed. (The PDF states its generation
+/// time separately, on its own "Dibuat:" line.)
+String buildPeriodLabel(ReportPeriod period, {ProfitDateRange? allTimeRange}) {
+  if (!period.isAllTime) return formatReportPeriod(period);
+  if (allTimeRange == null) return kRecapNoTransactionsPeriod;
+
+  // Routed through ReportPeriod/formatReportPeriod rather than a second
+  // date formatter of its own, so the resolved span reads exactly like
+  // every other period label in the app. ReportPeriod's future-end
+  // clamping is neutralised by passing the latest sale as `today`: these
+  // are recorded dates, not a range to be sanity-checked against now.
+  final span = ReportPeriod.days(
+    allTimeRange.earliest,
+    allTimeRange.latest,
+    today: allTimeRange.latest,
+  );
+  return '${formatReportPeriod(span)} '
+      '(${formatReportPeriod(const ReportPeriod.allTime())})';
 }
 
 /// The warning shown when an inverted range somehow reaches
