@@ -61,6 +61,7 @@ dependencies:
   pdf: ^3.12.0
   printing: ^5.14.3
   intl: ^0.20.2
+  flutter_svg: ^2.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -84,6 +85,43 @@ dev_dependencies:
   # rather than relying on another package's dependency.
   archive: ^4.0.0
 
+  flutter_launcher_icons: ^0.14.4
+
+  flutter_native_splash: ^2.4.6
+
+# Generates the Android launcher icons from the brand PNGs. Regenerate
+# with `dart run flutter_launcher_icons` after changing anything here.
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/branding/logo.png"
+  # Matches flutter.minSdkVersion (24) used by android/app/build.gradle.kts;
+  # >= 26 is what actually enables the adaptive-icon output.
+  min_sdk_android: 24
+  adaptive_icon_background: "#00AA13"
+  adaptive_icon_foreground: "assets/branding/logo_foreground.png"
+  remove_alpha_ios: false
+
+# Generates the native (pre-Flutter) splash screen: a white background with
+# the brand logo, matching the Flutter SplashScreen that takes over once the
+# engine is up, so the handoff reads as one continuous screen. Regenerate
+# with `dart run flutter_native_splash:create` after changing anything here.
+# Uses splash_icon.png rather than logo.png: it is a 288x288 canvas holding
+# a 200x200 badge, so the native splash draws a small centered mark with
+# breathing room instead of the full-bleed 1024px launcher art.
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/branding/splash_icon.png"
+  android_12:
+    color: "#FFFFFF"
+    image: "assets/branding/splash_icon.png"
+    icon_background_color: "#FFFFFF"
+  android: true
+  ios: false
+  web: false
+  # Deliberately not fullscreen: keeping the status bar visible means it
+  # doesn't pop in when Flutter takes over and draws its own splash.
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -97,7 +135,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/icon/app_icon.png
+    - assets/branding/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

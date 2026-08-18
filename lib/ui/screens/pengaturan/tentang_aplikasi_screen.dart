@@ -8,6 +8,7 @@ import '../../theme/app_dimensions.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_logo.dart';
 
 /// Simple, static "about" page — no external links and nothing editable,
 /// since this is an offline-first app with no feedback/support surface to
@@ -95,7 +96,7 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                     onTap: _onIconTap,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppDimensions.pillRadius),
-                      child: Image.asset('assets/icon/app_icon.png', width: 84, height: 84),
+                      child: const AppLogo(size: 84),
                     ),
                   ),
                   const SizedBox(height: 14),

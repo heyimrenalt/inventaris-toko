@@ -242,7 +242,7 @@ class NotificationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   static Future<void> initialize() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
     const initSettings = InitializationSettings(android: androidInit);
 
     final plugin = FlutterLocalNotificationsPlugin();
