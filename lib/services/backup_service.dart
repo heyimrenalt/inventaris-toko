@@ -81,7 +81,7 @@ class BackupService {
 
   /// Writes a full backup (with photos) to a new file named
   /// `inventaris_backup_{yyyy-MM-dd_HH-mm-ss}.json` inside [directory], and
-  /// records the export time on [AppSettings.lastBackupAt]. Returns the
+  /// records the write time on [AppSettings.lastGeneratedAt]. Returns the
   /// written [File].
   ///
   /// The final JSON stringification — the one part of a large export
@@ -98,7 +98,7 @@ class BackupService {
     final file = File(p.join(directory.path, fileName));
     await file.writeAsString(jsonString);
 
-    await AppSettingsRepository(_isar).updateLastBackupAt(effectiveNow);
+    await AppSettingsRepository(_isar).updateLastGeneratedAt(effectiveNow);
 
     return file;
   }
@@ -469,7 +469,10 @@ class BackupService {
 
   Map<String, dynamic> _appSettingsToJson(AppSettings settings) => {
         'defaultMinStockThreshold': settings.defaultMinStockThreshold,
-        'lastBackupAt': settings.lastBackupAt?.toIso8601String(),
+        // JSON key intentionally stays `lastBackupAt` (v1 compatibility)
+        // even though the Dart field is now `lastGeneratedAt`.
+        'lastBackupAt': settings.lastGeneratedAt?.toIso8601String(),
+        'lastExportedAt': settings.lastExportedAt?.toIso8601String(),
         'dailySummaryEnabled': settings.dailySummaryEnabled,
         'dailySummaryHour': settings.dailySummaryHour,
         'dailySummaryMinute': settings.dailySummaryMinute,
@@ -488,7 +491,9 @@ class BackupService {
   AppSettings _appSettingsFromJson(Map<String, dynamic> json) => AppSettings()
     ..id = 0
     ..defaultMinStockThreshold = (json['defaultMinStockThreshold'] as num).toDouble()
-    ..lastBackupAt = _parseNullableDate(json['lastBackupAt'])
+    ..lastGeneratedAt = _parseNullableDate(json['lastBackupAt'])
+    // Absent in v1 backups written before the split — parses to null.
+    ..lastExportedAt = _parseNullableDate(json['lastExportedAt'])
     ..dailySummaryEnabled = json['dailySummaryEnabled'] as bool
     ..dailySummaryHour = json['dailySummaryHour'] as int
     ..dailySummaryMinute = json['dailySummaryMinute'] as int

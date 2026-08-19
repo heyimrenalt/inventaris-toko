@@ -13,6 +13,7 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../services/backup_service.dart';
 import '../../../services/data_wipe_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/share_export_outcome.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
@@ -479,11 +480,13 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     );
   }
 
-  String _formatLastBackupSubtitle(DateTime? lastBackupAt) {
-    if (lastBackupAt == null) return 'Belum pernah dicadangkan';
-    final day = DateTime(lastBackupAt.year, lastBackupAt.month, lastBackupAt.day);
-    final hour = lastBackupAt.hour.toString().padLeft(2, '0');
-    final minute = lastBackupAt.minute.toString().padLeft(2, '0');
+  /// Shows [AppSettings.lastExportedAt] — when a backup actually left the
+  /// phone — not when a file was merely written to app storage.
+  String _formatLastBackupSubtitle(DateTime? lastExportedAt) {
+    if (lastExportedAt == null) return 'Belum pernah dicadangkan';
+    final day = DateTime(lastExportedAt.year, lastExportedAt.month, lastExportedAt.day);
+    final hour = lastExportedAt.hour.toString().padLeft(2, '0');
+    final minute = lastExportedAt.minute.toString().padLeft(2, '0');
     return 'Terakhir dicadangkan: ${formatDayLabel(day)} $hour.$minute';
   }
 
@@ -557,13 +560,22 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       try {
         // Best-effort and deliberately its own try/catch, separate from
         // the export above: the backup file itself is already safely
-        // written and AppSettings.lastBackupAt already updated by this
+        // written and AppSettings.lastGeneratedAt already updated by this
         // point, so a cancelled/failed share sheet (no share-target app,
         // or — under `flutter test` — no platform channel at all) must
         // never be reported as a backup failure.
-        await SharePlus.instance.share(
+        final result = await SharePlus.instance.share(
           ShareParams(files: [XFile(file.path)], text: 'Backup data Inventaris Toko'),
         );
+        // TEMPORARY: kept so the real status Android returns (especially
+        // whether `unavailable` ever shows up) can be read off a device
+        // log — it can't be observed under `flutter test`.
+        debugPrint('[backup] share result: ${result.status}');
+        if (shouldRecordExport(result.status)) {
+          final updated = await _settingsRepository.updateLastExportedAt(DateTime.now());
+          if (!mounted) return;
+          setState(() => _settings = updated);
+        }
       } catch (_) {
         // Ignored — see above.
       }
@@ -718,7 +730,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
             // token (AppTextStyles.caption) is 12px and gray700, changing both
             // size and color. Left raw (applies to every subtitle below).
             subtitle: Text(
-              _formatLastBackupSubtitle(settings?.lastBackupAt),
+              _formatLastBackupSubtitle(settings?.lastExportedAt),
               style: const TextStyle(fontSize: 13),
             ),
             trailing: const Icon(Icons.chevron_right),

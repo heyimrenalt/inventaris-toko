@@ -82,18 +82,23 @@ const AppSettingsSchema = CollectionSchema(
       name: r'lastBackupAt',
       type: IsarType.dateTime,
     ),
-    r'mutationPriceSnapshotBackfillDone': PropertySchema(
+    r'lastExportedAt': PropertySchema(
       id: 13,
+      name: r'lastExportedAt',
+      type: IsarType.dateTime,
+    ),
+    r'mutationPriceSnapshotBackfillDone': PropertySchema(
+      id: 14,
       name: r'mutationPriceSnapshotBackfillDone',
       type: IsarType.bool,
     ),
     r'restockCoverDays': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'restockCoverDays',
       type: IsarType.long,
     ),
     r'restockLeadTimeDays': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'restockLeadTimeDays',
       type: IsarType.long,
     ),
@@ -141,10 +146,11 @@ void _appSettingsSerialize(
   writer.writeLong(offsets[9], object.dailySummaryHour);
   writer.writeLong(offsets[10], object.dailySummaryMinute);
   writer.writeDouble(offsets[11], object.defaultMinStockThreshold);
-  writer.writeDateTime(offsets[12], object.lastBackupAt);
-  writer.writeBool(offsets[13], object.mutationPriceSnapshotBackfillDone);
-  writer.writeLong(offsets[14], object.restockCoverDays);
-  writer.writeLong(offsets[15], object.restockLeadTimeDays);
+  writer.writeDateTime(offsets[12], object.lastGeneratedAt);
+  writer.writeDateTime(offsets[13], object.lastExportedAt);
+  writer.writeBool(offsets[14], object.mutationPriceSnapshotBackfillDone);
+  writer.writeLong(offsets[15], object.restockCoverDays);
+  writer.writeLong(offsets[16], object.restockLeadTimeDays);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -167,10 +173,11 @@ AppSettings _appSettingsDeserialize(
   object.dailySummaryMinute = reader.readLong(offsets[10]);
   object.defaultMinStockThreshold = reader.readDouble(offsets[11]);
   object.id = id;
-  object.lastBackupAt = reader.readDateTimeOrNull(offsets[12]);
-  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[13]);
-  object.restockCoverDays = reader.readLong(offsets[14]);
-  object.restockLeadTimeDays = reader.readLong(offsets[15]);
+  object.lastGeneratedAt = reader.readDateTimeOrNull(offsets[12]);
+  object.lastExportedAt = reader.readDateTimeOrNull(offsets[13]);
+  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[14]);
+  object.restockCoverDays = reader.readLong(offsets[15]);
+  object.restockLeadTimeDays = reader.readLong(offsets[16]);
   return object;
 }
 
@@ -208,10 +215,12 @@ P _appSettingsDeserializeProp<P>(
     case 12:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 13:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 14:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 15:
+      return (reader.readLong(offset)) as P;
+    case 16:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1019,7 +1028,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtIsNull() {
+  lastGeneratedAtIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const FilterCondition.isNull(property: r'lastBackupAt'),
@@ -1028,7 +1037,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtIsNotNull() {
+  lastGeneratedAtIsNotNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const FilterCondition.isNotNull(property: r'lastBackupAt'),
@@ -1037,7 +1046,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtEqualTo(DateTime? value) {
+  lastGeneratedAtEqualTo(DateTime? value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(property: r'lastBackupAt', value: value),
@@ -1046,7 +1055,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtGreaterThan(DateTime? value, {bool include = false}) {
+  lastGeneratedAtGreaterThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(
@@ -1059,7 +1068,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtLessThan(DateTime? value, {bool include = false}) {
+  lastGeneratedAtLessThan(DateTime? value, {bool include = false}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.lessThan(
@@ -1072,7 +1081,7 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
-  lastBackupAtBetween(
+  lastGeneratedAtBetween(
     DateTime? lower,
     DateTime? upper, {
     bool includeLower = true,
@@ -1082,6 +1091,79 @@ extension AppSettingsQueryFilter
       return query.addFilterCondition(
         FilterCondition.between(
           property: r'lastBackupAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastExportedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastExportedAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastExportedAt', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastExportedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastExportedAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastExportedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastExportedAt',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -1390,16 +1472,29 @@ extension AppSettingsQuerySortBy
     });
   }
 
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByLastBackupAt() {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByLastGeneratedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastBackupAt', Sort.asc);
     });
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
-  sortByLastBackupAtDesc() {
+  sortByLastGeneratedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastBackupAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByLastExportedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastExportedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByLastExportedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastExportedAt', Sort.desc);
     });
   }
 
@@ -1628,16 +1723,29 @@ extension AppSettingsQuerySortThenBy
     });
   }
 
-  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByLastBackupAt() {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByLastGeneratedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastBackupAt', Sort.asc);
     });
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
-  thenByLastBackupAtDesc() {
+  thenByLastGeneratedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastBackupAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByLastExportedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastExportedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByLastExportedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastExportedAt', Sort.desc);
     });
   }
 
@@ -1770,9 +1878,16 @@ extension AppSettingsQueryWhereDistinct
     });
   }
 
-  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByLastBackupAt() {
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByLastGeneratedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastBackupAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByLastExportedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastExportedAt');
     });
   }
 
@@ -1890,9 +2005,16 @@ extension AppSettingsQueryProperty
   }
 
   QueryBuilder<AppSettings, DateTime?, QQueryOperations>
-  lastBackupAtProperty() {
+  lastGeneratedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastBackupAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, DateTime?, QQueryOperations>
+  lastExportedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastExportedAt');
     });
   }
 

@@ -25,7 +25,8 @@ class AppSettingsRepository {
     final defaults = AppSettings()
       ..id = _singletonId
       ..defaultMinStockThreshold = _defaultMinStockThreshold
-      ..lastBackupAt = null
+      ..lastGeneratedAt = null
+      ..lastExportedAt = null
       ..dailySummaryEnabled = true
       ..dailySummaryHour = 20
       ..dailySummaryMinute = 0
@@ -209,9 +210,20 @@ class AppSettingsRepository {
     return settings;
   }
 
-  Future<AppSettings> updateLastBackupAt(DateTime timestamp) async {
+  Future<AppSettings> updateLastGeneratedAt(DateTime timestamp) async {
     final settings = await get();
-    settings.lastBackupAt = timestamp;
+    settings.lastGeneratedAt = timestamp;
+
+    await _isar.writeTxn(() async {
+      await _isar.appSettings.put(settings);
+    });
+
+    return settings;
+  }
+
+  Future<AppSettings> updateLastExportedAt(DateTime timestamp) async {
+    final settings = await get();
+    settings.lastExportedAt = timestamp;
 
     await _isar.writeTxn(() async {
       await _isar.appSettings.put(settings);

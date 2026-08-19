@@ -23,7 +23,7 @@ void main() {
     final settings = await repository.get();
     expect(settings.id, 0);
     expect(settings.defaultMinStockThreshold, 5);
-    expect(settings.lastBackupAt, isNull);
+    expect(settings.lastGeneratedAt, isNull);
     expect(settings.dailySummaryEnabled, isTrue);
     expect(settings.dailySummaryHour, 20);
     expect(settings.dailySummaryMinute, 0);

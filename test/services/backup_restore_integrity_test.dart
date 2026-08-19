@@ -409,16 +409,16 @@ void main() {
       expect(await isar.appSettings.get(7), isNull);
     });
 
-    test('via a real backup file on disk, lastBackupAt is the only difference', () async {
+    test('via a real backup file on disk, lastGeneratedAt is the only difference', () async {
       final file = await backupService.exportToFile(
         directory: tempDir,
         now: DateTime(2026, 8, 17, 12, 30, 15),
       );
-      // exportToFile stamps lastBackupAt *after* building the payload, so the
+      // exportToFile stamps lastGeneratedAt *after* building the payload, so the
       // file necessarily carries the pre-export value. That is the one field
       // a file round trip legitimately rewinds; everything else must match.
       final snapshotBefore = await _snapshotModels(isar, includePhotoPath: false);
-      expect((await settingsRepository.get()).lastBackupAt, DateTime(2026, 8, 17, 12, 30, 15));
+      expect((await settingsRepository.get()).lastGeneratedAt, DateTime(2026, 8, 17, 12, 30, 15));
 
       final parsed = await backupService.validateAndParse(await file.readAsString());
       await wipeEverything();
@@ -426,10 +426,10 @@ void main() {
 
       final snapshotAfter = await _snapshotModels(isar, includePhotoPath: false);
 
-      expect(snapshotAfter['appSettings']!.single['lastBackupAt'], isNull,
-          reason: 'the file was written before lastBackupAt was stamped');
-      snapshotAfter['appSettings']!.single.remove('lastBackupAt');
-      snapshotBefore['appSettings']!.single.remove('lastBackupAt');
+      expect(snapshotAfter['appSettings']!.single['lastGeneratedAt'], isNull,
+          reason: 'the file was written before lastGeneratedAt was stamped');
+      snapshotAfter['appSettings']!.single.remove('lastGeneratedAt');
+      snapshotBefore['appSettings']!.single.remove('lastGeneratedAt');
       expect(snapshotAfter, equals(snapshotBefore));
     });
   });
@@ -882,7 +882,8 @@ Future<Map<String, List<Map<String, Object?>>>> _snapshotModels(
         {
           'id': s.id,
           'defaultMinStockThreshold': s.defaultMinStockThreshold,
-          'lastBackupAt': s.lastBackupAt,
+          'lastGeneratedAt': s.lastGeneratedAt,
+          'lastExportedAt': s.lastExportedAt,
           'dailySummaryEnabled': s.dailySummaryEnabled,
           'dailySummaryHour': s.dailySummaryHour,
           'dailySummaryMinute': s.dailySummaryMinute,

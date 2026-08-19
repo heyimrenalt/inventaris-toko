@@ -955,7 +955,10 @@ void main() {
           await settleAfterAsyncWork(tester);
 
           expect(find.text('Data berhasil dicadangkan'), findsOneWidget);
-          expect(find.textContaining('Terakhir dicadangkan:'), findsOneWidget);
+          // The share sheet can't succeed under `flutter test` (no platform
+          // channel), so nothing was exported and the subtitle stays in its
+          // "never exported" state even though a file was generated.
+          expect(find.textContaining('Belum pernah dicadangkan'), findsOneWidget);
 
           final files = tempDir.listSync().whereType<File>().where((f) => f.path.endsWith('.json'));
           expect(files, isNotEmpty);
@@ -963,7 +966,8 @@ void main() {
           expect(content['version'], backupSchemaVersion);
 
           final settings = await AppSettingsRepository(isar).get();
-          expect(settings.lastBackupAt, isNotNull);
+          expect(settings.lastGeneratedAt, isNotNull);
+          expect(settings.lastExportedAt, isNull);
         });
       },
     );

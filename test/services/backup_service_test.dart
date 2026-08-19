@@ -212,14 +212,26 @@ void main() {
       expect(product['photoBase64'], isNull);
     });
 
-    test('exportToFile updates AppSettings.lastBackupAt', () async {
+  group('v1 backup compatibility', () {
+    test('a v1 appSettings payload with no lastExportedAt key restores to null', () async {
+      final parsed = await backupService.validateAndParse(_v1BackupJson);
+
+      await backupService.importBackup(parsed);
+
+      final settings = await settingsRepository.get();
+      expect(settings.lastGeneratedAt, DateTime(2026, 7, 1, 8, 15));
+      expect(settings.lastExportedAt, isNull);
+    });
+  });
+
+    test('exportToFile updates AppSettings.lastGeneratedAt', () async {
       final before = await settingsRepository.get();
-      expect(before.lastBackupAt, isNull);
+      expect(before.lastGeneratedAt, isNull);
 
       await backupService.exportToFile(directory: tempDir, now: DateTime(2026, 7, 17, 10, 30));
 
       final after = await settingsRepository.get();
-      expect(after.lastBackupAt, DateTime(2026, 7, 17, 10, 30));
+      expect(after.lastGeneratedAt, DateTime(2026, 7, 17, 10, 30));
     });
 
     test('exportToFile writes a file named with the given timestamp', () async {
@@ -562,3 +574,36 @@ void main() {
     });
   });
 }
+
+/// A backup written before the generated/exported split: it carries
+/// `lastBackupAt` and has no `lastExportedAt` key at all.
+const String _v1BackupJson = '''
+{
+  "version": 1,
+  "exportedAt": "2026-07-01T08:15:00.000",
+  "data": {
+    "appSettings": {
+      "defaultMinStockThreshold": 5.0,
+      "lastBackupAt": "2026-07-01T08:15:00.000",
+      "dailySummaryEnabled": true,
+      "dailySummaryHour": 20,
+      "dailySummaryMinute": 0,
+      "criticalStockAlertEnabled": true,
+      "criticalStockAlertHour1": 9,
+      "criticalStockAlertMinute1": 0,
+      "criticalStockAlertHour2": null,
+      "criticalStockAlertMinute2": null,
+      "criticalStockAlertHour3": null,
+      "criticalStockAlertMinute3": null,
+      "restockLeadTimeDays": 3,
+      "restockCoverDays": 7,
+      "batteryOptimizationDialogDismissed": false
+    },
+    "categories": [],
+    "products": [],
+    "mutations": [],
+    "costPriceAdjustments": [],
+    "restockLists": []
+  }
+}
+''';

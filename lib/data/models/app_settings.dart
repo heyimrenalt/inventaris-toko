@@ -9,7 +9,18 @@ class AppSettings {
 
   late double defaultMinStockThreshold;
 
-  DateTime? lastBackupAt;
+  /// When the backup file was last written to app storage.
+  ///
+  /// The `@Name` annotation pins the Isar property name to its original
+  /// `lastBackupAt` so renaming the Dart field does NOT read as
+  /// (drop old property + add new one), which would silently null out
+  /// this value on every existing device. Do not remove it.
+  @Name('lastBackupAt')
+  DateTime? lastGeneratedAt;
+
+  /// When a generated backup file last actually left the phone via the
+  /// share sheet. `null` = never exported.
+  DateTime? lastExportedAt;
 
   bool dailySummaryEnabled = true;
 
