@@ -8,6 +8,7 @@ import 'package:isar_community/isar.dart';
 import 'data/isar_service.dart';
 import 'data/migrations/mutation_snapshot_backfill.dart';
 import 'data/repositories/app_settings_repository.dart';
+import 'services/auto_backup_service.dart';
 import 'services/notification_service.dart';
 import 'ui/navigation/main_scaffold.dart';
 import 'ui/screens/splash_min_duration.dart';
@@ -143,5 +144,12 @@ class _MyAppState extends State<MyApp> {
     // not a notification and must survive the user switching every
     // notification off.
     await NotificationService.scheduleAutoBackup();
+
+    // Safety net for the retention sweep, which normally runs right after
+    // a snapshot is written. A shop that records nothing for weeks writes
+    // no snapshots, so without this its existing files would never be
+    // pruned. Self-throttled to once a week, so this is a no-op read on
+    // almost every start.
+    await AutoBackupService(isar).sweepRetentionIfDue();
   }
 }

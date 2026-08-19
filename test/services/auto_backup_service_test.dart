@@ -485,5 +485,273 @@ void main() {
         expect(await blockedService.runIfNeeded(now: _at(23)), isNull);
       });
     });
+
+    group('runRetention', () {
+      // Deletion against a real directory. The policy itself is covered by
+      // the pure tests below; what matters here is *which files the
+      // candidate list can contain at all*.
+
+      test('deletes expired files and keeps the recent ones', () async {
+        final old = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+        final recent = await writeAutoBackupFile(_at(23, day: 18));
+
+        final deleted = await service.runRetention(now: _at(9));
+
+        expect(deleted, [old.path]);
+        expect(await old.exists(), isFalse);
+        expect(await recent.exists(), isTrue);
+      });
+
+      test('never touches a file whose name does not parse', () async {
+        // The three shapes of foreign file that share the backup folder: a
+        // manual export (different prefix, must survive an unattended
+        // sweep), an auto-backup-prefixed name with an unparseable
+        // timestamp, and something unrelated. None of them can reach the
+        // policy, because listAutoBackupFiles never returns them.
+        final manual = File(
+          '${tempDir.path}/$manualBackupFilePrefix'
+          '${formatBackupFileTimestamp(_at(23, day: 1))}.json',
+        );
+        await manual.writeAsString('{}');
+        final corrupt = File('${tempDir.path}/${autoBackupFilePrefix}korup.json');
+        await corrupt.writeAsString('{}');
+        final unrelated = File('${tempDir.path}/notes.txt');
+        await unrelated.writeAsString('hi');
+        // A recent snapshot plus one genuinely expired one, so the sweep
+        // is not a no-op and the expired file is not the newest.
+        await writeAutoBackupFile(_at(23, day: 18));
+        final expired = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+
+        expect(await service.runRetention(now: _at(9)), [expired.path]);
+
+        expect(await manual.exists(), isTrue);
+        expect(await corrupt.exists(), isTrue);
+        expect(await unrelated.exists(), isTrue);
+      });
+
+      test('keeps the only file even when it is far past every window', () async {
+        final ancient = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+
+        expect(await service.runRetention(now: _at(9)), isEmpty);
+        expect(await ancient.exists(), isTrue);
+      });
+
+      test('is a no-op on a directory that does not exist', () async {
+        final missing = AutoBackupService(isar, directory: Directory('${tempDir.path}/nope'));
+
+        expect(await missing.runRetention(now: _at(9)), isEmpty);
+      });
+
+      test('runs after a generated snapshot', () async {
+        final ancient = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+        await putProduct(updatedAt: _at(20));
+
+        expect(await service.runIfNeeded(now: _at(23)), isNotNull);
+
+        expect(await ancient.exists(), isFalse);
+        expect(await AutoBackupService.listAutoBackupFiles(tempDir), hasLength(1));
+      });
+    });
+
+    group('sweepRetentionIfDue', () {
+      test('sweeps and stamps when it has never swept before', () async {
+        final ancient = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+        await writeAutoBackupFile(_at(23, day: 18));
+
+        expect(await service.sweepRetentionIfDue(now: _at(9)), isTrue);
+
+        expect(await ancient.exists(), isFalse);
+        expect((await settingsRepository.get()).lastRetentionSweepAt, _at(9));
+      });
+
+      test('does not sweep again within the interval', () async {
+        await settingsRepository.updateLastRetentionSweepAt(_at(9, day: 15));
+        final ancient = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+        await writeAutoBackupFile(_at(23, day: 18));
+
+        expect(await service.sweepRetentionIfDue(now: _at(9)), isFalse);
+
+        expect(await ancient.exists(), isTrue);
+        expect((await settingsRepository.get()).lastRetentionSweepAt, _at(9, day: 15));
+      });
+
+      test('sweeps again once the interval has passed', () async {
+        await settingsRepository.updateLastRetentionSweepAt(_at(8, day: 12));
+        final ancient = await writeAutoBackupFile(DateTime(2025, 1, 1, 23));
+        await writeAutoBackupFile(_at(23, day: 18));
+
+        expect(await service.sweepRetentionIfDue(now: _at(9)), isTrue);
+
+        expect(await ancient.exists(), isFalse);
+        expect((await settingsRepository.get()).lastRetentionSweepAt, _at(9));
+      });
+    });
+  });
+
+  group('isoWeekKey', () {
+    test('keys an ordinary mid-year date', () {
+      // 2026-08-19 is a Wednesday in ISO week 34.
+      expect(isoWeekKey(DateTime(2026, 8, 19)), (2026, 34));
+    });
+
+    test('every day of one week shares a key', () {
+      final keys = {
+        for (var day = 17; day <= 23; day++) isoWeekKey(DateTime(2026, 8, day)),
+      };
+      expect(keys, {(2026, 34)});
+    });
+
+    test('late December can belong to week 1 of the next ISO year', () {
+      // 2024-12-30 (Mon) and 2024-12-31 (Tue) sit in the week whose
+      // Thursday is 2025-01-02.
+      expect(isoWeekKey(DateTime(2024, 12, 30)), (2025, 1));
+      expect(isoWeekKey(DateTime(2024, 12, 31)), (2025, 1));
+      expect(isoWeekKey(DateTime(2025, 1, 1)), (2025, 1));
+    });
+
+    test('early January can belong to the last week of the previous ISO year', () {
+      // 2027-01-01 is a Friday; its Thursday is 2026-12-31.
+      expect(isoWeekKey(DateTime(2026, 12, 29)), (2026, 53));
+      expect(isoWeekKey(DateTime(2027, 1, 1)), (2026, 53));
+      // ...and 2026-01-01 (Thu) is already week 1 of 2026.
+      expect(isoWeekKey(DateTime(2026, 1, 1)), (2026, 1));
+    });
+
+    test('does not collide across years the way a bare week number would', () {
+      // Both are "week 1" by number, a year apart.
+      expect(isoWeekKey(DateTime(2024, 12, 30)).$2, isoWeekKey(DateTime(2026, 1, 1)).$2);
+      expect(isoWeekKey(DateTime(2024, 12, 30)), isNot(isoWeekKey(DateTime(2026, 1, 1))));
+    });
+  });
+
+  group('autoBackupPathsToDelete', () {
+    // The policy. No database, no filesystem, no clock.
+
+    AutoBackupEntry entryOn(DateTime stamp) =>
+        (timestamp: stamp, path: '/backups/$autoBackupFilePrefix'
+            '${formatBackupFileTimestamp(stamp)}.json');
+
+    List<String> pathsFor(Iterable<DateTime> stamps) =>
+        [for (final stamp in stamps) entryOn(stamp).path];
+
+    test('deletes nothing when there is nothing', () {
+      expect(autoBackupPathsToDelete(now: _at(9), entries: const []), isEmpty);
+    });
+
+    test('keeps every file inside the 7-day window', () {
+      final stamps = [for (var day = 13; day <= 19; day++) _at(23, day: day)];
+
+      expect(
+        autoBackupPathsToDelete(now: _at(9), entries: [for (final s in stamps) entryOn(s)]),
+        isEmpty,
+      );
+    });
+
+    test('keeps a file exactly 7 days old and drops the one before it', () {
+      // Guards the boundary: day 12 is 7 days before day 19, day 11 is 8.
+      // Both are outside every weekly slot only because the weeklies are
+      // switched off here — that interaction is covered separately below.
+      final keep = _at(23, day: 12);
+      final drop = _at(23, day: 11);
+      final newest = _at(23, day: 19);
+
+      expect(
+        autoBackupPathsToDelete(
+          now: _at(9),
+          entries: [entryOn(drop), entryOn(keep), entryOn(newest)],
+          weeklySlots: 0,
+        ),
+        pathsFor([drop]),
+      );
+    });
+
+    test('compares calendar days, not elapsed hours', () {
+      // 7 days and 14 hours of elapsed time, but only 7 calendar days.
+      expect(
+        autoBackupPathsToDelete(
+          now: _at(13),
+          entries: [entryOn(_at(23, day: 12)), entryOn(_at(23, day: 19))],
+          weeklySlots: 0,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('keeps the newest file of each of the last 4 ISO weeks', () {
+      // Weeks 34 (current), 33, 32 and 31 of 2026; two files in each of
+      // the older weeks, of which only the newer survives.
+      final entries = [
+        entryOn(_at(23, day: 19)), // wk 34, and inside the 7-day window
+        entryOn(_at(23, day: 10)), // wk 33, older
+        entryOn(_at(23, day: 12)), // wk 33, newest — kept
+        entryOn(_at(23, day: 3)), //  wk 32, older
+        entryOn(_at(23, day: 5)), //  wk 32, newest — kept
+        entryOn(DateTime(2026, 7, 27, 23)), // wk 31, older
+        entryOn(DateTime(2026, 7, 29, 23)), // wk 31, newest — kept
+      ];
+
+      expect(
+        autoBackupPathsToDelete(now: _at(9), entries: entries),
+        pathsFor([_at(23, day: 10), _at(23, day: 3), DateTime(2026, 7, 27, 23)]),
+      );
+    });
+
+    test('deletes files beyond both the daily and the weekly window', () {
+      // Week 30 of 2026 is the fifth week back — no slot for it.
+      final tooOld = DateTime(2026, 7, 22, 23);
+      final entries = [entryOn(tooOld), entryOn(_at(23, day: 19))];
+
+      expect(autoBackupPathsToDelete(now: _at(9), entries: entries), pathsFor([tooOld]));
+    });
+
+    test('does not let two ISO years collide on one weekly slot', () {
+      // Sweeping on 2027-01-04 (wk 1 of 2027). The three weeks back are
+      // 2026 wk 53, 52 and 51. 2025-12-29 is wk 1 of *2026* — a bare week
+      // number would file it in the current slot and keep it; the ISO-year
+      // key correctly expires it.
+      final now = DateTime(2027, 1, 4, 9);
+      final lastYear = DateTime(2025, 12, 29, 23);
+      final entries = [
+        entryOn(lastYear),
+        entryOn(DateTime(2026, 12, 30, 23)), // wk 53 of 2026 — kept
+        entryOn(DateTime(2027, 1, 2, 23)), //   wk 53 of 2026 too, newer
+      ];
+
+      expect(autoBackupPathsToDelete(now: now, entries: entries), pathsFor([lastYear]));
+    });
+
+    test('keeps the newest file even when every window is switched off', () {
+      // The date-bug backstop: nothing qualifies under any rule, and the
+      // last file standing is still not deleted.
+      final entries = [
+        entryOn(DateTime(2025, 1, 1, 23)),
+        entryOn(DateTime(2025, 2, 1, 23)),
+      ];
+
+      expect(
+        autoBackupPathsToDelete(
+          now: _at(9),
+          entries: entries,
+          recentDays: 0,
+          weeklySlots: 0,
+        ),
+        pathsFor([DateTime(2025, 1, 1, 23)]),
+      );
+    });
+
+    test('keeps a file dated in the future', () {
+      // A snapshot written while the clock was wrong is not "old".
+      final future = DateTime(2027, 5, 1, 23);
+
+      expect(
+        autoBackupPathsToDelete(
+          now: _at(9),
+          entries: [entryOn(future), entryOn(_at(23, day: 18))],
+          recentDays: 0,
+          weeklySlots: 0,
+        ),
+        pathsFor([_at(23, day: 18)]),
+      );
+    });
   });
 }

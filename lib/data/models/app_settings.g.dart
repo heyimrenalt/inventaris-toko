@@ -87,18 +87,23 @@ const AppSettingsSchema = CollectionSchema(
       name: r'lastExportedAt',
       type: IsarType.dateTime,
     ),
-    r'mutationPriceSnapshotBackfillDone': PropertySchema(
+    r'lastRetentionSweepAt': PropertySchema(
       id: 14,
+      name: r'lastRetentionSweepAt',
+      type: IsarType.dateTime,
+    ),
+    r'mutationPriceSnapshotBackfillDone': PropertySchema(
+      id: 15,
       name: r'mutationPriceSnapshotBackfillDone',
       type: IsarType.bool,
     ),
     r'restockCoverDays': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'restockCoverDays',
       type: IsarType.long,
     ),
     r'restockLeadTimeDays': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'restockLeadTimeDays',
       type: IsarType.long,
     ),
@@ -148,9 +153,10 @@ void _appSettingsSerialize(
   writer.writeDouble(offsets[11], object.defaultMinStockThreshold);
   writer.writeDateTime(offsets[12], object.lastGeneratedAt);
   writer.writeDateTime(offsets[13], object.lastExportedAt);
-  writer.writeBool(offsets[14], object.mutationPriceSnapshotBackfillDone);
-  writer.writeLong(offsets[15], object.restockCoverDays);
-  writer.writeLong(offsets[16], object.restockLeadTimeDays);
+  writer.writeDateTime(offsets[14], object.lastRetentionSweepAt);
+  writer.writeBool(offsets[15], object.mutationPriceSnapshotBackfillDone);
+  writer.writeLong(offsets[16], object.restockCoverDays);
+  writer.writeLong(offsets[17], object.restockLeadTimeDays);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -175,9 +181,10 @@ AppSettings _appSettingsDeserialize(
   object.id = id;
   object.lastGeneratedAt = reader.readDateTimeOrNull(offsets[12]);
   object.lastExportedAt = reader.readDateTimeOrNull(offsets[13]);
-  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[14]);
-  object.restockCoverDays = reader.readLong(offsets[15]);
-  object.restockLeadTimeDays = reader.readLong(offsets[16]);
+  object.lastRetentionSweepAt = reader.readDateTimeOrNull(offsets[14]);
+  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[15]);
+  object.restockCoverDays = reader.readLong(offsets[16]);
+  object.restockLeadTimeDays = reader.readLong(offsets[17]);
   return object;
 }
 
@@ -217,10 +224,12 @@ P _appSettingsDeserializeProp<P>(
     case 13:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 14:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 15:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 16:
+      return (reader.readLong(offset)) as P;
+    case 17:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1174,6 +1183,82 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastRetentionSweepAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastRetentionSweepAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastRetentionSweepAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastRetentionSweepAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastRetentionSweepAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastRetentionSweepAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastRetentionSweepAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   mutationPriceSnapshotBackfillDoneEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1499,6 +1584,20 @@ extension AppSettingsQuerySortBy
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByLastRetentionSweepAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRetentionSweepAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByLastRetentionSweepAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRetentionSweepAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   sortByMutationPriceSnapshotBackfillDone() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.asc);
@@ -1750,6 +1849,20 @@ extension AppSettingsQuerySortThenBy
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByLastRetentionSweepAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRetentionSweepAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByLastRetentionSweepAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRetentionSweepAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   thenByMutationPriceSnapshotBackfillDone() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'mutationPriceSnapshotBackfillDone', Sort.asc);
@@ -1892,6 +2005,13 @@ extension AppSettingsQueryWhereDistinct
   }
 
   QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByLastRetentionSweepAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastRetentionSweepAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
   distinctByMutationPriceSnapshotBackfillDone() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'mutationPriceSnapshotBackfillDone');
@@ -2015,6 +2135,13 @@ extension AppSettingsQueryProperty
   lastExportedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastExportedAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, DateTime?, QQueryOperations>
+  lastRetentionSweepAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastRetentionSweepAt');
     });
   }
 

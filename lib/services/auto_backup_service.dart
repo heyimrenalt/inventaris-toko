@@ -137,6 +137,104 @@ AutoBackupDecision decideAutoBackup({
 bool _isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+/// How many days back the "keep everything" window of the retention
+/// policy reaches. Daily granularity, not 7×24 hours: the files are one
+/// per calendar day, so an hours-based cutoff would keep or drop a day's
+/// snapshot depending on what time of day it happened to be written.
+const autoBackupRetentionDays = 7;
+
+/// How many ISO weeks back the policy keeps one snapshot each for, on top
+/// of [autoBackupRetentionDays]. Includes the current week, so with the
+/// default of 4 the oldest kept weekly is about a month old.
+const autoBackupWeeklySlots = 4;
+
+/// How stale [AppSettingsRepository.lastRetentionSweepAt] has to be before
+/// the app-start safety net sweeps. Retention normally runs right after a
+/// snapshot is written; this covers the shop that records nothing for
+/// weeks, where no snapshot is ever generated and files would otherwise
+/// age past every window unswept.
+const autoBackupRetentionSweepInterval = Duration(days: 7);
+
+/// One already-parsed auto-backup file: the timestamp read out of its
+/// name, and the path it lives at.
+typedef AutoBackupEntry = ({DateTime timestamp, String path});
+
+/// The `(ISO-year, ISO-week)` pair [date] falls in.
+///
+/// The year is the *ISO* year, which is not always [DateTime.year]: an ISO
+/// week belongs to the year containing its Thursday, so 2024-12-30 is week
+/// 1 of 2025 and 2027-01-01 is week 53 of 2026. Keying weekly retention
+/// slots on the bare week number instead would make those two files
+/// collide on one slot and silently expire one of them.
+(int, int) isoWeekKey(DateTime date) {
+  // Computed in UTC throughout: adding whole days to a local DateTime
+  // across a DST transition can land on the wrong calendar day.
+  final day = DateTime.utc(date.year, date.month, date.day);
+  final thursday = day.add(Duration(days: 4 - day.weekday));
+  final firstOfIsoYear = DateTime.utc(thursday.year, 1, 1);
+
+  return (thursday.year, thursday.difference(firstOfIsoYear).inDays ~/ 7 + 1);
+}
+
+/// Which of [entries] the retention policy expires, as paths to delete.
+///
+/// Pure over plain values so the whole policy is testable without a
+/// database, a filesystem, or a clock — and, more importantly, so it
+/// *cannot* discover a file on its own. It only ever returns paths that
+/// were handed to it, which is what makes
+/// [AutoBackupService.listAutoBackupFiles]'s parse gate a real guarantee:
+/// a file whose name does not parse never reaches this function, so it can
+/// never be deleted. See [AutoBackupService.runRetention].
+///
+/// Kept:
+/// * every entry dated within the last [recentDays] calendar days;
+/// * the newest entry in each of the last [weeklySlots] ISO weeks;
+/// * the single newest entry, unconditionally.
+///
+/// That last rule is a deliberate backstop rather than a consequence of
+/// the first two: if a clock jump, a wrong timezone, or a bug in this
+/// function decided everything on disk was expired, the app would be left
+/// with no snapshot at all. Keeping the newest one costs half a megabyte.
+List<String> autoBackupPathsToDelete({
+  required DateTime now,
+  required List<AutoBackupEntry> entries,
+  int recentDays = autoBackupRetentionDays,
+  int weeklySlots = autoBackupWeeklySlots,
+}) {
+  if (entries.isEmpty) return const [];
+
+  final newest = entries.reduce((a, b) => a.timestamp.isAfter(b.timestamp) ? a : b);
+  final keep = <String>{newest.path};
+
+  final today = DateTime.utc(now.year, now.month, now.day);
+  for (final entry in entries) {
+    final day = DateTime.utc(entry.timestamp.year, entry.timestamp.month, entry.timestamp.day);
+    // A negative age is a file dated in the future — a clock that was
+    // wrong when it was written. Keep it: it is not old by any reading.
+    if (today.difference(day).inDays <= recentDays) keep.add(entry.path);
+  }
+
+  final weeklyWindow = <(int, int)>{
+    for (var week = 0; week < weeklySlots; week++)
+      isoWeekKey(now.subtract(Duration(days: 7 * week))),
+  };
+  final newestPerWeek = <(int, int), AutoBackupEntry>{};
+  for (final entry in entries) {
+    final key = isoWeekKey(entry.timestamp);
+    if (!weeklyWindow.contains(key)) continue;
+    final incumbent = newestPerWeek[key];
+    if (incumbent == null || entry.timestamp.isAfter(incumbent.timestamp)) {
+      newestPerWeek[key] = entry;
+    }
+  }
+  keep.addAll(newestPerWeek.values.map((entry) => entry.path));
+
+  return [
+    for (final entry in entries)
+      if (!keep.contains(entry.path)) entry.path,
+  ];
+}
+
 /// Unattended daily backup into app-specific storage.
 ///
 /// Deliberately *not* a replacement for "Cadangkan Data": these snapshots
@@ -192,9 +290,79 @@ class AutoBackupService {
         fileNamePrefix: autoBackupFilePrefix,
       );
 
+      // Retention runs here, straight after a successful write, so the
+      // directory is pruned on exactly the schedule it grows on. The
+      // just-written file is the newest one, which the policy never
+      // deletes. Failures inside are already swallowed per-file.
+      await runRetention(directory: directory, now: effectiveNow);
+
       return file;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Deletes the auto-backup files [autoBackupPathsToDelete] expires, and
+  /// returns the paths actually removed.
+  ///
+  /// The candidate list comes from [listAutoBackupFiles] and nowhere else.
+  /// This method must never enumerate [directory] itself: the parse gate in
+  /// [listAutoBackupFiles] is the only thing standing between retention and
+  /// the manual exports, unrelated files, and subdirectories that share the
+  /// backup folder, and a second listing here would route around it.
+  ///
+  /// Never throws — a file that vanished under us, or that the OS refuses to
+  /// unlink, costs its own deletion and nothing else.
+  Future<List<String>> runRetention({Directory? directory, DateTime? now}) async {
+    final effectiveDirectory = directory ?? this.directory ?? await resolveBackupDirectory();
+    final files = await listAutoBackupFiles(effectiveDirectory);
+
+    final entries = <AutoBackupEntry>[];
+    for (final file in files) {
+      final timestamp = parseBackupFileTimestamp(file.path, prefix: autoBackupFilePrefix);
+      if (timestamp == null) continue;
+      entries.add((timestamp: timestamp, path: file.path));
+    }
+
+    final deleted = <String>[];
+    for (final path in autoBackupPathsToDelete(now: now ?? DateTime.now(), entries: entries)) {
+      try {
+        await File(path).delete();
+        deleted.add(path);
+      } catch (_) {
+        // Keep going: one undeletable file must not strand the rest.
+      }
+    }
+
+    return deleted;
+  }
+
+  /// The app-start safety net: sweeps only if the last sweep was more than
+  /// [autoBackupRetentionSweepInterval] ago (or never), and stamps
+  /// `lastRetentionSweepAt` when it does.
+  ///
+  /// Without this, a shop that records nothing for weeks generates no
+  /// snapshots, so the post-generate sweep never fires and the files it
+  /// already has age past every retention window untouched.
+  ///
+  /// Returns whether it swept. Never throws, for the same reason
+  /// [runIfNeeded] doesn't: startup must not fail over housekeeping.
+  Future<bool> sweepRetentionIfDue({DateTime? now}) async {
+    try {
+      final effectiveNow = now ?? DateTime.now();
+      final repository = AppSettingsRepository(_isar);
+      final lastSweepAt = (await repository.get()).lastRetentionSweepAt;
+
+      final isDue = lastSweepAt == null ||
+          effectiveNow.difference(lastSweepAt) > autoBackupRetentionSweepInterval;
+      if (!isDue) return false;
+
+      await runRetention(now: effectiveNow);
+      await repository.updateLastRetentionSweepAt(effectiveNow);
+
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

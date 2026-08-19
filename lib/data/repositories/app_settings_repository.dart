@@ -232,6 +232,17 @@ class AppSettingsRepository {
     return settings;
   }
 
+  Future<AppSettings> updateLastRetentionSweepAt(DateTime timestamp) async {
+    final settings = await get();
+    settings.lastRetentionSweepAt = timestamp;
+
+    await _isar.writeTxn(() async {
+      await _isar.appSettings.put(settings);
+    });
+
+    return settings;
+  }
+
   Future<AppSettings> dismissBatteryOptimizationDialog() async {
     final settings = await get();
     settings.batteryOptimizationDialogDismissed = true;

@@ -74,6 +74,16 @@ class AppSettings {
   /// regardless, so a lost flag costs a redundant pass, not corruption.
   bool mutationPriceSnapshotBackfillDone = false;
 
+  /// When retention last swept the auto-backup directory (see
+  /// `AutoBackupService.sweepRetentionIfDue`). `null` = never.
+  ///
+  /// Deliberately LOCAL ONLY: it is not written to, or read from, the
+  /// backup JSON. It describes the state of one phone's backup folder, so
+  /// carrying it to another device would only suppress that device's first
+  /// sweep for a week. Restoring a backup therefore resets it to `null`,
+  /// which is the safe direction — the next start sweeps.
+  DateTime? lastRetentionSweepAt;
+
   /// The 1-3 configured "Alert stok kritis" times, derived from the slot
   /// fields above. Never empty: slot 1 always contributes.
   @ignore
