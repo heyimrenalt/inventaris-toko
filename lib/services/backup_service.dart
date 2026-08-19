@@ -79,22 +79,35 @@ class BackupService {
     };
   }
 
-  /// Writes a full backup (with photos) to a new file named
-  /// `inventaris_backup_{yyyy-MM-dd_HH-mm-ss}.json` inside [directory], and
+  /// Writes a backup to a new file named
+  /// `{fileNamePrefix}{yyyy-MM-dd_HH-mm-ss}.json` inside [directory], and
   /// records the write time on [AppSettings.lastGeneratedAt]. Returns the
   /// written [File].
+  ///
+  /// The defaults describe a manual export: photos embedded as base64,
+  /// [manualBackupFilePrefix]. `AutoBackupService` overrides both — it
+  /// writes [autoBackupFilePrefix] files with `includePhotos: false`,
+  /// because those files live in app-specific storage next to the photo
+  /// files they reference and are deleted with them on uninstall. Embedding
+  /// a copy of every photo in every daily snapshot would multiply the file
+  /// size ~80x to protect against nothing.
   ///
   /// The final JSON stringification — the one part of a large export
   /// (hundreds of products with embedded photo base64, 50MB+) that's both
   /// synchronous and CPU-heavy enough to jank the UI thread — runs in a
   /// background isolate via [compute]. Everything before it (Isar reads,
   /// photo file reads) is normal `await`-yielding I/O and doesn't need one.
-  Future<File> exportToFile({required Directory directory, DateTime? now}) async {
-    final data = await buildBackupData();
+  Future<File> exportToFile({
+    required Directory directory,
+    DateTime? now,
+    bool includePhotos = true,
+    String fileNamePrefix = manualBackupFilePrefix,
+  }) async {
+    final data = await buildBackupData(includePhotos: includePhotos);
     final jsonString = await compute(_jsonEncodeForCompute, data);
 
     final effectiveNow = now ?? DateTime.now();
-    final fileName = 'inventaris_backup_${_formatFileTimestamp(effectiveNow)}.json';
+    final fileName = '$fileNamePrefix${formatBackupFileTimestamp(effectiveNow)}.json';
     final file = File(p.join(directory.path, fileName));
     await file.writeAsString(jsonString);
 
@@ -530,10 +543,51 @@ class BackupService {
     return '.jpg';
   }
 
-  String _formatFileTimestamp(DateTime dt) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${dt.year}-${two(dt.month)}-${two(dt.day)}_${two(dt.hour)}-${two(dt.minute)}-${two(dt.second)}';
-  }
+}
+
+/// Filename prefix for a backup the user made deliberately via "Cadangkan
+/// Data". Retention (see `AutoBackupService`) never touches these — a file
+/// the user asked for is theirs to delete.
+const manualBackupFilePrefix = 'inventaris_backup_';
+
+/// Filename prefix for a backup written unattended by the auto-backup job.
+/// Deliberately distinct from [manualBackupFilePrefix] so retention can
+/// delete old ones without ever matching a manual export.
+///
+/// Note it does *not* start with [manualBackupFilePrefix], so a prefix test
+/// for one can never accidentally match the other.
+const autoBackupFilePrefix = 'inventaris_autobackup_';
+
+/// `yyyy-MM-dd_HH-mm-ss`, the timestamp segment of every backup filename.
+/// Paired with [parseBackupFileTimestamp] — the two must stay inverses of
+/// each other, since retention reads a file's date back out of its name
+/// rather than trusting filesystem mtime (which a copy or restore rewrites).
+String formatBackupFileTimestamp(DateTime dt) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${dt.year}-${two(dt.month)}-${two(dt.day)}_${two(dt.hour)}-${two(dt.minute)}-${two(dt.second)}';
+}
+
+/// Inverse of [formatBackupFileTimestamp]: recovers the timestamp from a
+/// backup file's *name* (with or without a directory part), or `null` if
+/// [fileName] does not carry [prefix] followed by a well-formed timestamp.
+///
+/// Returns `null` rather than throwing because the backup directory is
+/// shared with whatever else the user or OS drops there; an unparseable
+/// name means "not one of ours", which is a normal condition, not an error.
+DateTime? parseBackupFileTimestamp(String fileName, {required String prefix}) {
+  final baseName = p.basename(fileName);
+  if (!baseName.startsWith(prefix) || !baseName.endsWith('.json')) return null;
+
+  final stamp = baseName.substring(prefix.length, baseName.length - '.json'.length);
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$').firstMatch(stamp);
+  if (match == null) return null;
+
+  final parts = [for (var i = 1; i <= 6; i++) int.parse(match.group(i)!)];
+  final parsed = DateTime(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+  // Rejects names that parse as digits but aren't real dates (month 13,
+  // day 32): DateTime silently rolls those over, so round-tripping the
+  // result back through the formatter is what actually catches them.
+  return formatBackupFileTimestamp(parsed) == stamp ? parsed : null;
 }
 
 String _jsonEncodeForCompute(Map<String, dynamic> data) => jsonEncode(data);

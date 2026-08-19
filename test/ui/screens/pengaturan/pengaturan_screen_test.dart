@@ -59,7 +59,12 @@ class _ThrowingExportBackupService extends BackupService {
   _ThrowingExportBackupService(super.isar);
 
   @override
-  Future<File> exportToFile({required Directory directory, DateTime? now}) async {
+  Future<File> exportToFile({
+    required Directory directory,
+    DateTime? now,
+    bool includePhotos = true,
+    String fileNamePrefix = manualBackupFilePrefix,
+  }) async {
     throw Exception('simulated export failure');
   }
 }

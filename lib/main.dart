@@ -139,5 +139,9 @@ class _MyAppState extends State<MyApp> {
     final settings = await AppSettingsRepository(isar).get();
     await NotificationService.scheduleDailySummary(settings);
     await NotificationService.scheduleCriticalStockAlerts(settings);
+    // Takes no settings and is never conditional: the auto-backup job is
+    // not a notification and must survive the user switching every
+    // notification off.
+    await NotificationService.scheduleAutoBackup();
   }
 }

@@ -12,6 +12,7 @@ import '../data/repositories/product_repository.dart';
 import '../data/repositories/stock_mutation_repository.dart';
 import '../domain/prioritas_kulakan_calculator.dart';
 import '../ui/screens/beranda/prioritas_kulakan_screen.dart';
+import 'auto_backup_service.dart';
 
 const dailySummaryChannelId = 'channel_daily_summary';
 const stockCriticalChannelId = 'channel_stock_critical';
@@ -361,6 +362,24 @@ class NotificationService {
     );
   }
 
+  /// Registers the unattended backup job (see [AutoBackupService]).
+  ///
+  /// Lives here only because this file owns the [WorkScheduler] seam and
+  /// [callbackDispatcher]; it is deliberately *not* part of
+  /// [scheduleDailySummary] and reads no notification setting, so switching
+  /// off "Ringkasan Harian" can never switch off backups as a side effect.
+  /// Unconditional and idempotent — `registerPeriodic` uses
+  /// `ExistingPeriodicWorkPolicy.update`, so calling it on every launch
+  /// keeps the job alive after a force-stop or reboot without restarting
+  /// its schedule.
+  static Future<void> scheduleAutoBackup() async {
+    await scheduler.registerPeriodic(
+      autoBackupTaskName,
+      autoBackupTaskName,
+      frequency: autoBackupTickFrequency,
+    );
+  }
+
   /// Registers (or cancels) the up-to-3 exact daily alarms behind "Alert
   /// stok kritis", based on [settings]. Every configured slot is
   /// canceled and re-armed from scratch on every call (cheap — just OS
@@ -614,6 +633,8 @@ void callbackDispatcher() {
     switch (task) {
       case _dailySummaryTaskName:
         await NotificationService.executeDailySummaryTask(isar);
+      case autoBackupTaskName:
+        await AutoBackupService(isar).runIfNeeded();
     }
     return true;
   });
