@@ -206,14 +206,22 @@ void main() {
       // identical code — unusable as a metric. Pumping to a concrete
       // condition instead makes the number mean "time until the figures
       // are on screen", which is what we actually want to know.
-      await _pumpUntilFound(tester, find.text('Salin'));
+      // `.hitTestable()`: being in the tree is not enough. On a real
+      // device the render view is still Size(0, 0) for the first frames
+      // after pumpWidget, so the action bar can be mounted and laid out
+      // against a zero-sized surface — present to a plain finder, but at
+      // a global offset that tap() cannot hit. Waiting until the widget
+      // actually answers a hit test at its centre makes the measurement
+      // mean "time until the figures are on screen and usable", and makes
+      // the tap below deterministic.
+      await _pumpUntilFound(tester, find.text('Salin').hitTestable());
     });
 
     expect(find.text('Rekap Keuntungan'), findsOneWidget);
     expect(find.byKey(const Key('recap_empty_period')), findsNothing);
 
     await timings.measureAsync('Copy-to-clipboard (full report)', () async {
-      await tester.tap(find.text('Salin'));
+      await tester.tap(find.text('Salin').hitTestable());
       // Two frames: one to run the tap handler, one to start the SnackBar.
       // Settling here would wait out the SnackBar's full 3s display and
       // dismissal, which measures Material's animation, not the copy.

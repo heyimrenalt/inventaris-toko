@@ -287,40 +287,96 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       appBar: AppHeader.withBack(title: 'Rekap Keuntungan'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPeriodSelection(),
-            const SizedBox(height: AppSpacing.xl),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(AppSpacing.xxl),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            // An empty period gets its own explicit message rather than a
-            // wall of zeroes, which reads as a bug rather than as
-            // "nothing was sold then".
-            else if (report == null || report.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                child: Center(
-                  child: Text(
-                    _emptyPeriodMessage,
-                    key: const Key('recap_empty_period'),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body.copyWith(color: AppColors.gray600),
-                  ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(child: _buildPeriodSelection()),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.xl),
                 ),
-              )
-            else ...[
-              _buildSummary(report),
-              const SizedBox(height: AppSpacing.xl),
-              _buildProductDetails(report),
-            ],
-          ],
-        ),
+                if (_loading)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppSpacing.xxl),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  )
+                // An empty period gets its own explicit message rather than a
+                // wall of zeroes, which reads as a bug rather than as
+                // "nothing was sold then".
+                else if (report == null || report.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xxl,
+                      ),
+                      child: Center(
+                        child: Text(
+                          _emptyPeriodMessage,
+                          key: const Key('recap_empty_period'),
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.gray600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else ...[
+                  SliverToBoxAdapter(child: _buildSummary(report)),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: AppSpacing.xl),
+                  ),
+                  // The card border has to wrap the title *and* the list, so
+                  // the decoration moves onto a DecoratedSliver instead of a
+                  // Container: that is what lets the list itself stay lazy.
+                  DecoratedSliver(
+                    decoration: _cardDecoration,
+                    sliver: SliverMainAxisGroup(
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.md,
+                            ),
+                            child: Text(
+                              'Detail Per Produk (${report.lines.length})',
+                              style: AppTextStyles.caption.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.gray700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            0,
+                            AppSpacing.md,
+                            AppSpacing.md,
+                          ),
+                          sliver: SliverList.separated(
+                            itemCount: report.lines.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: AppSpacing.md),
+                            itemBuilder: (context, index) =>
+                                _buildProductLine(report.lines[index], index),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
       // Pinned below the scroll area rather than stacked over it, so no
       // manual spacer is needed to keep the last product row reachable.
@@ -414,11 +470,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
 
   Widget _buildSummary(ProfitReport report) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        border: Border.all(color: AppColors.gray300),
-        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
-      ),
+      decoration: _cardDecoration,
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,78 +528,53 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     );
   }
 
-  Widget _buildProductDetails(ProfitReport report) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        border: Border.all(color: AppColors.gray300),
-        borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
-      ),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Detail Per Produk (${report.lines.length})',
-            style: AppTextStyles.caption.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.gray700,
+  // Shared by the summary card and the product-details sliver; kept as a
+  // getter so the DecoratedSliver and the Containers cannot drift apart.
+  static final BoxDecoration _cardDecoration = BoxDecoration(
+    color: AppColors.gray50,
+    border: Border.all(color: AppColors.gray300),
+    borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
+  );
+
+  Widget _buildProductLine(ProductProfitLine item, int index) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${index + 1}. ${item.name}',
+          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Harga Jual: ${_formatCurrency(item.averageSellPrice)}',
+              style: AppTextStyles.caption,
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: report.lines.length,
-            separatorBuilder: (context, index) =>
-                const Divider(height: AppSpacing.md),
-            itemBuilder: (context, index) {
-              final item = report.lines[index];
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${index + 1}. ${item.name}',
-                    style: AppTextStyles.caption.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Harga Jual: ${_formatCurrency(item.averageSellPrice)}',
-                        style: AppTextStyles.caption,
-                      ),
-                      Text(
-                        'Terjual: ${_formatQty(item.quantitySold)} pcs',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Modal: ${_formatCurrency(item.averageCostPrice)}',
-                        style: AppTextStyles.caption,
-                      ),
-                      Text(
-                        'Profit: ${_formatCurrency(item.profit)}',
-                        style: AppTextStyles.caption.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+            Text(
+              'Terjual: ${_formatQty(item.quantitySold)} pcs',
+              style: AppTextStyles.caption,
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Modal: ${_formatCurrency(item.averageCostPrice)}',
+              style: AppTextStyles.caption,
+            ),
+            Text(
+              'Profit: ${_formatCurrency(item.profit)}',
+              style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
