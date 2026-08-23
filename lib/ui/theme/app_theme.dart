@@ -16,6 +16,22 @@ abstract final class AppTheme {
       onPrimary: AppColors.white,
       error: AppColors.redPrimary,
       surface: AppColors.white,
+    ).copyWith(
+      // `ColorScheme.fromSeed` derives the whole `surfaceContainer*` family
+      // by blending the seed (our green) into the neutral tones, so every
+      // Material 3 surface that falls back to one of them — dialogs
+      // (`surfaceContainerHigh`), bottom sheets (`surfaceContainerLow`),
+      // chips (`surfaceContainerHighest`) — came out visibly green-tinted
+      // next to the neutral #EEEEEE scaffold the main screens use. Pin the
+      // family to our own neutral greys so no surface picks up the cast.
+      surfaceContainerLowest: AppColors.white,
+      surfaceContainerLow: AppColors.gray50,
+      surfaceContainer: AppColors.gray100,
+      surfaceContainerHigh: AppColors.gray100,
+      surfaceContainerHighest: AppColors.gray300,
+      // Kills Material 3's elevation tint overlay app-wide: an elevated
+      // surface stays its own colour instead of drifting towards green.
+      surfaceTint: Colors.transparent,
     );
 
     return ThemeData(
@@ -104,6 +120,17 @@ abstract final class AppTheme {
           fontSize: 14,
         ),
         actionTextColor: AppColors.white,
+      ),
+      // Explicit white for the two surface types that otherwise inherit a
+      // derived container colour — dialogs and modal sheets sit on top of
+      // the neutral scaffold and should read as plain white cards.
+      dialogTheme: const DialogThemeData(
+        backgroundColor: AppColors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.white,
+        surfaceTintColor: Colors.transparent,
       ),
       dividerTheme: const DividerThemeData(color: AppColors.gray300, thickness: 1),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(

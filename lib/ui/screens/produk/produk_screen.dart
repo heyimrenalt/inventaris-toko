@@ -237,9 +237,18 @@ class _ProdukScreenState extends State<ProdukScreen> {
                   GlassBottomNav.contentGap)
               .clamp(0.0, double.infinity),
         ),
-        child: FloatingActionButton(
-          onPressed: _openAddForm,
-          child: const Icon(Icons.add),
+        // 40dp instead of the 56dp default: at 56 the button covered the
+        // stock number of the last row. The icon stays deliberately large
+        // (28 vs the 24 default) so the compact circle still reads as a
+        // bold "+" rather than a small glyph adrift in empty space.
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: FloatingActionButton(
+            onPressed: _openAddForm,
+            shape: const CircleBorder(),
+            child: const Icon(Icons.add, size: 28),
+          ),
         ),
       ),
     );
