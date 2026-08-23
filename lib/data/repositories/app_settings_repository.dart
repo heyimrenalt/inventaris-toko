@@ -232,6 +232,24 @@ class AppSettingsRepository {
     return settings;
   }
 
+  /// Stamps the stale-export reminder's bookkeeping in one write.
+  /// [firstSeenAt] is only ever set on the first run — later calls pass
+  /// the value already stored so the grace-period anchor never moves.
+  Future<AppSettings> updateBackupReminderState({
+    DateTime? lastRemindedAt,
+    DateTime? firstSeenAt,
+  }) async {
+    final settings = await get();
+    if (lastRemindedAt != null) settings.lastBackupReminderAt = lastRemindedAt;
+    if (firstSeenAt != null) settings.backupReminderFirstSeenAt = firstSeenAt;
+
+    await _isar.writeTxn(() async {
+      await _isar.appSettings.put(settings);
+    });
+
+    return settings;
+  }
+
   Future<AppSettings> updateLastRetentionSweepAt(DateTime timestamp) async {
     final settings = await get();
     settings.lastRetentionSweepAt = timestamp;

@@ -17,93 +17,103 @@ const AppSettingsSchema = CollectionSchema(
   name: r'AppSettings',
   id: -5633561779022347008,
   properties: {
-    r'batteryOptimizationDialogDismissed': PropertySchema(
+    r'backupReminderFirstSeenAt': PropertySchema(
       id: 0,
+      name: r'backupReminderFirstSeenAt',
+      type: IsarType.dateTime,
+    ),
+    r'batteryOptimizationDialogDismissed': PropertySchema(
+      id: 1,
       name: r'batteryOptimizationDialogDismissed',
       type: IsarType.bool,
     ),
     r'criticalStockAlertEnabled': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'criticalStockAlertEnabled',
       type: IsarType.bool,
     ),
     r'criticalStockAlertHour1': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'criticalStockAlertHour1',
       type: IsarType.long,
     ),
     r'criticalStockAlertHour2': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'criticalStockAlertHour2',
       type: IsarType.long,
     ),
     r'criticalStockAlertHour3': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'criticalStockAlertHour3',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute1': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'criticalStockAlertMinute1',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute2': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'criticalStockAlertMinute2',
       type: IsarType.long,
     ),
     r'criticalStockAlertMinute3': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'criticalStockAlertMinute3',
       type: IsarType.long,
     ),
     r'dailySummaryEnabled': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'dailySummaryEnabled',
       type: IsarType.bool,
     ),
     r'dailySummaryHour': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'dailySummaryHour',
       type: IsarType.long,
     ),
     r'dailySummaryMinute': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'dailySummaryMinute',
       type: IsarType.long,
     ),
     r'defaultMinStockThreshold': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'defaultMinStockThreshold',
       type: IsarType.double,
     ),
     r'lastBackupAt': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'lastBackupAt',
       type: IsarType.dateTime,
     ),
+    r'lastBackupReminderAt': PropertySchema(
+      id: 14,
+      name: r'lastBackupReminderAt',
+      type: IsarType.dateTime,
+    ),
     r'lastExportedAt': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'lastExportedAt',
       type: IsarType.dateTime,
     ),
     r'lastRetentionSweepAt': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'lastRetentionSweepAt',
       type: IsarType.dateTime,
     ),
     r'mutationPriceSnapshotBackfillDone': PropertySchema(
-      id: 15,
+      id: 17,
       name: r'mutationPriceSnapshotBackfillDone',
       type: IsarType.bool,
     ),
     r'restockCoverDays': PropertySchema(
-      id: 16,
+      id: 18,
       name: r'restockCoverDays',
       type: IsarType.long,
     ),
     r'restockLeadTimeDays': PropertySchema(
-      id: 17,
+      id: 19,
       name: r'restockLeadTimeDays',
       type: IsarType.long,
     ),
@@ -139,24 +149,26 @@ void _appSettingsSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.batteryOptimizationDialogDismissed);
-  writer.writeBool(offsets[1], object.criticalStockAlertEnabled);
-  writer.writeLong(offsets[2], object.criticalStockAlertHour1);
-  writer.writeLong(offsets[3], object.criticalStockAlertHour2);
-  writer.writeLong(offsets[4], object.criticalStockAlertHour3);
-  writer.writeLong(offsets[5], object.criticalStockAlertMinute1);
-  writer.writeLong(offsets[6], object.criticalStockAlertMinute2);
-  writer.writeLong(offsets[7], object.criticalStockAlertMinute3);
-  writer.writeBool(offsets[8], object.dailySummaryEnabled);
-  writer.writeLong(offsets[9], object.dailySummaryHour);
-  writer.writeLong(offsets[10], object.dailySummaryMinute);
-  writer.writeDouble(offsets[11], object.defaultMinStockThreshold);
-  writer.writeDateTime(offsets[12], object.lastGeneratedAt);
-  writer.writeDateTime(offsets[13], object.lastExportedAt);
-  writer.writeDateTime(offsets[14], object.lastRetentionSweepAt);
-  writer.writeBool(offsets[15], object.mutationPriceSnapshotBackfillDone);
-  writer.writeLong(offsets[16], object.restockCoverDays);
-  writer.writeLong(offsets[17], object.restockLeadTimeDays);
+  writer.writeDateTime(offsets[0], object.backupReminderFirstSeenAt);
+  writer.writeBool(offsets[1], object.batteryOptimizationDialogDismissed);
+  writer.writeBool(offsets[2], object.criticalStockAlertEnabled);
+  writer.writeLong(offsets[3], object.criticalStockAlertHour1);
+  writer.writeLong(offsets[4], object.criticalStockAlertHour2);
+  writer.writeLong(offsets[5], object.criticalStockAlertHour3);
+  writer.writeLong(offsets[6], object.criticalStockAlertMinute1);
+  writer.writeLong(offsets[7], object.criticalStockAlertMinute2);
+  writer.writeLong(offsets[8], object.criticalStockAlertMinute3);
+  writer.writeBool(offsets[9], object.dailySummaryEnabled);
+  writer.writeLong(offsets[10], object.dailySummaryHour);
+  writer.writeLong(offsets[11], object.dailySummaryMinute);
+  writer.writeDouble(offsets[12], object.defaultMinStockThreshold);
+  writer.writeDateTime(offsets[13], object.lastGeneratedAt);
+  writer.writeDateTime(offsets[14], object.lastBackupReminderAt);
+  writer.writeDateTime(offsets[15], object.lastExportedAt);
+  writer.writeDateTime(offsets[16], object.lastRetentionSweepAt);
+  writer.writeBool(offsets[17], object.mutationPriceSnapshotBackfillDone);
+  writer.writeLong(offsets[18], object.restockCoverDays);
+  writer.writeLong(offsets[19], object.restockLeadTimeDays);
 }
 
 AppSettings _appSettingsDeserialize(
@@ -166,25 +178,27 @@ AppSettings _appSettingsDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = AppSettings();
-  object.batteryOptimizationDialogDismissed = reader.readBool(offsets[0]);
-  object.criticalStockAlertEnabled = reader.readBool(offsets[1]);
-  object.criticalStockAlertHour1 = reader.readLong(offsets[2]);
-  object.criticalStockAlertHour2 = reader.readLongOrNull(offsets[3]);
-  object.criticalStockAlertHour3 = reader.readLongOrNull(offsets[4]);
-  object.criticalStockAlertMinute1 = reader.readLong(offsets[5]);
-  object.criticalStockAlertMinute2 = reader.readLongOrNull(offsets[6]);
-  object.criticalStockAlertMinute3 = reader.readLongOrNull(offsets[7]);
-  object.dailySummaryEnabled = reader.readBool(offsets[8]);
-  object.dailySummaryHour = reader.readLong(offsets[9]);
-  object.dailySummaryMinute = reader.readLong(offsets[10]);
-  object.defaultMinStockThreshold = reader.readDouble(offsets[11]);
+  object.backupReminderFirstSeenAt = reader.readDateTimeOrNull(offsets[0]);
+  object.batteryOptimizationDialogDismissed = reader.readBool(offsets[1]);
+  object.criticalStockAlertEnabled = reader.readBool(offsets[2]);
+  object.criticalStockAlertHour1 = reader.readLong(offsets[3]);
+  object.criticalStockAlertHour2 = reader.readLongOrNull(offsets[4]);
+  object.criticalStockAlertHour3 = reader.readLongOrNull(offsets[5]);
+  object.criticalStockAlertMinute1 = reader.readLong(offsets[6]);
+  object.criticalStockAlertMinute2 = reader.readLongOrNull(offsets[7]);
+  object.criticalStockAlertMinute3 = reader.readLongOrNull(offsets[8]);
+  object.dailySummaryEnabled = reader.readBool(offsets[9]);
+  object.dailySummaryHour = reader.readLong(offsets[10]);
+  object.dailySummaryMinute = reader.readLong(offsets[11]);
+  object.defaultMinStockThreshold = reader.readDouble(offsets[12]);
   object.id = id;
-  object.lastGeneratedAt = reader.readDateTimeOrNull(offsets[12]);
-  object.lastExportedAt = reader.readDateTimeOrNull(offsets[13]);
-  object.lastRetentionSweepAt = reader.readDateTimeOrNull(offsets[14]);
-  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[15]);
-  object.restockCoverDays = reader.readLong(offsets[16]);
-  object.restockLeadTimeDays = reader.readLong(offsets[17]);
+  object.lastGeneratedAt = reader.readDateTimeOrNull(offsets[13]);
+  object.lastBackupReminderAt = reader.readDateTimeOrNull(offsets[14]);
+  object.lastExportedAt = reader.readDateTimeOrNull(offsets[15]);
+  object.lastRetentionSweepAt = reader.readDateTimeOrNull(offsets[16]);
+  object.mutationPriceSnapshotBackfillDone = reader.readBool(offsets[17]);
+  object.restockCoverDays = reader.readLong(offsets[18]);
+  object.restockLeadTimeDays = reader.readLong(offsets[19]);
   return object;
 }
 
@@ -196,40 +210,44 @@ P _appSettingsDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 1:
       return (reader.readBool(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 3:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
       return (reader.readLongOrNull(offset)) as P;
     case 5:
-      return (reader.readLong(offset)) as P;
-    case 6:
       return (reader.readLongOrNull(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
     case 7:
       return (reader.readLongOrNull(offset)) as P;
     case 8:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 9:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 10:
       return (reader.readLong(offset)) as P;
     case 11:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 12:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 13:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 14:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 15:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 16:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 17:
+      return (reader.readBool(offset)) as P;
+    case 18:
+      return (reader.readLong(offset)) as P;
+    case 19:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -336,6 +354,85 @@ extension AppSettingsQueryWhere
 
 extension AppSettingsQueryFilter
     on QueryBuilder<AppSettings, AppSettings, QFilterCondition> {
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'backupReminderFirstSeenAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'backupReminderFirstSeenAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'backupReminderFirstSeenAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'backupReminderFirstSeenAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'backupReminderFirstSeenAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  backupReminderFirstSeenAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'backupReminderFirstSeenAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   batteryOptimizationDialogDismissedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
@@ -1110,6 +1207,82 @@ extension AppSettingsQueryFilter
   }
 
   QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastBackupReminderAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastBackupReminderAt'),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastBackupReminderAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtGreaterThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastBackupReminderAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtLessThan(DateTime? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastBackupReminderAt',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
+  lastBackupReminderAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastBackupReminderAt',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterFilterCondition>
   lastExportedAtIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1390,6 +1563,20 @@ extension AppSettingsQueryLinks
 extension AppSettingsQuerySortBy
     on QueryBuilder<AppSettings, AppSettings, QSortBy> {
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByBackupReminderFirstSeenAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backupReminderFirstSeenAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByBackupReminderFirstSeenAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backupReminderFirstSeenAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   sortByBatteryOptimizationDialogDismissed() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'batteryOptimizationDialogDismissed', Sort.asc);
@@ -1570,6 +1757,20 @@ extension AppSettingsQuerySortBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByLastBackupReminderAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastBackupReminderAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  sortByLastBackupReminderAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastBackupReminderAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> sortByLastExportedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastExportedAt', Sort.asc);
@@ -1642,6 +1843,20 @@ extension AppSettingsQuerySortBy
 
 extension AppSettingsQuerySortThenBy
     on QueryBuilder<AppSettings, AppSettings, QSortThenBy> {
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByBackupReminderFirstSeenAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backupReminderFirstSeenAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByBackupReminderFirstSeenAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'backupReminderFirstSeenAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
   thenByBatteryOptimizationDialogDismissed() {
     return QueryBuilder.apply(this, (query) {
@@ -1835,6 +2050,20 @@ extension AppSettingsQuerySortThenBy
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByLastBackupReminderAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastBackupReminderAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<AppSettings, AppSettings, QAfterSortBy>
+  thenByLastBackupReminderAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastBackupReminderAt', Sort.desc);
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QAfterSortBy> thenByLastExportedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastExportedAt', Sort.asc);
@@ -1907,6 +2136,13 @@ extension AppSettingsQuerySortThenBy
 
 extension AppSettingsQueryWhereDistinct
     on QueryBuilder<AppSettings, AppSettings, QDistinct> {
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByBackupReminderFirstSeenAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'backupReminderFirstSeenAt');
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QDistinct>
   distinctByBatteryOptimizationDialogDismissed() {
     return QueryBuilder.apply(this, (query) {
@@ -1998,6 +2234,13 @@ extension AppSettingsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<AppSettings, AppSettings, QDistinct>
+  distinctByLastBackupReminderAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastBackupReminderAt');
+    });
+  }
+
   QueryBuilder<AppSettings, AppSettings, QDistinct> distinctByLastExportedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastExportedAt');
@@ -2038,6 +2281,13 @@ extension AppSettingsQueryProperty
   QueryBuilder<AppSettings, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<AppSettings, DateTime?, QQueryOperations>
+  backupReminderFirstSeenAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'backupReminderFirstSeenAt');
     });
   }
 
@@ -2128,6 +2378,13 @@ extension AppSettingsQueryProperty
   lastGeneratedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastBackupAt');
+    });
+  }
+
+  QueryBuilder<AppSettings, DateTime?, QQueryOperations>
+  lastBackupReminderAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastBackupReminderAt');
     });
   }
 

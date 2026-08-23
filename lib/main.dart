@@ -144,6 +144,7 @@ class _MyAppState extends State<MyApp> {
     // not a notification and must survive the user switching every
     // notification off.
     await NotificationService.scheduleAutoBackup();
+    await NotificationService.scheduleBackupReminder();
 
     // Safety net for the retention sweep, which normally runs right after
     // a snapshot is written. A shop that records nothing for weeks writes

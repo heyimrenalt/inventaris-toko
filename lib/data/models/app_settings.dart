@@ -84,6 +84,17 @@ class AppSettings {
   /// which is the safe direction — the next start sweeps.
   DateTime? lastRetentionSweepAt;
 
+  /// When the stale-export reminder last fired (see
+  /// `decideBackupReminder`). `null` = never fired. Local only, like
+  /// [lastRetentionSweepAt]: it describes one phone's notification
+  /// history, not the shop's data.
+  DateTime? lastBackupReminderAt;
+
+  /// When the stale-export reminder job first ran on this install. Used
+  /// only as the anchor for the first-reminder grace period when nothing
+  /// has ever been exported. `null` = the job has never run yet.
+  DateTime? backupReminderFirstSeenAt;
+
   /// The 1-3 configured "Alert stok kritis" times, derived from the slot
   /// fields above. Never empty: slot 1 always contributes.
   @ignore

@@ -109,7 +109,7 @@ class BackupService {
     final effectiveNow = now ?? DateTime.now();
     final fileName = '$fileNamePrefix${formatBackupFileTimestamp(effectiveNow)}.json';
     final file = File(p.join(directory.path, fileName));
-    await file.writeAsString(jsonString);
+    await writeFileAtomically(file, jsonString);
 
     await AppSettingsRepository(_isar).updateLastGeneratedAt(effectiveNow);
 
@@ -548,6 +548,43 @@ class BackupService {
 /// Filename prefix for a backup the user made deliberately via "Cadangkan
 /// Data". Retention (see `AutoBackupService`) never touches these — a file
 /// the user asked for is theirs to delete.
+/// Suffix of the temporary file [writeFileAtomically] writes through.
+/// Deliberately not `.json`, so a leftover temp file can never be mistaken
+/// for a snapshot by the auto-backup scanner (which matches on the
+/// backup filename prefixes) or by the user in a file manager.
+const backupTempFileSuffix = '.part';
+
+/// Writes [contents] to [file] atomically: the bytes go to a sibling
+/// temp file first, are flushed to disk, and only then renamed into
+/// place.
+///
+/// A plain `writeAsString` truncates the destination and streams into it,
+/// so a process killed mid-write (which is routine for the unattended
+/// auto-backup job — the OS can stop it at any moment) leaves a partial
+/// file under the real, valid-looking name. `decideAutoBackup` reads only
+/// filenames, so it would count that day as backed up and the day would
+/// silently have no usable snapshot. `rename` on the same filesystem is
+/// atomic, so the destination path only ever holds a complete file — or,
+/// if the write died, the previous file (or nothing at all).
+///
+/// The temp file is removed on failure so a killed or failed write does
+/// not accumulate `.part` litter in the backup directory.
+Future<File> writeFileAtomically(File file, String contents) async {
+  final tempFile = File('${file.path}$backupTempFileSuffix');
+  try {
+    final sink = tempFile.openWrite();
+    sink.write(contents);
+    await sink.flush();
+    await sink.close();
+    return await tempFile.rename(file.path);
+  } catch (_) {
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+    rethrow;
+  }
+}
+
 const manualBackupFilePrefix = 'inventaris_backup_';
 
 /// Filename prefix for a backup written unattended by the auto-backup job.

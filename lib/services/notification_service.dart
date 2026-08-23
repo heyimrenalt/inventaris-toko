@@ -10,19 +10,36 @@ import '../data/models/product.dart';
 import '../data/repositories/app_settings_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/repositories/stock_mutation_repository.dart';
+import '../domain/backup_reminder_policy.dart';
 import '../domain/prioritas_kulakan_calculator.dart';
 import '../ui/screens/beranda/prioritas_kulakan_screen.dart';
 import 'auto_backup_service.dart';
 
 const dailySummaryChannelId = 'channel_daily_summary';
 const stockCriticalChannelId = 'channel_stock_critical';
+const backupReminderChannelId = 'channel_backup_reminder';
 
 const _dailySummaryTaskName = 'dailySummaryTask';
 const _dailySummaryRetryTaskName = 'dailySummaryRetryTask';
 const _payloadDailySummary = 'daily_summary';
 const _payloadCriticalStock = 'critical_stock';
+const _payloadBackupReminder = 'backup_reminder';
+
+/// Workmanager task behind the stale-export reminder. Its own task (not a
+/// branch of the auto-backup job) for the same reason the auto-backup job
+/// is separate from the daily summary: the two answer different questions
+/// — "is today's snapshot taken?" vs "has a backup left the phone
+/// lately?" — and neither should be able to switch the other off.
+const backupReminderTaskName = 'backupReminderTask';
+
+/// How often the OS is asked to run [backupReminderTaskName]. Daily: the
+/// decision it makes has day granularity, and a deferred tick simply
+/// pushes one reminder a few hours later, never skips it — the due time
+/// is recomputed from stored timestamps on every run.
+const backupReminderTickFrequency = Duration(hours: 24);
 
 const _dailySummaryNotificationId = 1;
+const backupReminderNotificationId = 2;
 
 /// Up to 3 daily "Alert stok kritis" slots, each with its own fixed
 /// notification ID ([criticalStockAlertNotificationId]) and alarm ID
@@ -272,6 +289,15 @@ class NotificationService {
       ),
     );
 
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        backupReminderChannelId,
+        'Pengingat Backup',
+        description: 'Pengingat mencadangkan data ke luar HP',
+        importance: Importance.high,
+      ),
+    );
+
     await Workmanager().initialize(callbackDispatcher);
     await AndroidAlarmManager.initialize();
   }
@@ -378,6 +404,71 @@ class NotificationService {
       autoBackupTaskName,
       frequency: autoBackupTickFrequency,
     );
+  }
+
+  /// Registers the daily stale-export reminder check (see
+  /// [executeBackupReminderTask]). Unconditional and idempotent for the
+  /// same reasons as [scheduleAutoBackup]: this reminder is the last line
+  /// of defence against total data loss, so it is not tied to any
+  /// notification toggle.
+  static Future<void> scheduleBackupReminder() async {
+    await scheduler.registerPeriodic(
+      backupReminderTaskName,
+      backupReminderTaskName,
+      frequency: backupReminderTickFrequency,
+    );
+  }
+
+  /// Runs the stale-export check and, if a reminder is due, sends it.
+  ///
+  /// Staleness is measured purely from [AppSettings.lastExportedAt] —
+  /// stamped only when a generated file actually leaves the phone via the
+  /// share sheet. Auto-backups stamp `lastGeneratedAt` instead and are
+  /// deliberately invisible here (see [staleExportThreshold]).
+  static Future<void> executeBackupReminderTask(Isar isar, {DateTime? now}) async {
+    final effectiveNow = now ?? DateTime.now();
+    final repository = AppSettingsRepository(isar);
+    final settings = await repository.get();
+
+    final decision = decideBackupReminder(
+      now: effectiveNow,
+      lastExportedAt: settings.lastExportedAt,
+      lastRemindedAt: settings.lastBackupReminderAt,
+      firstSeenAt: settings.backupReminderFirstSeenAt,
+    );
+
+    // Anchor the never-exported grace period on the first run, whether or
+    // not anything is sent this time.
+    if (settings.backupReminderFirstSeenAt == null) {
+      await repository.updateBackupReminderState(firstSeenAt: effectiveNow);
+    }
+
+    if (!decision.shouldNotifyNow) return;
+
+    await sender.showNotification(
+      id: backupReminderNotificationId,
+      title: 'Waktunya backup data Toko Mama',
+      body: buildBackupReminderBody(settings.lastExportedAt, effectiveNow),
+      channelId: backupReminderChannelId,
+      channelName: 'Pengingat Backup',
+      channelDescription: 'Pengingat mencadangkan data ke luar HP',
+      highImportance: true,
+      payload: _payloadBackupReminder,
+    );
+
+    await repository.updateBackupReminderState(lastRemindedAt: effectiveNow);
+  }
+
+  /// Body for the stale-export reminder. Names how long it has been (or
+  /// that it has never happened) so the notification carries the reason,
+  /// not just the nag — same shape as the critical-stock body, which
+  /// leads with the facts and ends with the action.
+  static String buildBackupReminderBody(DateTime? lastExportedAt, DateTime now) {
+    if (lastExportedAt == null) {
+      return 'Data belum pernah dicadangkan ke luar HP — backup sekarang.';
+    }
+    final days = now.difference(lastExportedAt).inDays;
+    return 'Backup terakhir $days hari lalu — backup sekarang.';
   }
 
   /// Registers (or cancels) the up-to-3 exact daily alarms behind "Alert
@@ -635,6 +726,8 @@ void callbackDispatcher() {
         await NotificationService.executeDailySummaryTask(isar);
       case autoBackupTaskName:
         await AutoBackupService(isar).runIfNeeded();
+      case backupReminderTaskName:
+        await NotificationService.executeBackupReminderTask(isar);
     }
     return true;
   });
