@@ -18,6 +18,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/time_picker_sheet.dart';
@@ -417,9 +418,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
 
     widget.onDataReset?.call();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Semua data berhasil dihapus.')),
-    );
+    AppSnack.success(context, 'Semua data berhasil dihapus.');
   }
 
   Future<bool?> _showHapusSemuaDataWarningDialog() {
@@ -553,9 +552,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
       if (!mounted) return;
       setState(() => _settings = settings);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data berhasil dicadangkan')),
-      );
+      AppSnack.success(context, 'Data berhasil dicadangkan');
 
       try {
         // Best-effort and deliberately its own try/catch, separate from
@@ -582,9 +579,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     } catch (e) {
       if (!mounted) return;
       _dismissProgressDialog();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mencadangkan data: $e')),
-      );
+      AppSnack.error(context, 'Gagal mencadangkan data: $e');
     }
   }
 
@@ -641,9 +636,7 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
 
       widget.onDataReset?.call();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data berhasil dipulihkan')),
-      );
+      AppSnack.success(context, 'Data berhasil dipulihkan');
     } on BackupValidationException catch (e) {
       if (!mounted) return;
       _dismissProgressDialog();

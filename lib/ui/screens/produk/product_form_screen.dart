@@ -20,6 +20,7 @@ import '../../theme/app_dimensions.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/category_picker_field.dart';
 
 /// Shared add/edit form. [existing] null means "add"; non-null means
@@ -230,8 +231,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       }
     } on PhotoPermissionDeniedException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak dapat mengakses kamera/galeri. Periksa izin aplikasi.')),
+      AppSnack.error(
+        context,
+        'Tidak dapat mengakses kamera/galeri. Periksa izin aplikasi.',
       );
     }
   }
@@ -352,8 +354,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.isEditing ? 'Produk diperbarui' : 'Produk ditambahkan')),
+      AppSnack.success(
+        context,
+        widget.isEditing ? 'Produk diperbarui' : 'Produk ditambahkan',
       );
       Navigator.of(context).pop(true);
     } on ValidationException catch (e) {

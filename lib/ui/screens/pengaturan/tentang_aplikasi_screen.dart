@@ -9,6 +9,7 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/app_snack.dart';
 
 /// Simple, static "about" page — no external links and nothing editable,
 /// since this is an offline-first app with no feedback/support surface to
@@ -60,9 +61,7 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
     _iconTapCount++;
     if (_iconTapCount < 5) return;
     _iconTapCount = 0;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Terima kasih sudah pakai Inventaris Toko!')),
-    );
+    AppSnack.info(context, 'Terima kasih sudah pakai Inventaris Toko!');
   }
 
   /// `dart:io`'s [Platform.version] returns a full string like

@@ -9,6 +9,7 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/unit_conversion.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../../widgets/product_search_bar.dart';
@@ -145,7 +146,7 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
 
   Future<void> _undoMutation(ScaffoldMessengerState messenger, int mutationId) async {
     await _mutationRepository.undoMutation(mutationId);
-    messenger.showSnackBar(const SnackBar(content: Text('Mutasi dibatalkan')));
+    AppSnack.infoOn(messenger, 'Mutasi dibatalkan');
   }
 
   Future<void> _save() async {
@@ -195,37 +196,25 @@ class _CatatStokKeluarBatchScreenState extends State<CatatStokKeluarBatchScreen>
       if (succeeded.length == 1 && lastMutation != null) {
         final item = succeeded.first;
         final mutationId = lastMutation.id;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
+        AppSnack.actionOn(
+          messenger,
+          message:
               'Tersimpan: ${item.product.name} -${formatMutationQuantity(item.qtyInPcs)}',
-            ),
-            duration: const Duration(seconds: 5),
-            // SnackBar.persist defaults to true whenever action is
-            // non-null (see SnackBar's own doc comment on `persist`),
-            // which makes the `duration` above a no-op — the SnackBar
-            // would otherwise sit there until manually swiped away
-            // instead of auto-dismissing.
-            persist: false,
-            action: SnackBarAction(
-              label: 'Batalkan',
-              onPressed: () => _undoMutation(messenger, mutationId),
-            ),
-          ),
+          actionLabel: 'Batalkan',
+          duration: const Duration(seconds: 5),
+          onAction: () => _undoMutation(messenger, mutationId),
         );
       } else {
-        messenger.showSnackBar(
-          SnackBar(content: Text('${succeeded.length} barang berhasil dicatat')),
+        AppSnack.successOn(
+          messenger,
+          '${succeeded.length} barang berhasil dicatat',
         );
       }
       Navigator.of(context).pop(true);
     } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '${succeeded.length} berhasil, ${failedNames.length} gagal: ${failedNames.join(', ')}',
-          ),
-        ),
+      AppSnack.errorOn(
+        messenger,
+        '${succeeded.length} berhasil, ${failedNames.length} gagal: ${failedNames.join(', ')}',
       );
     }
   }

@@ -5,6 +5,7 @@ import '../../../data/models/product.dart';
 import '../../../data/models/stock_mutation.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
@@ -81,19 +82,15 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Mutasi dibatalkan'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Urungkan',
-          textColor: const Color(0xFF69F0AE),
-          onPressed: () async {
-            await _mutationRepository.undoMutation(reversal.id);
-            await _load();
-          },
-        ),
-      ),
+    AppSnack.action(
+      context,
+      message: 'Mutasi dibatalkan',
+      actionLabel: 'Urungkan',
+      duration: const Duration(seconds: 5),
+      onAction: () async {
+        await _mutationRepository.undoMutation(reversal.id);
+        await _load();
+      },
     );
   }
 

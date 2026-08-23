@@ -11,6 +11,7 @@ import '../../../data/repositories/repository_exceptions.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/prioritas_kulakan_calculator.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../../widgets/unit_qty_field.dart';
 
@@ -185,22 +186,13 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
       final sign = _type == StockMutationType.stockIn ? '+' : '-';
       final messenger = ScaffoldMessenger.of(context);
       final mutationId = mutation.id;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
+      AppSnack.actionOn(
+        messenger,
+        message:
             '$verb dicatat: $sign${formatMutationQuantity(_quantityInPcs)} ${product.name}',
-          ),
-          duration: const Duration(seconds: 5),
-          // SnackBar.persist defaults to true whenever action is non-null
-          // (see SnackBar's own doc comment on `persist`), which makes the
-          // `duration` above a no-op — the SnackBar would otherwise sit
-          // there until manually swiped away instead of auto-dismissing.
-          persist: false,
-          action: SnackBarAction(
-            label: 'Batalkan',
-            onPressed: () => _undoMutation(messenger, mutationId),
-          ),
-        ),
+        actionLabel: 'Batalkan',
+        duration: const Duration(seconds: 5),
+        onAction: () => _undoMutation(messenger, mutationId),
       );
       Navigator.of(context).pop(true);
     } on InsufficientStockException catch (e) {
@@ -226,7 +218,7 @@ class _CatatMutasiScreenState extends State<CatatMutasiScreen> {
   /// to an ancestor Scaffold that outlives this screen).
   Future<void> _undoMutation(ScaffoldMessengerState messenger, int mutationId) async {
     await _mutationRepository.undoMutation(mutationId);
-    messenger.showSnackBar(const SnackBar(content: Text('Mutasi dibatalkan')));
+    AppSnack.infoOn(messenger, 'Mutasi dibatalkan');
   }
 
   @override

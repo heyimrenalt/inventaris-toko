@@ -92,6 +92,19 @@ abstract final class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.primary),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          color: AppColors.white,
+          fontSize: 14,
+        ),
+        actionTextColor: AppColors.white,
+      ),
       dividerTheme: const DividerThemeData(color: AppColors.gray300, thickness: 1),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.white,

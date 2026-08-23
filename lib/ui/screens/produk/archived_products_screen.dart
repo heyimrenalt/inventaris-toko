@@ -8,6 +8,7 @@ import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 
 class ArchivedProductsScreen extends StatefulWidget {
   const ArchivedProductsScreen({super.key, required this.isar});
@@ -50,9 +51,7 @@ class _ArchivedProductsScreenState extends State<ArchivedProductsScreen> {
   Future<void> _restore(Product product) async {
     await _productRepository.unarchive(product.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Produk dipulihkan')),
-    );
+    AppSnack.success(context, 'Produk dipulihkan');
     await _load();
   }
 

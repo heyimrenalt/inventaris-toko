@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/profit_report.dart';
+import 'app_snack.dart';
 import 'date_range_picker_sheet.dart';
 
 /// Formats a [ReportPeriod] for display. Shared with any caller that
@@ -132,12 +133,10 @@ class ReportPeriodFilter extends StatelessWidget {
       onChanged(ReportPeriod.days(picked.start, picked.end, today: today));
     } on ArgumentError {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          key: Key('report_period_inverted_warning'),
-          content: Text(kInvertedRangeWarning),
-          backgroundColor: Colors.red,
-        ),
+      AppSnack.error(
+        context,
+        kInvertedRangeWarning,
+        key: const Key('report_period_inverted_warning'),
       );
     }
   }

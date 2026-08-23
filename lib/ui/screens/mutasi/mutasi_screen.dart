@@ -13,6 +13,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/date_range_filter.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/mutation_list_item.dart';
@@ -167,20 +168,16 @@ class _MutasiScreenState extends State<MutasiScreen> {
     await _load();
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Mutasi dibatalkan'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(
-          label: 'Urungkan',
-          textColor: const Color(0xFF69F0AE),
-          onPressed: () async {
-            // Reversing the reversal re-applies the original quantity.
-            await _mutationRepository.undoMutation(reversal.id);
-            await _load();
-          },
-        ),
-      ),
+    AppSnack.action(
+      context,
+      message: 'Mutasi dibatalkan',
+      actionLabel: 'Urungkan',
+      duration: const Duration(seconds: 5),
+      onAction: () async {
+        // Reversing the reversal re-applies the original quantity.
+        await _mutationRepository.undoMutation(reversal.id);
+        await _load();
+      },
     );
   }
 

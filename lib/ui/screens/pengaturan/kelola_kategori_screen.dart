@@ -15,6 +15,7 @@ import '../../theme/app_dimensions.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_search_bar.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/category_form_dialog.dart';
 import '../../widgets/confirm_dialog.dart';
 
@@ -157,10 +158,6 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     return _categories.where((c) => keep.contains(c.id)).toList();
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   Future<void> _showCategoryFormDialog({Category? existing, int? parentId}) async {
     final result = await showCategoryFormDialog(
       context: context,
@@ -173,7 +170,11 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
       setState(() => _expandedIds.add(parentId));
     }
     await _loadData();
-    _showSnackBar(existing == null ? 'Kategori ditambahkan' : 'Kategori diperbarui');
+    if (!mounted) return;
+    AppSnack.success(
+      context,
+      existing == null ? 'Kategori ditambahkan' : 'Kategori diperbarui',
+    );
   }
 
   Future<void> _confirmDelete(Category category) async {
@@ -190,7 +191,8 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     try {
       await _categoryRepository.delete(category.id);
       await _loadData();
-      _showSnackBar('Kategori dihapus');
+      if (!mounted) return;
+      AppSnack.success(context, 'Kategori dihapus');
     } on CategoryInUseException catch (e) {
       if (!mounted) return;
       await _showBlockedDialog(

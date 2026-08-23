@@ -18,6 +18,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/mutation_list_item.dart';
 import '../mutasi/catat_mutasi_screen.dart';
@@ -192,9 +193,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         await widget.photoStorageService.deletePhoto(photoPath);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produk dihapus')),
-      );
+      AppSnack.success(context, 'Produk dihapus');
       Navigator.of(context).pop(true);
     } on ProductHasHistoryException catch (e) {
       if (!mounted) return;
@@ -248,18 +247,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     await _productRepository.archive(product.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Produk diarsipkan')),
-    );
+    AppSnack.success(context, 'Produk diarsipkan');
     Navigator.of(context).pop(true);
   }
 
   Future<void> _unarchiveProduct(Product product) async {
     await _productRepository.unarchive(product.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Produk dipulihkan')),
-    );
+    AppSnack.success(context, 'Produk dipulihkan');
     await _load();
   }
 

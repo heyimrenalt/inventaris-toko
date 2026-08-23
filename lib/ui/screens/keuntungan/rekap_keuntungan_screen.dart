@@ -16,6 +16,7 @@ import '../../theme/app_dimensions.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/report_period_filter.dart';
 import '../../widgets/secondary_button.dart';
@@ -118,9 +119,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      AppSnack.error(context, 'Error: $e');
     }
   }
 
@@ -187,22 +186,10 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
 
       if (!mounted) return;
 
-      // Show snackbar properly
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ Rekap berhasil disalin ke clipboard'),
-          duration: Duration(seconds: 3),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      AppSnack.success(context, '✓ Rekap berhasil disalin ke clipboard');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: AppColors.redPrimary,
-        ),
-      );
+      AppSnack.error(context, 'Error: $e');
     }
   }
 
@@ -266,12 +253,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal membuat PDF: $e'),
-          backgroundColor: AppColors.redPrimary,
-        ),
-      );
+      AppSnack.error(context, 'Gagal membuat PDF: $e');
     } finally {
       // Always re-enable the button, even on error, so it can never get
       // stuck permanently disabled.

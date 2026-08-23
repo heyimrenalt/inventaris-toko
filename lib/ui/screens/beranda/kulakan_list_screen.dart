@@ -16,6 +16,7 @@ import '../../../data/repositories/restock_list_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
 import '../../../domain/unit_conversion.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_snack.dart';
 import '../../widgets/restock_qty_field.dart';
 
 /// A persisted kulakan (restock) shopping list for one store/supplier —
@@ -148,18 +149,14 @@ class _KulakanListScreenState extends State<KulakanListScreen> {
     );
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Daftar kulakan disalin ke clipboard')),
-    );
+    AppSnack.info(context, 'Daftar kulakan disalin ke clipboard');
   }
 
   Future<void> _complete() async {
     setState(() => _completing = true);
     await _restockListRepository.complete(widget.restockListId);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Daftar kulakan selesai')),
-    );
+    AppSnack.success(context, 'Daftar kulakan selesai');
     Navigator.of(context).pop();
   }
 

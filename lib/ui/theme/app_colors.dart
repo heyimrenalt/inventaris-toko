@@ -18,6 +18,10 @@ abstract final class AppColors {
   static const redText = Color(0xFFC62828);
   static const redPrimary = Color(0xFFD32F2F);
 
+  /// Success background for feedback surfaces (SnackBars). Darker than
+  /// [primary] so white text on top stays readable.
+  static const successPrimary = Color(0xFF2E7D32);
+
   static const darkText = Color(0xFF1C1C1C);
   static const gray700 = Color(0xFF616161);
 
