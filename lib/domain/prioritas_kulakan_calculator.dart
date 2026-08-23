@@ -151,7 +151,12 @@ class PrioritasKulakanCalculator {
 
     final aDays = a.estimatedDaysRemaining ?? (a.isOutOfStock ? -1 : double.infinity);
     final bDays = b.estimatedDaysRemaining ?? (b.isOutOfStock ? -1 : double.infinity);
-    return aDays.compareTo(bDays);
+    final daysCompare = aDays.compareTo(bDays);
+    if (daysCompare != 0) return daysCompare;
+
+    final velocityCompare = b.dailyVelocity.compareTo(a.dailyVelocity); // desc
+    if (velocityCompare != 0) return velocityCompare;
+    return a.product.id.compareTo(b.product.id); // asc
   }
 
   int _urgencyRank(PriorityUrgency urgency) {

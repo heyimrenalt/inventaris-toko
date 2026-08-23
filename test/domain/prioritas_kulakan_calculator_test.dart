@@ -378,6 +378,71 @@ void main() {
     expect(results.last.urgency, PriorityUrgency.red);
   });
 
+  test('calculateAll breaks a tie between two out-of-stock products by velocity, then by id', () {
+    // Both out of stock (estimatedDays == -1, red), so urgency rank and
+    // estimatedDays are identical: only the velocity/id tie-break can
+    // decide the order, and it must be the same order every run.
+    final fast = product(currentStock: 0)..id = 11;
+    final slow = product(currentStock: 0)..id = 12;
+
+    final results = calculator.calculateAll(
+      products: [slow, fast],
+      stockOutMutationsByProductId: {
+        11: confidentMutations(count: 5, quantityEach: 60), // 10.0/day
+        12: confidentMutations(count: 5, quantityEach: 6), // 1.0/day
+      },
+      restockLeadTimeDays: defaultLeadTime,
+      restockCoverDays: defaultCoverDays,
+      now: now,
+    );
+
+    expect(results.map((r) => r.product.id).toList(), [11, 12]);
+  });
+
+  test('calculateAll falls back to product.id ascending when velocity ties too', () {
+    final lowerId = product(currentStock: 0)..id = 21;
+    final higherId = product(currentStock: 0)..id = 22;
+
+    // Identical history: same urgency, same estimatedDays, same velocity.
+    final mutations = confidentMutations(count: 5, quantityEach: 6);
+
+    final results = calculator.calculateAll(
+      products: [higherId, lowerId],
+      stockOutMutationsByProductId: {21: mutations, 22: mutations},
+      restockLeadTimeDays: defaultLeadTime,
+      restockCoverDays: defaultCoverDays,
+      now: now,
+    );
+
+    expect(results.map((r) => r.product.id).toList(), [21, 22]);
+  });
+
+  test('a product whose sales are all older than the recent window keeps its all-time weight', () {
+    // recentTotal == 0 (nothing within 30 days), allTimeTotal == 90 over
+    // 90 days => all-time rate 1.0/day, weighted 0.3 => 0.3/day. The
+    // product must stay eligible rather than being dropped as "no
+    // velocity", and can still surface as red.
+    final mutations = [
+      stockOut(quantity: 45, createdAt: now.subtract(const Duration(days: 90))),
+      stockOut(quantity: 45, createdAt: now.subtract(const Duration(days: 60))),
+    ];
+
+    final result = calculator.calculate(
+      product: product(currentStock: 0.5),
+      stockOutMutations: mutations,
+      restockLeadTimeDays: defaultLeadTime,
+      restockCoverDays: defaultCoverDays,
+      now: now,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.dailyVelocity, closeTo(0.3, 1e-9));
+    expect(result.dailyVelocity, greaterThan(0));
+    // 0.5 / 0.3 = 1.67 days, below the 3-day lead time.
+    expect(result.estimatedDaysRemaining, closeTo(0.5 / 0.3, 1e-9));
+    expect(result.urgency, PriorityUrgency.red);
+  });
+
   group('formatEstimatedDaysLabel', () {
     test('below 1 day reads "kurang dari 1 hari"', () {
       expect(formatEstimatedDaysLabel(0.5), 'kurang dari 1 hari');
