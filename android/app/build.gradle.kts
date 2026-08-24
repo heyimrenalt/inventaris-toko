@@ -55,18 +55,18 @@ android {
             // (see android/app/key.properties, generated once and never
             // regenerated — regenerating it or losing it breaks updates for
             // anyone who already installed the app, forcing an uninstall and
-            // losing their local Isar data). Fail loudly on a fresh clone
-            // rather than silently falling back to the debug keystore, which
-            // would produce an APK that can never update a real install.
+            // losing their local Isar data). Deliberately left *unsigned*
+            // rather than falling back to the debug keystore, which would
+            // produce an APK that can never update a real install. The
+            // missing-keystore case is turned into a hard failure by the
+            // taskGraph check at the bottom of this file — not by throwing
+            // here, since this block is evaluated at configuration time for
+            // every Gradle invocation, which would break `flutter run` and
+            // the integration tests on a fresh clone that has no keystore.
             signingConfig = if (hasKeystoreProperties) {
                 signingConfigs.getByName("release")
             } else {
-                throw GradleException(
-                    "android/app/key.properties not found. Release builds must be " +
-                    "signed with the permanent release keystore, not the debug " +
-                    "keystore. See android/app/key.properties.example, or generate " +
-                    "one with keytool (see project notes) before running a release build."
-                )
+                null
             }
             // This project had never been release-built before this round of
             // on-device verification. R8 minification/obfuscation (on by
@@ -98,4 +98,27 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Fails a release build that has no keystore, while leaving debug builds
+// (`flutter run`, `flutter test integration_test`) working on a fresh clone.
+// Checked against the resolved task graph rather than thrown from the
+// `release { }` block above: that block runs during configuration on *every*
+// Gradle invocation, so throwing there made even a debug run impossible
+// without a keystore.
+gradle.taskGraph.whenReady {
+    if (hasKeystoreProperties) return@whenReady
+    val releaseTask = allTasks.firstOrNull { task ->
+        task.project == project &&
+            task.name.contains("Release") &&
+            listOf("assemble", "bundle", "package", "install").any { task.name.startsWith(it) }
+    } ?: return@whenReady
+
+    throw GradleException(
+        "Cannot run '${releaseTask.name}': android/app/key.properties not found. " +
+        "Release builds must be signed with the permanent release keystore, not " +
+        "the debug keystore — a debug-signed APK can never update a real install. " +
+        "Copy android/app/key.properties.example to android/app/key.properties and " +
+        "fill in the real passwords, or generate the keystore first with keytool."
+    )
 }
