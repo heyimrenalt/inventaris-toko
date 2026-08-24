@@ -1,11 +1,21 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keystorePropertiesFile = rootProject.file("app/key.properties")
+val keystoreProperties = Properties()
+val hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace = "com.example.inventaris_toko"
+    namespace = "com.tokomama.inventaris"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -18,8 +28,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.inventaris_toko"
+        applicationId = "com.tokomama.inventaris"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // isar_community_flutter_libs requires minSdk 23.
@@ -29,11 +38,36 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasKeystoreProperties) {
+            create("release") {
+                storeFile = rootProject.file("app/" + keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Release builds must be signed with the permanent release keystore
+            // (see android/app/key.properties, generated once and never
+            // regenerated — regenerating it or losing it breaks updates for
+            // anyone who already installed the app, forcing an uninstall and
+            // losing their local Isar data). Fail loudly on a fresh clone
+            // rather than silently falling back to the debug keystore, which
+            // would produce an APK that can never update a real install.
+            signingConfig = if (hasKeystoreProperties) {
+                signingConfigs.getByName("release")
+            } else {
+                throw GradleException(
+                    "android/app/key.properties not found. Release builds must be " +
+                    "signed with the permanent release keystore, not the debug " +
+                    "keystore. See android/app/key.properties.example, or generate " +
+                    "one with keytool (see project notes) before running a release build."
+                )
+            }
             // This project had never been release-built before this round of
             // on-device verification. R8 minification/obfuscation (on by
             // Flutter's own default, even with no `isMinifyEnabled` set here)

@@ -1,4 +1,4 @@
-package com.example.inventaris_toko
+package com.tokomama.inventaris
 
 import io.flutter.embedding.android.FlutterActivity
 
