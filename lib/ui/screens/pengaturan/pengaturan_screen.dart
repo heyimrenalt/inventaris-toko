@@ -21,6 +21,7 @@ import '../../widgets/app_header.dart';
 import '../../widgets/app_snack.dart';
 import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/glass_bottom_nav.dart';
+import '../../widgets/settings_group.dart';
 import '../../widgets/time_picker_sheet.dart';
 import 'kelola_kategori_screen.dart';
 import 'tentang_aplikasi_screen.dart';
@@ -690,185 +691,168 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
   Widget build(BuildContext context) {
     final settings = _settings;
     return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: const AppHeader(title: 'Pengaturan'),
       body: ListView(
         // Clears the floating glass nav bar. extendBody already reports the
         // bar's full height as padding.bottom, so this is just that plus a
         // small gap.
         padding: EdgeInsets.only(
+          top: AppSpacing.lg,
           bottom: MediaQuery.of(context).padding.bottom + GlassBottomNav.contentGap,
         ),
         children: [
-          const _SectionHeader('Produk'),
-          ListTile(
-            minVerticalPadding: AppSpacing.lg,
-            leading: const Icon(Icons.category),
-            // TODO(ui-migration): every ListTile/SwitchListTile title on this
-            // screen is a raw fontSize:16 — AppTextStyles.subheading is
-            // 16/w700, so tokenizing them would bold the whole settings list.
-            // Left raw pending a design decision (applies to all tiles below).
-            title: const Text('Kelola kategori', style: TextStyle(fontSize: 16)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => KelolaKategoriScreen.show(context, isar: widget.isar),
+          SettingsGroup(
+            title: 'Produk',
+            children: [
+              SettingsRow(
+                icon: Icons.category,
+                title: 'Kelola kategori',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => KelolaKategoriScreen.show(context, isar: widget.isar),
+              ),
+            ],
           ),
-          if (settings != null) ..._buildPrioritasKulakanSection(settings),
-          if (settings != null) ..._buildNotifikasiSection(settings),
-          const _SectionHeader('Data'),
-          ListTile(
-            key: const Key('pengaturan_cadangkan_data_tile'),
-            minVerticalPadding: AppSpacing.lg,
-            leading: const Icon(Icons.backup),
-            title: const Text('Cadangkan Data', style: TextStyle(fontSize: 16)),
-            // TODO(ui-migration): subtitles here are fontSize:13 — the nearest
-            // token (AppTextStyles.caption) is 12px and gray700, changing both
-            // size and color. Left raw (applies to every subtitle below).
-            subtitle: Text(
-              _formatLastBackupSubtitle(settings?.lastExportedAt),
-              style: const TextStyle(fontSize: 13),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _cadangkanData,
+          if (settings != null) _buildPrioritasKulakanSection(settings),
+          if (settings != null) _buildNotifikasiSection(settings),
+          SettingsGroup(
+            title: 'Data',
+            children: [
+              SettingsRow(
+                key: const Key('pengaturan_cadangkan_data_tile'),
+                icon: Icons.backup,
+                title: 'Cadangkan Data',
+                subtitle: _formatLastBackupSubtitle(settings?.lastExportedAt),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _cadangkanData,
+              ),
+              SettingsRow(
+                key: const Key('pengaturan_pulihkan_data_tile'),
+                icon: Icons.restore,
+                title: 'Pulihkan Data',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _pulihkanData,
+              ),
+              SettingsRow(
+                key: const Key('pengaturan_hapus_semua_data_tile'),
+                // TODO(ui-migration): Colors.red (#F44336) here and on the
+                // title below is not AppColors.redPrimary (#D32F2F) or
+                // redText (#C62828) — three different reds express one
+                // destructive concept across this file (see also the
+                // FilledButton fills in the delete/restore dialogs). Needs a
+                // design pass, not a mechanical swap.
+                icon: Icons.delete_forever,
+                iconColor: Colors.red,
+                title: 'Hapus semua data',
+                titleColor: Colors.red,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _hapusSemuaData,
+              ),
+            ],
           ),
-          ListTile(
-            key: const Key('pengaturan_pulihkan_data_tile'),
-            minVerticalPadding: AppSpacing.lg,
-            leading: const Icon(Icons.restore),
-            title: const Text('Pulihkan Data', style: TextStyle(fontSize: 16)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _pulihkanData,
-          ),
-          ListTile(
-            key: const Key('pengaturan_hapus_semua_data_tile'),
-            minVerticalPadding: AppSpacing.lg,
-            // TODO(ui-migration): Colors.red (#F44336) here and on the title
-            // below is not AppColors.redPrimary (#D32F2F) or redText
-            // (#C62828) — three different reds express one destructive
-            // concept across this file (see also the FilledButton fills in
-            // the delete/restore dialogs). Needs a design pass, not a
-            // mechanical swap.
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text(
-              'Hapus semua data',
-              style: TextStyle(fontSize: 16, color: Colors.red),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _hapusSemuaData,
-          ),
-          const _SectionHeader('Lainnya'),
-          ListTile(
-            key: const Key('pengaturan_tentang_aplikasi_tile'),
-            minVerticalPadding: AppSpacing.lg,
-            leading: const Icon(Icons.info_outline),
-            title: const Text('Tentang Aplikasi', style: TextStyle(fontSize: 16)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TentangAplikasiScreen()),
-              );
-            },
+          SettingsGroup(
+            title: 'Lainnya',
+            children: [
+              SettingsRow(
+                key: const Key('pengaturan_tentang_aplikasi_tile'),
+                icon: Icons.info_outline,
+                title: 'Tentang Aplikasi',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TentangAplikasiScreen()),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildPrioritasKulakanSection(AppSettings settings) {
-    return [
-      const _SectionHeader('Prioritas Kulakan'),
-      ListTile(
-        key: const Key('pengaturan_restock_lead_time_tile'),
-        minVerticalPadding: AppSpacing.lg,
-        leading: const Icon(Icons.warning_amber_outlined),
-        title: const Text(restockLeadTimeLabel, style: TextStyle(fontSize: 16)),
-        subtitle: const Text(
-          restockLeadTimeDescription,
-          style: TextStyle(fontSize: 13),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // TODO(ui-migration): trailing values are fontSize:16 —
-            // AppTextStyles.subheading would change both weight (w700) and
-            // color. Left raw (applies to every trailing value below).
-            Text('${settings.restockLeadTimeDays} hari', style: const TextStyle(fontSize: 16)),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-        onTap: _editRestockLeadTimeDays,
-      ),
-      ListTile(
-        key: const Key('pengaturan_restock_cover_days_tile'),
-        minVerticalPadding: AppSpacing.lg,
-        leading: const Icon(Icons.shopping_cart_outlined),
-        title: const Text(restockCoverDaysLabel, style: TextStyle(fontSize: 16)),
-        subtitle: const Text(
-          restockCoverDaysDescription,
-          style: TextStyle(fontSize: 13),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${settings.restockCoverDays} hari', style: const TextStyle(fontSize: 16)),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-        onTap: _editRestockCoverDays,
-      ),
-    ];
-  }
-
-  List<Widget> _buildNotifikasiSection(AppSettings settings) {
-    final time = TimeOfDay(hour: settings.dailySummaryHour, minute: settings.dailySummaryMinute);
-    return [
-      const _SectionHeader('Notifikasi'),
-      // TODO(ui-migration): this and the "Alert stok kritis" SwitchListTile
-      // below are the only rows with no leading icon and no
-      // minVerticalPadding — they sit shorter and unindented next to every
-      // other tile. Deliberately not fixed here (layout change).
-      SwitchListTile(
-        key: const Key('pengaturan_daily_summary_toggle'),
-        title: const Text('Ringkasan harian', style: TextStyle(fontSize: 16)),
-        value: settings.dailySummaryEnabled,
-        onChanged: _toggleDailySummary,
-      ),
-      if (settings.dailySummaryEnabled)
-        ListTile(
-          key: const Key('pengaturan_daily_summary_time'),
-          minVerticalPadding: AppSpacing.lg,
-          leading: const Icon(Icons.access_time),
-          title: const Text('Jam pengiriman', style: TextStyle(fontSize: 16)),
-          trailing: ConstrainedBox(
-            // TODO(ui-migration): off-scale magic number, and the identical
-            // trailing-time content in _buildCriticalStockAlertTimeRows is
-            // capped at 70 instead — two widths for one thing.
-            constraints: const BoxConstraints(maxWidth: 90),
-            child: Text(
-              time.format(context),
-              style: const TextStyle(fontSize: 16),
-              textAlign: TextAlign.end,
-              overflow: TextOverflow.ellipsis,
-            ),
+  Widget _buildPrioritasKulakanSection(AppSettings settings) {
+    return SettingsGroup(
+      title: 'Prioritas Kulakan',
+      children: [
+        SettingsRow(
+          key: const Key('pengaturan_restock_lead_time_tile'),
+          icon: Icons.warning_amber_outlined,
+          title: restockLeadTimeLabel,
+          description: restockLeadTimeDescription,
+          topAlign: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${settings.restockLeadTimeDays} hari', style: const TextStyle(fontSize: 16)),
+              const Icon(Icons.chevron_right),
+            ],
           ),
-          onTap: _pickDailySummaryTime,
+          onTap: _editRestockLeadTimeDays,
         ),
-      SwitchListTile(
-        key: const Key('pengaturan_critical_stock_toggle'),
-        title: const Text('Alert stok kritis', style: TextStyle(fontSize: 16)),
-        value: settings.criticalStockAlertEnabled,
-        onChanged: _toggleCriticalStockAlert,
-      ),
-      if (settings.criticalStockAlertEnabled) ..._buildCriticalStockAlertTimeRows(settings),
-      ListTile(
-        key: const Key('pengaturan_notification_troubleshoot_tile'),
-        minVerticalPadding: AppSpacing.lg,
-        leading: const Icon(Icons.help_outline),
-        title: const Text('Notifikasi tidak muncul?', style: TextStyle(fontSize: 16)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _showBatteryOptimizationDialog,
-      ),
-    ];
+        SettingsRow(
+          key: const Key('pengaturan_restock_cover_days_tile'),
+          icon: Icons.shopping_cart_outlined,
+          title: restockCoverDaysLabel,
+          description: restockCoverDaysDescription,
+          topAlign: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${settings.restockCoverDays} hari', style: const TextStyle(fontSize: 16)),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: _editRestockCoverDays,
+        ),
+      ],
+    );
   }
 
+  Widget _buildNotifikasiSection(AppSettings settings) {
+    final time = TimeOfDay(hour: settings.dailySummaryHour, minute: settings.dailySummaryMinute);
+    return SettingsGroup(
+      title: 'Notifikasi',
+      children: [
+        SwitchListTile(
+          key: const Key('pengaturan_daily_summary_toggle'),
+          title: const Text('Ringkasan harian', style: TextStyle(fontSize: 16)),
+          value: settings.dailySummaryEnabled,
+          onChanged: _toggleDailySummary,
+        ),
+        if (settings.dailySummaryEnabled)
+          SettingsRow(
+            key: const Key('pengaturan_daily_summary_time'),
+            icon: Icons.access_time,
+            title: 'Jam pengiriman',
+            trailing: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 90),
+              child: Text(
+                time.format(context),
+                style: const TextStyle(fontSize: 16),
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            onTap: _pickDailySummaryTime,
+          ),
+        SwitchListTile(
+          key: const Key('pengaturan_critical_stock_toggle'),
+          title: const Text('Alert stok kritis', style: TextStyle(fontSize: 16)),
+          value: settings.criticalStockAlertEnabled,
+          onChanged: _toggleCriticalStockAlert,
+        ),
+        if (settings.criticalStockAlertEnabled) ..._buildCriticalStockAlertTimeRows(settings),
+        SettingsRow(
+          key: const Key('pengaturan_notification_troubleshoot_tile'),
+          icon: Icons.help_outline,
+          title: 'Notifikasi tidak muncul?',
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showBatteryOptimizationDialog,
+        ),
+      ],
+    );
+  }
 
   /// Up to 3 tappable time rows for "Alert stok kritis", plus a
   /// "+ Tambah jam" row when fewer than 3 are configured. Slot 1 (index
@@ -878,17 +862,14 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
     final times = settings.criticalStockAlertTimes;
     return [
       for (var index = 0; index < times.length; index++)
-        ListTile(
+        SettingsRow(
           key: Key('pengaturan_critical_stock_time_$index'),
-          minVerticalPadding: AppSpacing.lg,
-          leading: const Icon(Icons.access_time),
-          title: Text('Jam ke-${index + 1}', style: const TextStyle(fontSize: 16)),
+          icon: Icons.access_time,
+          title: 'Jam ke-${index + 1}',
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               ConstrainedBox(
-                // TODO(ui-migration): off-scale, and 70 here vs 90 on the
-                // "Jam pengiriman" row for the same formatted-time content.
                 constraints: const BoxConstraints(maxWidth: 70),
                 child: Text(
                   TimeOfDay(hour: times[index].hour, minute: times[index].minute).format(context),
@@ -908,13 +889,10 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           onTap: () => _pickCriticalStockAlertTime(index),
         ),
       if (times.length < 3)
-        // TODO(ui-migration): unlike every other onTap tile on this screen,
-        // this one has no trailing chevron.
-        ListTile(
+        SettingsRow(
           key: const Key('pengaturan_critical_stock_add_time'),
-          minVerticalPadding: AppSpacing.lg,
-          leading: const Icon(Icons.add),
-          title: const Text('Tambah jam', style: TextStyle(fontSize: 16)),
+          icon: Icons.add,
+          title: 'Tambah jam',
           onTap: _addCriticalStockAlertSlot,
         ),
     ];
@@ -1169,29 +1147,6 @@ class _HapusSemuaDataConfirmDialogState extends State<_HapusSemuaDataConfirmDial
           child: const Text('Hapus', style: TextStyle(fontSize: 16)),
         ),
       ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.sm),
-      child: Text(
-        title,
-        // TODO(ui-migration): 14/w700/primary — AppTextStyles.bodyMedium is
-        // 14/w600, so swapping would lighten every section header. Left raw.
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      ),
     );
   }
 }
