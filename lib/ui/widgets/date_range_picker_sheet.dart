@@ -10,8 +10,9 @@ import 'date_range_filter.dart';
 /// or `null` if dismissed without applying.
 ///
 /// Both fields take typed DD/MM/YYYY input — formatted by
-/// [DateInputFormatter], validated by [parseDdMmYyyy], the same logic
-/// [DateRangeFilterBar] uses on the Mutasi screens — or a tap on the
+/// [DateInputFormatter] and validated per keystroke by
+/// [validateDateInput], the same logic [DateRangeFilterBar] uses on the
+/// Mutasi screens — or a tap on the
 /// calendar icon, which opens the native date picker and writes its result
 /// back through [_formatDate] in the same DD/MM/YYYY shape, so both input
 /// paths converge on one format instead of risking drift between them.
@@ -79,18 +80,22 @@ class _DateRangePickerSheetState extends State<_DateRangePickerSheet> {
     super.dispose();
   }
 
-  String? _errorFor(String value) {
-    if (value.length < 10) return null;
-    return parseDdMmYyyy(value) == null ? 'Tanggal tidak valid.' : null;
-  }
+  /// The one shared live validator, same call the Mutasi filter bar
+  /// makes — errors surface per keystroke rather than waiting for a
+  /// complete ten-character date.
+  DateInputValidation _validate(String value) => validateDateInput(
+        value,
+        firstDate: widget.firstDate,
+        lastDate: widget.lastDate,
+      );
 
-  void _handleStartChanged(String value) => setState(() => _startError = _errorFor(value));
+  void _handleStartChanged(String value) => setState(() => _startError = _validate(value).error);
 
-  void _handleEndChanged(String value) => setState(() => _endError = _errorFor(value));
+  void _handleEndChanged(String value) => setState(() => _endError = _validate(value).error);
 
   Future<void> _openCalendar({required bool isStart}) async {
     final controller = isStart ? _startController : _endController;
-    final parsed = parseDdMmYyyy(controller.text);
+    final parsed = _validate(controller.text).date;
     final initialDate = _clamp(parsed ?? widget.lastDate, widget.firstDate, widget.lastDate);
 
     final picked = await showDatePicker(
@@ -112,8 +117,8 @@ class _DateRangePickerSheetState extends State<_DateRangePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final start = parseDdMmYyyy(_startController.text);
-    final end = parseDdMmYyyy(_endController.text);
+    final start = _validate(_startController.text).date;
+    final end = _validate(_endController.text).date;
     final rangeError =
         start != null && end != null && end.isBefore(start) ? 'Tanggal akhir harus setelah tanggal mulai.' : null;
     final canApply = start != null && end != null && rangeError == null;

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/profit_report.dart';
 import 'app_snack.dart';
+import 'date_range_filter.dart';
 import 'date_range_picker_sheet.dart';
 
 /// Formats a [ReportPeriod] for display. Shared with any caller that
@@ -56,14 +57,10 @@ String buildPeriodLabel(ReportPeriod period, {ProfitDateRange? allTimeRange}) {
 
   // Routed through ReportPeriod/formatReportPeriod rather than a second
   // date formatter of its own, so the resolved span reads exactly like
-  // every other period label in the app. ReportPeriod's future-end
-  // clamping is neutralised by passing the latest sale as `today`: these
-  // are recorded dates, not a range to be sanity-checked against now.
-  final span = ReportPeriod.days(
-    allTimeRange.earliest,
-    allTimeRange.latest,
-    today: allTimeRange.latest,
-  );
+  // every other period label in the app. These are recorded sale dates,
+  // never user input, so they need no bounds check of their own — and
+  // ReportPeriod no longer applies one.
+  final span = ReportPeriod.days(allTimeRange.earliest, allTimeRange.latest);
   return '${formatReportPeriod(span)} '
       '(${formatReportPeriod(const ReportPeriod.allTime())})';
 }
@@ -114,11 +111,14 @@ class ReportPeriodFilter extends StatelessWidget {
   final bool enabled;
 
   Future<void> _pickRange(BuildContext context) async {
-    final today = DateTime.now();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final picked = await showDateRangePickerSheet(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(today.year, today.month, today.day),
+      firstDate: DateTime(kMinValidYear),
+      // Today, not the end of the year: the same ceiling the sheet's
+      // typed fields now enforce, so picking and typing agree.
+      lastDate: today,
       initialRange: period.isAllTime
           ? null
           : DateTimeRange(start: period.startDay!, end: period.endDay!),
@@ -130,7 +130,7 @@ class ReportPeriodFilter extends StatelessWidget {
     // is the one that guarantees the user sees *why* nothing was applied
     // if it ever does.
     try {
-      onChanged(ReportPeriod.days(picked.start, picked.end, today: today));
+      onChanged(ReportPeriod.days(picked.start, picked.end));
     } on ArgumentError {
       if (!context.mounted) return;
       AppSnack.error(

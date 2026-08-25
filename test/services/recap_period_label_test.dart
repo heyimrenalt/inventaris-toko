@@ -135,7 +135,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 10),
         DateTime(2026, 7, 12),
-        today: DateTime(2026, 7, 25),
       );
 
       // Even when a span is supplied, a bounded period must not be widened
@@ -156,7 +155,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 12),
         DateTime(2026, 7, 12),
-        today: DateTime(2026, 7, 25),
       );
 
       expect(
@@ -175,7 +173,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 10),
         DateTime(2026, 7, 12),
-        today: DateTime(2026, 7, 25),
       );
 
       expect(buildPeriodLabel(period), isNot(contains('Semua')));

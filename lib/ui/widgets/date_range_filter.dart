@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 
 /// Groups raw digits into DD/MM/YYYY as the user types, inserting "/"
 /// after the day and month. Doesn't judge whether the resulting date is
-/// real — [parseDdMmYyyy] handles validity once a full date is entered.
+/// real — [validateDateInput] does that on every keystroke, and
+/// [parseDdMmYyyy] on a completed date.
 class DateInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -22,37 +23,65 @@ class DateInputFormatter extends TextInputFormatter {
   }
 }
 
-/// Earliest year typed input accepts. Matches [ReportPeriodFilter]'s
-/// calendar `firstDate: DateTime(2020)` — the same floor the calendar
-/// picker enforces, so typed and picked dates can't disagree on what's in
-/// range.
+/// Earliest year the report screens allow. Used as the floor
+/// `ReportPeriodFilter` hands to both its calendar and its typed fields,
+/// so the two can't disagree about what's in range.
 const int kMinValidYear = 2020;
 
-/// Latest year typed input accepts: the current year, matching
-/// [ReportPeriodFilter]'s calendar `lastDate` (today's date — this checks
-/// only the year component, since a year-level bound can't reproduce the
-/// picker's exact day cutoff without duplicating its call site).
-int maxValidYear() => DateTime.now().year;
+/// Shown when the typed text can never become a real calendar date —
+/// a day of 82, a month of 13, 31 September, 29 February off a leap year.
+const String kInvalidDateError = 'Tanggal tidak valid.';
 
-/// Message for a year outside [kMinValidYear]..[maxValidYear]. Kept next to
-/// [parseDdMmYyyy] so a caller can surface a specific reason instead of a
-/// generic "invalid date" message — not wired into any screen by this
-/// change, since that's a UI-layer concern.
-String yearRangeError() => 'Tahun harus antara $kMinValidYear–${maxValidYear()}';
+/// Shown when the typed date is real but lies after the caller's
+/// [lastDate] — which every call site sets to today. Future dates are
+/// rejected outright rather than clamped: a date the shop hasn't reached
+/// yet cannot describe anything that was recorded.
+const String kFutureDateError = 'Tanggal tidak boleh melebihi hari ini.';
+
+/// Shown when the typed date is real but older than the caller's
+/// [firstDate].
+const String kTooEarlyDateError = 'Tanggal terlalu awal.';
+
+/// Message for a year that can't fall inside the caller's bounds. Reported
+/// as soon as the typed year prefix rules every allowed year out, so
+/// "01/01/19…" fails on the third year digit rather than the fourth.
+String yearRangeError(DateTime firstDate, DateTime lastDate) =>
+    'Tahun harus antara ${firstDate.year}–${lastDate.year}';
+
+DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
+
+/// Longest any month can run, ignoring the leap year question — February
+/// gets 29 here so a typed "29/02" isn't rejected before the year that
+/// decides it has been entered. The exact leap check happens in
+/// [parseDdMmYyyy] once all four year digits are present.
+const List<int> _longestMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /// Parses a DD/MM/YYYY string, or returns null if it isn't a real
-/// calendar date. Rather than a hand-rolled days-per-month table, this
-/// relies on [DateTime]'s own normalizing constructor: DateTime(2026, 2,
-/// 30) silently rolls over to March 2nd, so comparing the constructed
-/// date's fields back against the parsed input catches both plain
-/// out-of-range days and month-specific ones (30 Feb, 29 Feb outside a
-/// leap year) without this code needing to know how many days each month
-/// has.
+/// calendar date within [firstDate]..[lastDate] (both inclusive, compared
+/// by calendar day, so a bound carrying a time-of-day still means the
+/// whole day).
+///
+/// Rather than a hand-rolled days-per-month table, this relies on
+/// [DateTime]'s own normalizing constructor: DateTime(2026, 2, 30)
+/// silently rolls over to March 2nd, so comparing the constructed date's
+/// fields back against the parsed input catches both plain out-of-range
+/// days and month-specific ones (30 Feb, 29 Feb outside a leap year)
+/// without this code needing to know how many days each month has.
+///
+/// The bounds are the caller's rather than a hardcoded year window: every
+/// call site already holds the same `firstDate`/`lastDate` it gives its
+/// calendar picker, so typing a date and picking one now accept exactly
+/// the same set of days — including the upper bound being *today*, not
+/// the end of the current year.
 ///
 /// Leading/trailing whitespace is rejected, not trimmed — `text` must be
 /// exactly 10 characters of `DD/MM/YYYY`, so a stray space already fails
 /// the length check below before reaching the digit parsing.
-DateTime? parseDdMmYyyy(String text) {
+DateTime? parseDdMmYyyy(
+  String text, {
+  required DateTime firstDate,
+  required DateTime lastDate,
+}) {
   if (text.length != 10) return null;
   final parts = text.split('/');
   if (parts.length != 3) return null;
@@ -63,11 +92,113 @@ DateTime? parseDdMmYyyy(String text) {
   if (day == null || month == null || year == null) return null;
   if (month < 1 || month > 12) return null;
   if (day < 1 || day > 31) return null;
-  if (year < kMinValidYear || year > maxValidYear()) return null;
 
   final date = DateTime(year, month, day);
   if (date.year != year || date.month != month || date.day != day) return null;
+  if (date.isBefore(_dayOf(firstDate))) return null;
+  if (date.isAfter(_dayOf(lastDate))) return null;
   return date;
+}
+
+/// What [validateDateInput] makes of the text currently in a date field.
+///
+/// The two states a field cares about are deliberately not opposites:
+/// text can be neither valid nor in error ("29" — not a date yet, but
+/// nothing rules one out), which is what keeps the error from flashing
+/// under the user's fingers while they're still typing.
+class DateInputValidation {
+  const DateInputValidation._(this.date, this.error);
+
+  /// The parsed date, non-null only once the input is complete and fully
+  /// within bounds — the same value [parseDdMmYyyy] would return.
+  final DateTime? date;
+
+  /// The message to show in red, non-null only once the input can no
+  /// longer become a valid date no matter what is typed next.
+  final String? error;
+
+  /// True when the field holds a complete, in-bounds date.
+  bool get isValid => date != null;
+}
+
+const DateInputValidation _pending = DateInputValidation._(null, null);
+
+DateInputValidation _rejected(String error) => DateInputValidation._(null, error);
+
+/// Validates a partially-typed DD/MM/YYYY string on every keystroke.
+///
+/// The rule is "flag it the moment it's unsalvageable", not "flag it once
+/// it's complete": each prefix is checked against what it could still
+/// grow into. A day whose first digit is 4 can only ever reach 40–49, so
+/// it fails on that first keystroke; "2" could still become 29, so it
+/// doesn't. The same applies to the month (a leading 2 can never lead to
+/// 01–12) and to the year, whose typed prefix is compared as an interval
+/// against [firstDate]'s year..[lastDate]'s year.
+///
+/// Only once all eight digits are in does this defer to [parseDdMmYyyy]
+/// for the checks that need the whole date: the leap-year question, and
+/// the exact day-level bounds.
+DateInputValidation validateDateInput(
+  String text, {
+  required DateTime firstDate,
+  required DateTime lastDate,
+}) {
+  final digits = text.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return _pending;
+
+  // Day. With one digit typed the day is still open-ended, so only a
+  // first digit above 3 (40-99) is already hopeless.
+  final dayFirst = int.parse(digits[0]);
+  if (dayFirst > 3) return _rejected(kInvalidDateError);
+  if (digits.length >= 2) {
+    final day = int.parse(digits.substring(0, 2));
+    if (day < 1 || day > 31) return _rejected(kInvalidDateError);
+  }
+  if (digits.length < 3) return _pending;
+
+  // Month, same shape: a leading digit above 1 can't reach 01-12.
+  final monthFirst = int.parse(digits[2]);
+  if (monthFirst > 1) return _rejected(kInvalidDateError);
+  if (digits.length >= 4) {
+    final month = int.parse(digits.substring(2, 4));
+    if (month < 1 || month > 12) return _rejected(kInvalidDateError);
+
+    // Day against month, using the longest that month can ever run, so
+    // 31/09 fails here while 29/02 waits for the year.
+    final day = int.parse(digits.substring(0, 2));
+    if (day > _longestMonth[month - 1]) return _rejected(kInvalidDateError);
+  }
+  if (digits.length <= 4) return _pending;
+
+  // Year, as an interval: the typed prefix pins the leading digits and
+  // the rest are free, so "20" covers 2000-2099 and only fails if that
+  // whole span misses the allowed years.
+  final typed = digits.length - 4;
+  final free = 4 - typed;
+  final scale = [1, 10, 100, 1000][free];
+  final prefix = int.parse(digits.substring(4));
+  final lowestYear = prefix * scale;
+  final highestYear = lowestYear + scale - 1;
+  if (highestYear < firstDate.year || lowestYear > lastDate.year) {
+    return _rejected(yearRangeError(firstDate, lastDate));
+  }
+  if (digits.length < 8) return _pending;
+
+  // Complete: the remaining questions (leap year, and the day-level
+  // bounds rather than the year-level ones checked above) all need the
+  // whole date, which is exactly what the parser answers.
+  final formatted = '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4)}';
+  final date = parseDdMmYyyy(formatted, firstDate: firstDate, lastDate: lastDate);
+  if (date != null) return DateInputValidation._(date, null);
+
+  final year = int.parse(digits.substring(4));
+  final month = int.parse(digits.substring(2, 4));
+  final day = int.parse(digits.substring(0, 2));
+  final asDate = DateTime(year, month, day);
+  final isRealDate = asDate.year == year && asDate.month == month && asDate.day == day;
+  if (!isRealDate) return _rejected(kInvalidDateError);
+  if (asDate.isAfter(_dayOf(lastDate))) return _rejected(kFutureDateError);
+  return _rejected(kTooEarlyDateError);
 }
 
 String _formatDate(DateTime date) =>
@@ -120,27 +251,41 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
     super.dispose();
   }
 
+  /// Live per-keystroke validation, shared by both fields and identical
+  /// to the one the date-range sheet runs — the error appears as soon as
+  /// the typed prefix is unsalvageable, not once ten characters are in.
+  DateInputValidation _validate(String value) => validateDateInput(
+        value,
+        firstDate: widget.firstDate,
+        lastDate: widget.lastDate,
+      );
+
   void _handleStartChanged(String value) {
-    setState(() {
-      _startError = value.length < 10 ? null : (parseDdMmYyyy(value) == null ? 'Tanggal tidak valid.' : null);
-    });
+    setState(() => _startError = _validate(value).error);
   }
 
   void _handleEndChanged(String value) {
-    setState(() {
-      _endError = value.length < 10 ? null : (parseDdMmYyyy(value) == null ? 'Tanggal tidak valid.' : null);
-    });
+    setState(() => _endError = _validate(value).error);
   }
 
   void _applyTyped() {
     final startText = _startController.text;
     final endText = _endController.text;
-    final start = parseDdMmYyyy(startText);
-    final end = parseDdMmYyyy(endText);
+    final startValidation = _validate(startText);
+    final endValidation = _validate(endText);
+    final start = startValidation.date;
+    final end = endValidation.date;
 
     setState(() {
-      _startError = startText.isEmpty ? 'Wajib diisi' : (start == null ? 'Tanggal tidak valid.' : null);
-      _endError = endText.isEmpty ? 'Wajib diisi' : (end == null ? 'Tanggal tidak valid.' : null);
+      // An incomplete-but-not-yet-wrong entry ("29/02") has no error of
+      // its own, so it falls back to the generic invalid message on tap
+      // rather than applying nothing without explanation.
+      _startError = startText.isEmpty
+          ? 'Wajib diisi'
+          : (start == null ? (startValidation.error ?? kInvalidDateError) : null);
+      _endError = endText.isEmpty
+          ? 'Wajib diisi'
+          : (end == null ? (endValidation.error ?? kInvalidDateError) : null);
     });
 
     if (start == null || end == null) return;
@@ -190,7 +335,7 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
     // either way, so tapping it while incomplete/invalid still surfaces
     // "Wajib diisi" / the format error instead of silently doing nothing.
     final canApply =
-        parseDdMmYyyy(_startController.text) != null && parseDdMmYyyy(_endController.text) != null;
+        _validate(_startController.text).isValid && _validate(_endController.text).isValid;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),

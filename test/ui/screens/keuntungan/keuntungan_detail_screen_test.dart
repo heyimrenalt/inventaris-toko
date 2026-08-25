@@ -186,7 +186,6 @@ void main() {
           ReportPeriod.days(
             DateTime(2026, 4, 1),
             DateTime(2026, 4, 30),
-            today: DateTime(2026, 8, 11),
           ),
         );
     await settle(tester);

@@ -93,7 +93,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 1),
         DateTime(2026, 7, 25),
-        today: DateTime(2026, 7, 25),
       );
       final bytes = await buildRecapPdf(
         report: _report(count: 5, period: period),

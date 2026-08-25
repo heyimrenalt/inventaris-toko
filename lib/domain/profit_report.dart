@@ -49,23 +49,19 @@ class ReportPeriod {
   /// The UI must prevent the inversion in the first place; this is the
   /// backstop that makes an inverted [ReportPeriod] unconstructible.
   ///
-  /// Future dates are **clamped, not rejected**: an end day after [today]
-  /// is pulled back to [today]. There can be no sales in the future, so a
-  /// future end date is harmless rather than erroneous — clamping keeps
-  /// "1 Jan – 31 Dec" usable as "the year so far" instead of failing it.
-  /// A *start* day in the future is left alone: it yields a legitimately
-  /// empty window rather than being silently rewritten into a different
-  /// period than the one asked for.
-  factory ReportPeriod.days(DateTime start, DateTime end, {DateTime? today}) {
+  /// Future dates get no special handling here, because they can no
+  /// longer arrive. This used to clamp a future end day back to today and
+  /// let a future start day stand as an empty window; both are now
+  /// rejected at the input itself — the typed fields refuse a date after
+  /// today (see `validateDateInput`) and the calendar pickers are bounded
+  /// by the same `lastDate`. Silently rewriting the period the user asked
+  /// for was the part worth losing: the range shown and the range queried
+  /// are now always the same range.
+  factory ReportPeriod.days(DateTime start, DateTime end) {
     final startDay = _dayOf(start);
-    var endDay = _dayOf(end);
+    final endDay = _dayOf(end);
     if (endDay.isBefore(startDay)) {
       throw ArgumentError('Tanggal akhir tidak boleh sebelum tanggal mulai.');
-    }
-
-    final todayDay = _dayOf(today ?? DateTime.now());
-    if (endDay.isAfter(todayDay) && !startDay.isAfter(todayDay)) {
-      endDay = todayDay;
     }
     return ReportPeriod._(startDay, endDay);
   }

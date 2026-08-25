@@ -79,7 +79,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 10, 14, 37),
         DateTime(2026, 7, 12, 9, 5),
-        today: DateTime(2026, 7, 24),
       );
 
       // Time-of-day on the inputs is discarded: whole days, either way.
@@ -103,20 +102,20 @@ void main() {
         () => ReportPeriod.days(
           DateTime(2026, 8, 1),
           DateTime(2026, 7, 24),
-          today: DateTime(2026, 8, 2),
         ),
         throwsArgumentError,
       );
     });
 
-    test('a future end date is clamped to today', () {
+    test('the period is kept exactly as asked for, with no clamping of any '
+        'kind — future dates are now rejected at the input instead, so the '
+        'range shown and the range queried can never diverge', () {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 1),
         DateTime(2027, 1, 1),
-        today: DateTime(2026, 7, 24, 10, 0),
       );
-      expect(period.endDay, DateTime(2026, 7, 24));
-      expect(period.endExclusive, DateTime(2026, 7, 25));
+      expect(period.endDay, DateTime(2027, 1, 1));
+      expect(period.endExclusive, DateTime(2027, 1, 2));
     });
   });
 
@@ -134,7 +133,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 10),
           DateTime(2026, 7, 12),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -149,7 +147,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 10),
           DateTime(2026, 7, 12),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -165,7 +162,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 10),
         DateTime(2026, 7, 12),
-        today: DateTime(2026, 7, 24),
       );
       final report = await mutationRepository.buildProfitReport(period);
 
@@ -184,7 +180,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 11),
           DateTime(2026, 7, 11),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -205,7 +200,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 10),
         DateTime(2026, 7, 12),
-        today: DateTime(2026, 7, 24),
       );
       final report = await mutationRepository.buildProfitReport(period);
       final rows = await mutationRepository.getStockOutMutationsInPeriod(period);
@@ -231,14 +225,12 @@ void main() {
           ReportPeriod.days(
             DateTime(2026, 7, 1),
             DateTime(2026, 7, 10),
-            today: DateTime(2026, 7, 24),
           ),
         );
         final second = await mutationRepository.buildProfitReport(
           ReportPeriod.days(
             DateTime(2026, 7, 11),
             DateTime(2026, 7, 24),
-            today: DateTime(2026, 7, 24),
           ),
         );
         final all = await mutationRepository.buildProfitReport(
@@ -262,7 +254,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 11),
         DateTime(2026, 7, 11),
-        today: DateTime(2026, 7, 24),
       );
       final before = await mutationRepository.buildProfitReport(period);
       expect(before.totalProfit, 4 * 2000);
@@ -284,7 +275,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 11),
           DateTime(2026, 7, 11),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -304,7 +294,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 11),
           DateTime(2026, 7, 11),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -320,7 +309,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 11),
           DateTime(2026, 7, 11),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -338,7 +326,6 @@ void main() {
           ReportPeriod.days(
             DateTime(2026, 7, 11),
             DateTime(2026, 7, 11),
-            today: DateTime(2026, 7, 24),
           ),
         );
 
@@ -366,7 +353,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 7, 11),
           DateTime(2026, 7, 11),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -384,7 +370,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 6, 1),
           DateTime(2026, 6, 30),
-          today: DateTime(2026, 7, 24),
         ),
       );
 
@@ -423,7 +408,6 @@ void main() {
         ReportPeriod.days(
           DateTime(2026, 1, 1),
           DateTime(2026, 7, 24),
-          today: DateTime(2026, 7, 24),
         ),
       );
       expect(recent.totalProfit, 1 * 2000);
@@ -439,7 +423,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 1),
         DateTime(2026, 7, 10),
-        today: DateTime(2026, 7, 24),
       );
 
       final scoped = await mutationRepository.calculateProfitByDate(period);

@@ -44,7 +44,6 @@ void main() {
           period: ReportPeriod.days(
             DateTime(2026, 7, 1),
             DateTime(2026, 7, 21),
-            today: DateTime(2026, 7, 25),
           ),
           onChanged: (period) => applied = period,
         ),
@@ -78,7 +77,6 @@ void main() {
         () => ReportPeriod.days(
           DateTime(2026, 7, 22),
           DateTime(2026, 7, 21),
-          today: DateTime(2026, 7, 25),
         ),
         throwsArgumentError,
       );
@@ -98,7 +96,6 @@ void main() {
       final period = ReportPeriod.days(
         DateTime(2026, 7, 21),
         DateTime(2026, 7, 21),
-        today: DateTime(2026, 7, 25),
       );
       expect(formatReportPeriod(period), '21 Jul 2026');
     });
