@@ -23,6 +23,7 @@ import '../../widgets/day_grouped_mutations.dart';
 import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/settings_group.dart';
 import '../../widgets/time_picker_sheet.dart';
+import 'faq_screen.dart';
 import 'kelola_kategori_screen.dart';
 import 'tentang_aplikasi_screen.dart';
 
@@ -753,6 +754,17 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
           SettingsGroup(
             title: 'Lainnya',
             children: [
+              SettingsRow(
+                key: const Key('pengaturan_faq_tile'),
+                icon: Icons.help_outline,
+                title: 'FAQ',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const FaqScreen()),
+                  );
+                },
+              ),
               SettingsRow(
                 key: const Key('pengaturan_tentang_aplikasi_tile'),
                 icon: Icons.info_outline,

@@ -13,6 +13,7 @@ import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart
 import 'package:inventaris_toko/services/backup_service.dart';
 import 'package:inventaris_toko/services/data_wipe_service.dart';
 import 'package:inventaris_toko/services/notification_service.dart';
+import 'package:inventaris_toko/ui/screens/pengaturan/faq_screen.dart';
 import 'package:inventaris_toko/ui/screens/pengaturan/pengaturan_screen.dart';
 import 'package:isar_community/isar.dart';
 
@@ -1202,6 +1203,30 @@ void main() {
           ),
           findsOneWidget,
         );
+      });
+    });
+  });
+
+  group('Lainnya', () {
+    testWidgets('FAQ sits above Tentang Aplikasi and opens the FAQ screen', (tester) async {
+      await tester.runAsync(() async {
+        await pumpScreen(tester);
+
+        final faq = find.byKey(const Key('pengaturan_faq_tile'));
+        final tentang = find.byKey(const Key('pengaturan_tentang_aplikasi_tile'));
+        await tester.scrollUntilVisible(tentang, 300, scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+
+        expect(faq, findsOneWidget);
+        expect(
+          tester.getTopLeft(faq).dy,
+          lessThan(tester.getTopLeft(tentang).dy),
+        );
+
+        await tester.tap(faq);
+        await settleAfterAsyncWork(tester);
+
+        expect(find.byType(FaqScreen), findsOneWidget);
       });
     });
   });
