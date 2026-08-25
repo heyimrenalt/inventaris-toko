@@ -19,7 +19,33 @@ class DateInputFormatter extends TextInputFormatter {
     }
 
     final text = buffer.toString();
-    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
+
+    // Map the caret across the reformat by digit count rather than by raw
+    // offset: count the digits that precede the caret in what the user just
+    // typed, then walk the formatted text until that many digits have gone
+    // by. Anchoring to the digits is what lets the auto-inserted "/" shift
+    // around without dragging the caret to the end of the field — editing
+    // the middle of an existing date leaves the caret where the edit was.
+    final caret = newValue.selection.end.clamp(0, newValue.text.length);
+    var digitsBeforeCaret = 0;
+    for (var i = 0; i < caret; i++) {
+      if (_isDigit(newValue.text[i])) digitsBeforeCaret++;
+    }
+    if (digitsBeforeCaret > truncated.length) digitsBeforeCaret = truncated.length;
+
+    var offset = 0;
+    var seen = 0;
+    while (offset < text.length && seen < digitsBeforeCaret) {
+      if (_isDigit(text[offset])) seen++;
+      offset++;
+    }
+
+    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: offset));
+  }
+
+  static bool _isDigit(String char) {
+    final code = char.codeUnitAt(0);
+    return code >= 0x30 && code <= 0x39;
   }
 }
 

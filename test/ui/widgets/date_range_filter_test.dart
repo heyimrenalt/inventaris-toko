@@ -9,6 +9,13 @@ TextEditingValue _apply(DateInputFormatter formatter, String oldText, String new
   );
 }
 
+TextEditingValue _at(DateInputFormatter formatter, String oldText, String newText, int caret) {
+  return formatter.formatEditUpdate(
+    TextEditingValue(text: oldText),
+    TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: caret)),
+  );
+}
+
 void main() {
   group('DateInputFormatter', () {
     final formatter = DateInputFormatter();
@@ -24,6 +31,71 @@ void main() {
 
     test('ignores non-digit characters and caps at 8 digits (DD/MM/YYYY)', () {
       expect(_apply(formatter, '', 'ab01cd12ef2026gh99').text, '01/12/2026');
+    });
+
+    test('leaves the caret at the end when typing left to right', () {
+      expect(_apply(formatter, '', '0').selection.baseOffset, 1);
+      expect(_apply(formatter, '0', '01').selection.baseOffset, 2);
+      // The third digit pushes the caret past the "/" the formatter inserts.
+      expect(_apply(formatter, '01', '011').selection.baseOffset, 4);
+      expect(_apply(formatter, '01/1', '01/12').selection.baseOffset, 5);
+      expect(_apply(formatter, '01/12', '01/122').selection.baseOffset, 7);
+      expect(_apply(formatter, '01/12/2', '01/12/2026').selection.baseOffset, 10);
+    });
+
+    test('keeps the caret in place when a digit is typed in the middle', () {
+      // "12/07/2026" with the caret after "12/0"; typing 9 there gives
+      // "12/09" + the rest, and the caret must sit after the new 9.
+      final result = _at(formatter, '12/07/2026', '12/097/2026', 5);
+      expect(result.text, '12/09/7202');
+      expect(result.selection.baseOffset, 5);
+    });
+
+    test('keeps the caret in place when a digit is deleted in the middle', () {
+      // Backspace over the "7" of "12/07/2026".
+      final result = _at(formatter, '12/07/2026', '12/0/2026', 4);
+      expect(result.text, '12/02/026');
+      expect(result.selection.baseOffset, 4);
+    });
+
+    test('handles a caret sitting on either side of a "/"', () {
+      // Typed against the "/" from the left — the digit belongs to the day
+      // side, so the caret follows it across the separator.
+      final before = _at(formatter, '12/07/2026', '129/07/2026', 3);
+      expect(before.text, '12/90/7202');
+      expect(before.selection.baseOffset, 4);
+
+      // Typed against it from the right: same three digits precede the
+      // caret, so it lands in the same place.
+      final after = _at(formatter, '12/07/2026', '12/907/2026', 4);
+      expect(after.text, '12/90/7202');
+      expect(after.selection.baseOffset, 4);
+
+      // Deleting the separator itself removes no digit, so the text is
+      // unchanged and the caret rests before the restored "/".
+      final slashDeleted = _at(formatter, '12/07/2026', '1207/2026', 2);
+      expect(slashDeleted.text, '12/07/2026');
+      expect(slashDeleted.selection.baseOffset, 2);
+    });
+
+    test('handles the caret at position 0', () {
+      final result = _at(formatter, '12/07/2026', '312/07/2026', 1);
+      expect(result.text, '31/20/7202');
+      expect(result.selection.baseOffset, 1);
+    });
+
+    test('caps the caret when a full field overflows', () {
+      // Eight digits already; the ninth is truncated away, and the caret
+      // never runs past the formatted text.
+      final result = _at(formatter, '12/07/2026', '12/097/2026', 5);
+      expect(result.text.length, 10);
+      expect(result.selection.baseOffset, lessThanOrEqualTo(result.text.length));
+
+      // Truncation at the tail: digits beyond the caret are the ones lost,
+      // so a caret past the cut is clamped to the end of the field.
+      final tail = _at(formatter, '12/07/2026', '12/07/20269', 11);
+      expect(tail.text, '12/07/2026');
+      expect(tail.selection.baseOffset, 10);
     });
   });
 
