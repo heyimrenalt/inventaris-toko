@@ -62,4 +62,20 @@ void main() {
     await scrollTo(tester, find.text(item.bullets.first));
     expect(find.text(item.bullets.first), findsOneWidget);
   });
+
+  /// Guards against the clipping bug: expanded, item 11 is taller than the
+  /// viewport, so its very last bullet is only reachable if the whole card
+  /// scrolls instead of being cut off at the bottom edge.
+  testWidgets('the last bullet of item 11 is scrollable into view', (tester) async {
+    await pumpScreen(tester);
+
+    final item = faqItems.last;
+    await scrollTo(tester, find.text(item.question));
+    await tester.tap(find.text(item.question));
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text(item.bullets.last));
+    expect(find.text(item.bullets.last), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

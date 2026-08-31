@@ -116,7 +116,14 @@ class _FaqScreenState extends State<FaqScreen> {
       backgroundColor: AppColors.scaffoldBackground,
       appBar: AppHeader.withBack(title: 'FAQ'),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+        // The extra bottom inset keeps the last item — item 11 expanded is
+        // taller than the viewport — clear of the system navigation bar.
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.xxl + MediaQuery.viewPaddingOf(context).bottom,
+        ),
         child: Material(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
