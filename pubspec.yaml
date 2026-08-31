@@ -20,6 +20,9 @@ version: 1.0.0+1
 
 environment:
   sdk: ^3.12.2
+  # Tripwire, not a lock: fails `flutter pub get` if the toolchain moves off 3.44.x,
+  # so an unattended `flutter upgrade` cannot silently pull the Kotlin breaking change.
+  flutter: ">=3.44.6 <3.45.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
