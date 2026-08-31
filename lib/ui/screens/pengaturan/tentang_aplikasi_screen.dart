@@ -1,8 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:isar_community/isar.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../data/isar_service.dart';
+import '../../../data/models/cost_price_adjustment.dart';
+import '../../../data/models/product.dart';
+import '../../../data/models/stock_mutation.dart';
+import '../../../domain/last_activity.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_dimensions.dart';
 import '../../theme/app_spacing.dart';
@@ -15,12 +19,18 @@ import '../../widgets/app_snack.dart';
 /// since this is an offline-first app with no feedback/support surface to
 /// send the user to.
 class TentangAplikasiScreen extends StatefulWidget {
-  const TentangAplikasiScreen({super.key, this.packageInfoLoader});
+  const TentangAplikasiScreen({
+    super.key,
+    this.packageInfoLoader,
+    this.lastActivityLoader,
+  });
 
   static const String appName = 'Inventaris Toko';
 
-  // TODO(dev): fill in the real developer/publisher name once decided.
-  static const String developerName = 'Developer';
+  static const String description =
+      'Inventaris Toko membantu mencatat stok, harga modal, dan keuntungan '
+      'toko dengan rapi langsung dari HP — tanpa perlu buku catatan atau '
+      'komputer. Semua data tersimpan di HP dan bisa dicadangkan kapan saja.';
 
   /// Test seam only — real callers always let this default to
   /// [PackageInfo.fromPlatform]. [PackageInfo] caches its first-ever
@@ -28,6 +38,11 @@ class TentangAplikasiScreen extends StatefulWidget {
   /// test can't otherwise force the "lookup failed" path deterministically;
   /// this lets a test inject a loader that throws instead.
   final Future<PackageInfo> Function()? packageInfoLoader;
+
+  /// Test seam only — real callers let this default to the Isar-backed
+  /// lookup, which reads the newest write timestamp across the user's own
+  /// records.
+  final Future<List<DateTime?>> Function()? lastActivityLoader;
 
   @override
   State<TentangAplikasiScreen> createState() => _TentangAplikasiScreenState();
@@ -37,13 +52,18 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
   late final Future<PackageInfo> Function() _loadPackageInfo =
       widget.packageInfoLoader ?? PackageInfo.fromPlatform;
 
+  late final Future<List<DateTime?>> Function() _loadLastActivity =
+      widget.lastActivityLoader ?? _latestDataTimestamps;
+
   String _versionLabel = '-';
+  String _lastActivityLabel = kNoActivityLabel;
   int _iconTapCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+    _loadLastActivityLabel();
   }
 
   Future<void> _loadVersion() async {
@@ -57,18 +77,42 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
     }
   }
 
+  Future<void> _loadLastActivityLabel() async {
+    try {
+      final timestamps = await _loadLastActivity();
+      if (!mounted) return;
+      setState(() => _lastActivityLabel = resolveLastActivityLabel(timestamps));
+    } catch (_) {
+      // Isar unavailable (e.g. a widget test that never opened it) — the
+      // "Belum ada aktivitas" fallback already covers this.
+    }
+  }
+
+  /// The newest write timestamp of each collection the user actually
+  /// writes to: the stock-mutation ledger, products (created *and* edited,
+  /// since an edit leaves `createdAt` untouched), and cost-price
+  /// adjustments. Categories and settings are excluded — they're
+  /// configuration, not the "data activity" the row is about.
+  static Future<List<DateTime?>> _latestDataTimestamps() async {
+    final isar = IsarService.instance;
+    final results = await Future.wait<DateTime?>([
+      isar.stockMutations.where().sortByCreatedAtDesc().findFirst().then((m) => m?.createdAt),
+      isar.products.where().sortByUpdatedAtDesc().findFirst().then((p) => p?.updatedAt),
+      isar.products.where().sortByCreatedAtDesc().findFirst().then((p) => p?.createdAt),
+      isar.costPriceAdjustments
+          .where()
+          .sortByAdjustedAtDesc()
+          .findFirst()
+          .then((a) => a?.adjustedAt),
+    ]);
+    return results;
+  }
+
   void _onIconTap() {
     _iconTapCount++;
     if (_iconTapCount < 5) return;
     _iconTapCount = 0;
     AppSnack.info(context, 'Terima kasih sudah pakai Inventaris Toko!');
-  }
-
-  /// `dart:io`'s [Platform.version] returns a full string like
-  /// "3.5.3 (stable) (Fri Aug 16 ...)" — only the leading semver is shown.
-  String get _dartVersionLabel {
-    final match = RegExp(r'^[\d.]+').firstMatch(Platform.version);
-    return match?.group(0) ?? Platform.version;
   }
 
   @override
@@ -126,15 +170,10 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Aplikasi pencatatan stok barang untuk toko kelontong.',
+                    TentangAplikasiScreen.description,
+                    key: const Key('tentang_aplikasi_description'),
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.body.copyWith(color: AppColors.gray700),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Dibuat oleh ${TentangAplikasiScreen.developerName}',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body.copyWith(color: AppColors.gray700),
+                    style: AppTextStyles.caption.copyWith(color: AppColors.gray700),
                   ),
                 ],
               ),
@@ -146,9 +185,7 @@ class _TentangAplikasiScreenState extends State<TentangAplikasiScreen> {
                 children: [
                   _infoRow('Versi aplikasi', _versionLabel),
                   const Divider(height: AppSpacing.md),
-                  _infoRow('Flutter', _dartVersionLabel),
-                  const Divider(height: AppSpacing.md),
-                  _infoRow('Database', 'Isar'),
+                  _infoRow('Terakhir diperbarui', _lastActivityLabel),
                 ],
               ),
             ),

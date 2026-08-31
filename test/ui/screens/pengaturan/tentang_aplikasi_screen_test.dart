@@ -13,11 +13,65 @@ void main() {
         buildNumber: '1',
       );
 
+  Future<List<DateTime?>> noActivityLoader() async => [null, null, null, null];
+
+  testWidgets('renders the description, the version row and Terakhir diperbarui',
+      (tester) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TentangAplikasiScreen(
+            packageInfoLoader: fakeLoader,
+            lastActivityLoader: () async => [DateTime(2026, 8, 25)],
+          ),
+        ),
+      );
+      await settleAfterAsyncWork(tester);
+
+      final description =
+          tester.widget<Text>(find.byKey(const Key('tentang_aplikasi_description')));
+      expect(description.data, TentangAplikasiScreen.description);
+      expect(description.data, contains('Semua data tersimpan di HP'));
+
+      expect(find.text('Versi aplikasi'), findsOneWidget);
+      expect(find.text('Terakhir diperbarui'), findsOneWidget);
+      expect(find.text('25 Agu 2026'), findsOneWidget);
+
+      expect(find.textContaining('Dibuat oleh'), findsNothing);
+      expect(find.text('Flutter'), findsNothing);
+      expect(find.text('Database'), findsNothing);
+      expect(find.text('Isar'), findsNothing);
+    });
+  });
+
+  testWidgets('shows the fallback label when there is no data activity yet',
+      (tester) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TentangAplikasiScreen(
+            packageInfoLoader: fakeLoader,
+            lastActivityLoader: noActivityLoader,
+          ),
+        ),
+      );
+      await settleAfterAsyncWork(tester);
+
+      expect(find.text('Terakhir diperbarui'), findsOneWidget);
+      expect(find.text('Belum ada aktivitas'), findsOneWidget);
+    });
+  });
+
   testWidgets('renders without crashing', (tester) async {
     await tester.runAsync(() async {
       await expectNoFlutterErrors(tester, () async {
         await tester.pumpWidget(
-          MaterialApp(home: TentangAplikasiScreen(packageInfoLoader: fakeLoader)),
+          MaterialApp(
+            home: TentangAplikasiScreen(
+              packageInfoLoader: fakeLoader,
+              lastActivityLoader: noActivityLoader,
+            ),
+          ),
         );
         await settleAfterAsyncWork(tester);
 
@@ -29,7 +83,12 @@ void main() {
   testWidgets('shows the version reported by package_info_plus', (tester) async {
     await tester.runAsync(() async {
       await tester.pumpWidget(
-        MaterialApp(home: TentangAplikasiScreen(packageInfoLoader: fakeLoader)),
+        MaterialApp(
+          home: TentangAplikasiScreen(
+            packageInfoLoader: fakeLoader,
+            lastActivityLoader: noActivityLoader,
+          ),
+        ),
       );
       await settleAfterAsyncWork(tester);
 
@@ -46,6 +105,7 @@ void main() {
           MaterialApp(
             home: TentangAplikasiScreen(
               packageInfoLoader: () async => throw Exception('simulated lookup failure'),
+              lastActivityLoader: noActivityLoader,
             ),
           ),
         );
@@ -60,7 +120,12 @@ void main() {
   testWidgets("app name matches the app's known display name", (tester) async {
     await tester.runAsync(() async {
       await tester.pumpWidget(
-        MaterialApp(home: TentangAplikasiScreen(packageInfoLoader: fakeLoader)),
+        MaterialApp(
+          home: TentangAplikasiScreen(
+            packageInfoLoader: fakeLoader,
+            lastActivityLoader: noActivityLoader,
+          ),
+        ),
       );
       await settleAfterAsyncWork(tester);
 
@@ -79,7 +144,10 @@ void main() {
               child: ElevatedButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => TentangAplikasiScreen(packageInfoLoader: fakeLoader),
+                    builder: (_) => TentangAplikasiScreen(
+                      packageInfoLoader: fakeLoader,
+                      lastActivityLoader: noActivityLoader,
+                    ),
                   ),
                 ),
                 child: const Text('Buka'),
@@ -104,7 +172,12 @@ void main() {
   testWidgets('tapping the app icon 5 times shows the easter-egg SnackBar', (tester) async {
     await tester.runAsync(() async {
       await tester.pumpWidget(
-        MaterialApp(home: TentangAplikasiScreen(packageInfoLoader: fakeLoader)),
+        MaterialApp(
+          home: TentangAplikasiScreen(
+            packageInfoLoader: fakeLoader,
+            lastActivityLoader: noActivityLoader,
+          ),
+        ),
       );
       await settleAfterAsyncWork(tester);
 
