@@ -18,7 +18,7 @@ import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
 import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/category_tree_picker.dart';
-import '../../widgets/product_list_item.dart';
+import '../../widgets/product_grid_card.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 import 'sort_mode.dart';
@@ -197,6 +197,10 @@ class _ProdukScreenState extends State<ProdukScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _buildFilterBar(),
+                  // The list rows used to sit flush under the filter bar,
+                  // separated by their own dividers. Cards need real air
+                  // above them instead.
+                  const SizedBox(height: AppSpacing.xs),
                 ],
               ),
             ),
@@ -215,8 +219,17 @@ class _ProdukScreenState extends State<ProdukScreen> {
             if (!_loading && _visibleProducts.isNotEmpty)
               SliverToBoxAdapter(
                 child: SizedBox(
+                  // Nav bar (reported as padding.bottom thanks to
+                  // extendBody, so it follows the real bar rather than a
+                  // hardcoded height) plus the FAB, which floats over the
+                  // right-hand column and would otherwise sit on the last
+                  // card's price and stock once the list is scrolled to
+                  // the end. Both are cleared, so scrolling all the way
+                  // down always leaves the final row fully readable.
                   height: MediaQuery.of(context).padding.bottom +
-                      GlassBottomNav.contentGap,
+                      GlassBottomNav.contentGap +
+                      _fabSize +
+                      AppSpacing.md,
                 ),
               ),
           ],
@@ -242,8 +255,8 @@ class _ProdukScreenState extends State<ProdukScreen> {
         // (28 vs the 24 default) so the compact circle still reads as a
         // bold "+" rather than a small glyph adrift in empty space.
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: _fabSize,
+          height: _fabSize,
           child: FloatingActionButton(
             onPressed: _openAddForm,
             shape: const CircleBorder(),
@@ -375,27 +388,51 @@ class _ProdukScreenState extends State<ProdukScreen> {
     );
   }
 
+  /// Gutter between grid cards, and the screen inset on either side. The
+  /// two are deliberately different: [AppSpacing.md] between cards and
+  /// [AppSpacing.lg] at the edges, so the pair reads as a pair rather
+  /// than as two things drifting toward the screen borders.
+  /// Diameter of the add-FAB. Named because the bottom scroll padding
+  /// has to clear it, not just the nav bar.
+  static const double _fabSize = 40;
+
+  static const double _gridGutter = AppSpacing.md;
+  static const double _gridInset = AppSpacing.lg;
+  static const int _gridColumns = 2;
+
   Widget _buildProductList() {
     final categoryNameById = {for (final category in _categories) category.id: category.name};
     final visible = _visibleProducts;
 
-    return SliverList.builder(
-      itemCount: visible.length,
-      itemBuilder: (context, index) {
-        final product = visible[index];
-        final categoryId = product.categoryId;
-        return Column(
-          children: [
-            ProductListItem(
-              product: product,
-              categoryName: categoryId == null ? 'Lainnya' : (categoryNameById[categoryId] ?? '-'),
-              onTap: () => _openDetail(product),
-            ),
-            if (index < visible.length - 1)
-              const Divider(height: 0.5, thickness: 0.5, indent: 0, endIndent: 0),
-          ],
-        );
-      },
+    // The card's height follows from its width, so it is computed once
+    // here and handed to the delegate as a fixed extent rather than
+    // guessed at through childAspectRatio — the photo band and the text
+    // block below it then cannot disagree about how tall a cell is.
+    final gridWidth = MediaQuery.of(context).size.width - _gridInset * 2;
+    final cardWidth =
+        (gridWidth - _gridGutter * (_gridColumns - 1)) / _gridColumns;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: _gridInset),
+      sliver: SliverGrid.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns,
+          crossAxisSpacing: _gridGutter,
+          mainAxisSpacing: _gridGutter,
+          mainAxisExtent: ProductGridCard.extentFor(cardWidth),
+        ),
+        itemCount: visible.length,
+        itemBuilder: (context, index) {
+          final product = visible[index];
+          final categoryId = product.categoryId;
+          return ProductGridCard(
+            product: product,
+            categoryName:
+                categoryId == null ? 'Lainnya' : (categoryNameById[categoryId] ?? '-'),
+            onTap: () => _openDetail(product),
+          );
+        },
+      ),
     );
   }
 }

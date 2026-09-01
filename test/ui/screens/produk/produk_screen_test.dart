@@ -10,7 +10,7 @@ import 'package:inventaris_toko/ui/screens/produk/produk_screen.dart';
 import 'package:inventaris_toko/ui/widgets/app_header.dart';
 import 'package:inventaris_toko/ui/widgets/app_search_bar.dart';
 import 'package:inventaris_toko/ui/widgets/category_tree_picker.dart';
-import 'package:inventaris_toko/ui/widgets/product_list_item.dart';
+import 'package:inventaris_toko/ui/widgets/product_grid_card.dart';
 import 'package:isar_community/isar.dart';
 
 import '../../../data/repositories/test_isar.dart';
@@ -185,7 +185,7 @@ void main() {
 
       expect(find.text('Chips'), findsOneWidget);
       expect(
-        find.descendant(of: find.byType(ProductListItem), matching: find.textContaining('Snacks')),
+        find.descendant(of: find.byType(ProductGridCard), matching: find.textContaining('Snacks')),
         findsOneWidget,
       );
       expect(find.text('12'), findsOneWidget); // stock quantity
@@ -489,7 +489,7 @@ void main() {
 
       await pumpScreen(tester);
 
-      final productItems = find.byType(ProductListItem);
+      final productItems = find.byType(ProductGridCard);
       expect(productItems, findsNWidgets(2));
 
       // Initially should show High Stock Item first (default order)
