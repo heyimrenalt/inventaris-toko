@@ -112,6 +112,46 @@ void main() {
     expect(find.text('I'), findsOneWidget);
   });
 
+  group('long product names', () {
+    // The report that prompted this: "Silverqueen - Almond" ellipsised
+    // at the variant, which is the only part distinguishing it from the
+    // other Silverqueen entries.
+    testWidgets('wrap to a second line instead of being cut at the variant',
+        (tester) async {
+      await pumpCard(tester, buildProduct(name: 'Silverqueen - Almond'));
+
+      final name = tester.widget<Text>(find.text('Silverqueen - Almond'));
+      expect(name.maxLines, 2);
+
+      // It actually wrapped: the rendered name is taller than a single
+      // 14px line. (didExceedMaxLines is not used here — the test font is
+      // fixed-width and far wider than PlusJakartaSans, so it reports
+      // overflow for strings that fit fine on a real device.)
+      expect(tester.getSize(find.text('Silverqueen - Almond')).height,
+          greaterThan(20));
+    });
+
+    testWidgets('a two-line name does not push the price row out of the card',
+        (tester) async {
+      await pumpCard(tester, buildProduct(name: 'Silverqueen - Almond'));
+
+      // Nothing overflowed its cell, and the price/stock row is still
+      // laid out inside the card's bounds.
+      expect(tester.takeException(), isNull);
+      final cardBottom = tester.getRect(find.byType(ProductGridCard)).bottom;
+      expect(tester.getRect(find.text('Rp 3.500')).bottom, lessThanOrEqualTo(cardBottom));
+      expect(tester.getRect(find.text('11')).bottom, lessThanOrEqualTo(cardBottom));
+    });
+
+    testWidgets('a name too long even for two lines still ellipsises', (tester) async {
+      await pumpCard(
+        tester,
+        buildProduct(name: 'Silverqueen Almond Cashew Dark Chocolate Bar Besar'),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   testWidgets('extentFor leaves the text block room at every column width',
       (tester) async {
     // Narrow phone through to a wide one: the cell must always be taller

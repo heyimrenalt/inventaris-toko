@@ -39,11 +39,24 @@ class ProductGridCard extends StatelessWidget {
   /// of products fit on screen at once.
   static const double _photoAspectRatio = 16 / 10;
 
+  /// How many lines the product name may occupy. Two, not one: real
+  /// names on a half-width card run past it constantly — "Silverqueen -
+  /// Almond" and "Chitato sapi panggang" both ellipsised at one line,
+  /// hiding the very word that tells two variants apart.
+  static const int _nameMaxLines = 2;
+
   /// Height of everything below the photo — name, category, and the
   /// price/stock row, plus their padding. Fixed so the grid can size its
-  /// cells without measuring, which is why every text below is capped to
-  /// a single line.
-  static const double _textBlockHeight = 92;
+  /// cells without measuring; it therefore has to reserve the name's
+  /// full [_nameMaxLines], since a taller name on one card would
+  /// otherwise push that card's price row out of its cell.
+  ///
+  /// 112 = 92 for a one-line name plus ~20 for the second line of
+  /// [AppTextStyles.bodyMedium] (14px at its default line height). Cards
+  /// whose name fits on one line keep the difference as slack above the
+  /// price row, which the [Spacer] absorbs — so every price and stock
+  /// figure in a row still sits on the same baseline.
+  static const double _textBlockHeight = 112;
 
   /// Cell height for a given card width, so the grid delegate and this
   /// card can't disagree about it.
@@ -94,7 +107,7 @@ class ProductGridCard extends StatelessWidget {
                     Text(
                       product.name,
                       style: AppTextStyles.bodyMedium,
-                      maxLines: 1,
+                      maxLines: _nameMaxLines,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpacing.xxs),
