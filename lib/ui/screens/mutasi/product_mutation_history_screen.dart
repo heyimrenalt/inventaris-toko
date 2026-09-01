@@ -37,10 +37,24 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
   /// DD/MM/YYYY [DateRangeFilterBar] used on the Mutasi tab.
   DateTimeRange? _selectedRange;
 
+  /// Lower bound for [_selectedRange]'s fields: the oldest mutation in
+  /// the whole ledger, resolved once when the screen opens. Ledger-wide
+  /// rather than per-product on purpose — the same shared
+  /// [DateRangeFilterBar] bound as the Mutasi tab, so the two screens
+  /// accept exactly the same set of days.
+  DateTime? _earliestMutationDate;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadEarliestMutationBound();
+  }
+
+  Future<void> _loadEarliestMutationBound() async {
+    final earliest = await _mutationRepository.getEarliestMutationDate();
+    if (!mounted) return;
+    setState(() => _earliestMutationDate = earliest);
   }
 
   Future<void> _load() async {
@@ -144,7 +158,9 @@ class _ProductMutationHistoryScreenState extends State<ProductMutationHistoryScr
           padding: const EdgeInsets.only(top: 12),
           child: DateRangeFilterBar(
             selectedRange: _selectedRange,
-            firstDate: DateTime(now.year - 5),
+            // Empty ledger: today — an honest empty bound rather than an
+            // invented one. See the note on [_earliestMutationDate].
+            firstDate: _earliestMutationDate ?? now,
             lastDate: now,
             onChanged: (range) => setState(() => _selectedRange = range),
           ),

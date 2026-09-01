@@ -66,12 +66,22 @@ class _MutasiScreenState extends State<MutasiScreen> {
   String _searchQuery = '';
   bool _loading = true;
 
+  /// Lower bound for the date filter: the oldest mutation actually in the
+  /// ledger, so the filter can never reject a date the store's own data
+  /// spans. Resolved once when the screen opens and deliberately *not*
+  /// refreshed by the watchLazy re-[_load] below — a bound that shifted
+  /// under a filter the user is mid-way through typing would be worse
+  /// than a slightly stale one, and it can only ever move earlier when
+  /// history is undone, never later while the screen is open.
+  DateTime? _earliestMutationDate;
+
   StreamSubscription<void>? _mutationsSubscription;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadEarliestMutationBound();
     // MainScaffold keeps every tab alive in an IndexedStack, so this
     // screen's own initState only runs once — recording a mutation from
     // Product Detail's buttons (a different, separately-mounted screen)
@@ -89,6 +99,12 @@ class _MutasiScreenState extends State<MutasiScreen> {
     _mutationsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadEarliestMutationBound() async {
+    final earliest = await _mutationRepository.getEarliestMutationDate();
+    if (!mounted) return;
+    setState(() => _earliestMutationDate = earliest);
   }
 
   Future<void> _load() async {
@@ -241,7 +257,10 @@ class _MutasiScreenState extends State<MutasiScreen> {
     final now = DateTime.now();
     return DateRangeFilterBar(
       selectedRange: _selectedRange,
-      firstDate: DateTime(now.year - 2),
+      // Empty ledger: today. There's no range to filter, so an honest
+      // empty bound beats an invented one — and the moment the first
+      // mutation lands the bound becomes real.
+      firstDate: _earliestMutationDate ?? now,
       lastDate: now,
       onChanged: (range) => setState(() => _selectedRange = range),
     );
