@@ -49,11 +49,6 @@ class DateInputFormatter extends TextInputFormatter {
   }
 }
 
-/// Earliest year the report screens allow. Used as the floor
-/// `ReportPeriodFilter` hands to both its calendar and its typed fields,
-/// so the two can't disagree about what's in range.
-const int kMinValidYear = 2020;
-
 /// Shown when the typed text can never become a real calendar date —
 /// a day of 82, a month of 13, 31 September, 29 February off a leap year.
 const String kInvalidDateError = 'Tanggal tidak valid.';
@@ -68,11 +63,41 @@ const String kFutureDateError = 'Tanggal tidak boleh melebihi hari ini.';
 /// [firstDate].
 const String kTooEarlyDateError = 'Tanggal terlalu awal.';
 
-/// Message for a year that can't fall inside the caller's bounds. Reported
-/// as soon as the typed year prefix rules every allowed year out, so
-/// "01/01/19…" fails on the third year digit rather than the fourth.
-String yearRangeError(DateTime firstDate, DateTime lastDate) =>
-    'Tahun harus antara ${firstDate.year}–${lastDate.year}';
+/// Abbreviated Indonesian month names — the same forms `DateFormat('MMM',
+/// 'id_ID')` produces, so this message reads like every other date in the
+/// app. Kept as a plain list rather than going through `intl` on purpose:
+/// this file is also exercised by pure-logic tests that never call
+/// `initializeDateFormatting('id_ID')`, and a locale lookup there would
+/// throw.
+const List<String> _shortMonthNames = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+String _monthYear(DateTime date) => '${_shortMonthNames[date.month - 1]} ${date.year}';
+
+/// Message for a date that can't fall inside the caller's bounds.
+/// Reported as soon as the typed year prefix rules every allowed year
+/// out, so "01/01/19…" fails on the third year digit rather than the
+/// fourth.
+///
+/// The granularity follows the bounds rather than the check. The check
+/// itself is always year-level — it is the only thing a partial year
+/// prefix can decide — but naming years is useless when both bounds sit
+/// in the same one: now that the floor comes from the oldest real
+/// mutation, "Tahun harus antara 2026–2026" is a routine outcome, and it
+/// tells the user nothing about which dates would actually be accepted.
+/// So the message drops to months when the years match, and to a single
+/// month when those match too.
+String dateRangeError(DateTime firstDate, DateTime lastDate) {
+  if (firstDate.year != lastDate.year) {
+    return 'Tahun harus antara ${firstDate.year}–${lastDate.year}';
+  }
+  if (firstDate.month == lastDate.month) {
+    return 'Tanggal harus di bulan ${_monthYear(firstDate)}';
+  }
+  return 'Tanggal harus antara ${_monthYear(firstDate)} – ${_monthYear(lastDate)}';
+}
 
 DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
 
@@ -206,7 +231,7 @@ DateInputValidation validateDateInput(
   final lowestYear = prefix * scale;
   final highestYear = lowestYear + scale - 1;
   if (highestYear < firstDate.year || lowestYear > lastDate.year) {
-    return _rejected(yearRangeError(firstDate, lastDate));
+    return _rejected(dateRangeError(firstDate, lastDate));
   }
   if (digits.length < 8) return _pending;
 
@@ -385,10 +410,15 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
                     counterText: '',
                     isDense: true,
                     errorText: _startError,
-                    // Without this the decorator renders the error as a single
-                    // ellipsized line, clipping the longer messages
-                    // ("Tahun harus antara …"). Let them wrap instead.
-                    errorMaxLines: 3,
+                    // Without this the decorator renders the error as a
+                    // single ellipsized line, clipping the longer
+                    // messages ("Tanggal harus antara …"). Let them wrap
+                    // instead. Four, not three: the month-granularity
+                    // message is longer than the year one it replaced,
+                    // and measured at 360px it needs the fourth line —
+                    // three re-introduced the very truncation this
+                    // setting exists to prevent.
+                    errorMaxLines: 4,
                   ),
                   onChanged: _handleStartChanged,
                 ),
@@ -408,10 +438,15 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
                     counterText: '',
                     isDense: true,
                     errorText: _endError,
-                    // Without this the decorator renders the error as a single
-                    // ellipsized line, clipping the longer messages
-                    // ("Tahun harus antara …"). Let them wrap instead.
-                    errorMaxLines: 3,
+                    // Without this the decorator renders the error as a
+                    // single ellipsized line, clipping the longer
+                    // messages ("Tanggal harus antara …"). Let them wrap
+                    // instead. Four, not three: the month-granularity
+                    // message is longer than the year one it replaced,
+                    // and measured at 360px it needs the fourth line —
+                    // three re-introduced the very truncation this
+                    // setting exists to prevent.
+                    errorMaxLines: 4,
                   ),
                   onChanged: _handleEndChanged,
                 ),

@@ -134,7 +134,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('date_range_sheet_start_field')), '01011999');
     await tester.pump();
 
-    final expected = yearRangeError(DateTime(2020), DateTime(2026, 12, 31));
+    final expected = dateRangeError(DateTime(2020), DateTime(2026, 12, 31));
     final error = tester.widget<Text>(find.text(expected));
     expect(error.data, expected);
     expect(error.maxLines, isNull);

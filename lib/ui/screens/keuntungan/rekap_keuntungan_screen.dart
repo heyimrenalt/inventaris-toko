@@ -69,6 +69,11 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
   /// when no sale qualifies for the profit calculation.
   ProfitDateRange? _allTimeRange;
 
+  /// Floor for the period picker: the oldest mutation in the ledger,
+  /// resolved once when the screen opens rather than inside
+  /// [_loadRecapData], which re-runs on every period change.
+  DateTime? _earliestMutationDate;
+
   bool _loading = true;
 
   /// True while a PDF is being generated and shared. Disables the Bagikan
@@ -84,6 +89,13 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
   void initState() {
     super.initState();
     _loadRecapData();
+    _loadEarliestMutationBound();
+  }
+
+  Future<void> _loadEarliestMutationBound() async {
+    final earliest = await widget.mutationRepository.getEarliestMutationDate();
+    if (!mounted) return;
+    setState(() => _earliestMutationDate = earliest);
   }
 
   /// Sets the period and immediately re-runs the query. The only way the
@@ -421,6 +433,7 @@ class _RekapKeuntunganScreenState extends State<RekapKeuntunganScreen> {
             keyPrefix: 'recap_period',
             period: _period,
             onChanged: _applyPeriod,
+            earliestDate: _earliestMutationDate,
             enabled: !_loading,
           ),
           const SizedBox(height: AppSpacing.md),

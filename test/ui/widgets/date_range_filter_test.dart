@@ -188,7 +188,7 @@ void main() {
       expect(parse('31/12/2020', first: historyFloor), isNull);
       expect(parse('01/01/2021', first: historyFloor), DateTime(2021, 1, 1));
       // The report screens floor, which is still 2020.
-      expect(parse('01/01/2020', first: DateTime(kMinValidYear)), DateTime(2020, 1, 1));
+      expect(parse('01/01/2020', first: DateTime(2020)), DateTime(2020, 1, 1));
     });
 
     test('rejects a non-numeric segment reaching the parser directly', () {
@@ -272,9 +272,9 @@ void main() {
     });
 
     test('a year prefix that rules out every allowed year fails early', () {
-      expect(validate('01/01/19').error, yearRangeError(firstDate, lastDate));
-      expect(validate('01/01/3').error, yearRangeError(firstDate, lastDate));
-      expect(validate('01/01/9').error, yearRangeError(firstDate, lastDate));
+      expect(validate('01/01/19').error, dateRangeError(firstDate, lastDate));
+      expect(validate('01/01/3').error, dateRangeError(firstDate, lastDate));
+      expect(validate('01/01/9').error, dateRangeError(firstDate, lastDate));
     });
 
     test('a year prefix that could still land in range is left alone', () {
@@ -295,7 +295,7 @@ void main() {
     });
 
     test('a real date below the floor reports the year range', () {
-      expect(validate('01/01/2019').error, yearRangeError(firstDate, lastDate));
+      expect(validate('01/01/2019').error, dateRangeError(firstDate, lastDate));
     });
 
     test('typing a valid past date never errors at any point along the way', () {
@@ -360,10 +360,48 @@ void main() {
     });
   });
 
+  group('dateRangeError granularity follows the bounds', () {
+    test('bounds in different years name the years', () {
+      expect(
+        dateRangeError(DateTime(2024, 3, 4), DateTime(2026, 9, 1)),
+        'Tahun harus antara 2024\u20132026',
+      );
+    });
+
+    test('bounds inside one year name the months instead', () {
+      // The case the old year-only message made useless: with a floor
+      // derived from the oldest real mutation, both bounds routinely sit
+      // in the same year and "antara 2026-2026" told the user nothing.
+      expect(
+        dateRangeError(DateTime(2026, 8, 19), DateTime(2026, 9, 1)),
+        'Tanggal harus antara Agu 2026 \u2013 Sep 2026',
+      );
+    });
+
+    test('bounds inside one month name that single month', () {
+      expect(
+        dateRangeError(DateTime(2026, 8, 19), DateTime(2026, 8, 31)),
+        'Tanggal harus di bulan Agu 2026',
+      );
+    });
+
+    test('the month form is what a rejected year prefix actually shows', () {
+      final validation = validateDateInput(
+        '01/01/1999',
+        firstDate: DateTime(2026, 8, 19),
+        lastDate: DateTime(2026, 9, 1),
+      );
+      expect(validation.error, 'Tanggal harus antara Agu 2026 \u2013 Sep 2026');
+    });
+  });
+
   group('error messages render in full instead of being truncated', () {
-    // The longest message the field can show, and the one that was being
-    // clipped to "Tahun harus antara …" before errorMaxLines was set.
-    final longest = yearRangeError(DateTime(kMinValidYear), DateTime(2026, 9, 1));
+    // The longest message the field can show, and the shape that was
+    // being clipped before errorMaxLines was set. Since the bound became
+    // data-derived this is the *month* form, not the year form: bounds
+    // inside one year now report months, which is several characters
+    // longer than "Tahun harus antara 2020–2026" ever was.
+    final longest = dateRangeError(DateTime(2026, 8, 19), DateTime(2026, 9, 1));
 
     Future<void> pumpBar(WidgetTester tester) async {
       await tester.pumpWidget(
@@ -372,7 +410,7 @@ void main() {
             body: DateRangeFilterBar(
               selectedRange: null,
               onChanged: (_) {},
-              firstDate: DateTime(kMinValidYear),
+              firstDate: DateTime(2026, 8, 19),
               lastDate: DateTime(2026, 9, 1),
             ),
           ),
@@ -381,7 +419,7 @@ void main() {
     }
 
     for (final field in const ['mutasi_date_start_field', 'mutasi_date_end_field']) {
-      testWidgets('$field shows the whole year-range message across lines', (tester) async {
+      testWidgets('$field shows the whole out-of-range message across lines', (tester) async {
         // A narrow phone width is what made the single line overflow.
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1.0;

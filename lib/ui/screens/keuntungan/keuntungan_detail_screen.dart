@@ -40,6 +40,13 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
   /// while a specific range is selected (the range is already in the
   /// title) and when no sale qualifies for the profit calculation at all.
   ProfitDateRange? _allTimeRange;
+
+  /// Floor for the period picker: the oldest mutation in the ledger.
+  /// Resolved once when the screen opens, deliberately outside [_load] —
+  /// that runs every 2 seconds and on every watchLazy event, and a bound
+  /// shifting under a half-typed date would be worse than a stale one.
+  DateTime? _earliestMutationDate;
+
   final Map<String, bool> _expandedMonths = {};
   bool _loading = true;
 
@@ -60,6 +67,7 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadEarliestMutationBound();
 
     _mutationsSubscription = widget.isar.stockMutations.watchLazy().listen((_) => _load());
     _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) => _load());
@@ -70,6 +78,12 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
     _refreshTimer.cancel();
     _mutationsSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadEarliestMutationBound() async {
+    final earliest = await _mutationRepository.getEarliestMutationDate();
+    if (!mounted) return;
+    setState(() => _earliestMutationDate = earliest);
   }
 
   Future<void> _load() async {
@@ -306,6 +320,7 @@ class _KeuntunganDetailScreenState extends State<KeuntunganDetailScreen> {
       keyPrefix: 'keuntungan',
       period: _period,
       onChanged: _applyPeriod,
+      earliestDate: _earliestMutationDate,
     );
   }
 

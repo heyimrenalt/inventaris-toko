@@ -7,7 +7,9 @@ import 'package:inventaris_toko/data/repositories/category_repository.dart';
 import 'package:inventaris_toko/data/repositories/product_repository.dart';
 import 'package:inventaris_toko/data/repositories/stock_mutation_repository.dart';
 import 'package:inventaris_toko/ui/screens/mutasi/mutasi_screen.dart';
+import 'package:inventaris_toko/ui/screens/keuntungan/keuntungan_detail_screen.dart';
 import 'package:inventaris_toko/ui/screens/mutasi/product_mutation_history_screen.dart';
+import 'package:inventaris_toko/ui/widgets/report_period_filter.dart';
 import 'package:inventaris_toko/ui/widgets/date_range_filter.dart';
 import 'package:isar_community/isar.dart';
 
@@ -240,6 +242,30 @@ void main() {
       // firstDate/lastDate assertions, and it is showing today.
       expect(tester.takeException(), isNull);
       expect(find.text('${now.day}'), findsWidgets);
+    });
+  });
+
+  group('Laporan / Keuntungan', () {
+    testWidgets('takes its firstDate from the earliest mutation, not a hardcoded 2020',
+        (tester) async {
+      await tester.runAsync(() async {
+        final category = await categoryRepository.create('Snacks');
+        final product = await productRepository.create(
+          name: 'Chips',
+          categoryId: category.id,
+          unit: 'pcs',
+          sellPrice: 5000,
+        );
+        final oldest = threeYearsAgo();
+        await insertMutationAt(productId: product.id, createdAt: oldest);
+
+        await tester.pumpWidget(wrap(KeuntunganDetailScreen(isar: isar)));
+        await settleAfterAsyncWork(tester);
+
+        final filter = tester.widget<ReportPeriodFilter>(find.byType(ReportPeriodFilter));
+        expect(filter.earliestDate, oldest);
+        expect(filter.earliestDate!.year, isNot(2020));
+      });
     });
   });
 }

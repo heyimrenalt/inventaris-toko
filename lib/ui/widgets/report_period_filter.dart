@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 
 import '../../domain/profit_report.dart';
 import 'app_snack.dart';
-import 'date_range_filter.dart';
 import 'date_range_picker_sheet.dart';
 
 /// Formats a [ReportPeriod] for display. Shared with any caller that
@@ -94,12 +93,31 @@ class ReportPeriodFilter extends StatelessWidget {
     super.key,
     required this.period,
     required this.onChanged,
+    this.earliestDate,
     this.keyPrefix = 'report_period',
     this.enabled = true,
   });
 
   final ReportPeriod period;
   final ValueChanged<ReportPeriod> onChanged;
+
+  /// Floor for the picker and its typed fields: the oldest mutation in
+  /// the ledger, resolved once by the hosting screen. `null` (empty
+  /// ledger, or still loading) falls back to today — there is no span to
+  /// report, so an honest empty bound beats an invented year.
+  ///
+  /// This replaced a hardcoded 2020. That constant was never derived from
+  /// anything: it was written as a literal when the profit recap first
+  /// landed and only later given a name, which made it read as a decision
+  /// rather than the guess it was.
+  ///
+  /// Deliberately the whole ledger's earliest mutation, not the earliest
+  /// *profitable* stock-out that this screen's "Semua" label reports. The
+  /// two can differ, so the picker may accept a start date that predates
+  /// the span named in the label — an over-permissive floor yields an
+  /// empty report, which is recoverable, whereas a floor that rejects a
+  /// real date is the bug this whole change exists to remove.
+  final DateTime? earliestDate;
 
   /// Prefix for the widget keys of the two buttons, so a screen hosting
   /// more than one filter (or a test targeting a specific screen) can
@@ -115,7 +133,7 @@ class ReportPeriodFilter extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final picked = await showDateRangePickerSheet(
       context: context,
-      firstDate: DateTime(kMinValidYear),
+      firstDate: earliestDate ?? today,
       // Today, not the end of the year: the same ceiling the sheet's
       // typed fields now enforce, so picking and typing agree.
       lastDate: today,
