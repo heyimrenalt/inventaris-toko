@@ -1,4 +1,5 @@
-import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventaris_toko/ui/widgets/date_range_filter.dart';
 
@@ -357,5 +358,48 @@ void main() {
       final retyped = _apply(formatter, '', 'ab01cd12ef2026gh99').text;
       expect(retyped, '01/12/2026');
     });
+  });
+
+  group('error messages render in full instead of being truncated', () {
+    // The longest message the field can show, and the one that was being
+    // clipped to "Tahun harus antara …" before errorMaxLines was set.
+    final longest = yearRangeError(DateTime(kMinValidYear), DateTime(2026, 9, 1));
+
+    Future<void> pumpBar(WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DateRangeFilterBar(
+              selectedRange: null,
+              onChanged: (_) {},
+              firstDate: DateTime(kMinValidYear),
+              lastDate: DateTime(2026, 9, 1),
+            ),
+          ),
+        ),
+      );
+    }
+
+    for (final field in const ['mutasi_date_start_field', 'mutasi_date_end_field']) {
+      testWidgets('$field shows the whole year-range message across lines', (tester) async {
+        // A narrow phone width is what made the single line overflow.
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await pumpBar(tester);
+        // "01/01/19…" — the year prefix rules every allowed year out.
+        await tester.enterText(find.byKey(Key(field)), '01011999');
+        await tester.pump();
+
+        final error = tester.widget<Text>(find.text(longest));
+        expect(error.data, longest);
+        expect(error.maxLines, isNot(1));
+        expect(error.maxLines, greaterThan(1));
+        // The rendered paragraph must not have been ellipsized away.
+        expect(tester.renderObject<RenderParagraph>(find.text(longest)).didExceedMaxLines, isFalse);
+      });
+    }
+
   });
 }

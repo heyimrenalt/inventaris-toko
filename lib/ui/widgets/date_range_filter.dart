@@ -385,6 +385,10 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
                     counterText: '',
                     isDense: true,
                     errorText: _startError,
+                    // Without this the decorator renders the error as a single
+                    // ellipsized line, clipping the longer messages
+                    // ("Tahun harus antara …"). Let them wrap instead.
+                    errorMaxLines: 3,
                   ),
                   onChanged: _handleStartChanged,
                 ),
@@ -404,6 +408,10 @@ class _DateRangeFilterBarState extends State<DateRangeFilterBar> {
                     counterText: '',
                     isDense: true,
                     errorText: _endError,
+                    // Without this the decorator renders the error as a single
+                    // ellipsized line, clipping the longer messages
+                    // ("Tahun harus antara …"). Let them wrap instead.
+                    errorMaxLines: 3,
                   ),
                   onChanged: _handleEndChanged,
                 ),

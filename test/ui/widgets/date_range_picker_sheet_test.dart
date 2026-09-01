@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventaris_toko/ui/widgets/date_range_filter.dart';
 import 'package:inventaris_toko/ui/widgets/date_range_picker_sheet.dart';
 
 void main() {
@@ -120,5 +122,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result, isNull);
+  });
+
+  testWidgets('a long validation message wraps instead of being truncated', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await openSheet(tester);
+    // "01/01/19…" — the year prefix rules every allowed year out.
+    await tester.enterText(find.byKey(const Key('date_range_sheet_start_field')), '01011999');
+    await tester.pump();
+
+    final expected = yearRangeError(DateTime(2020), DateTime(2026, 12, 31));
+    final error = tester.widget<Text>(find.text(expected));
+    expect(error.data, expected);
+    expect(error.maxLines, isNull);
+    expect(error.overflow, isNot(TextOverflow.ellipsis));
+    expect(tester.renderObject<RenderParagraph>(find.text(expected)).didExceedMaxLines, isFalse);
   });
 }
