@@ -24,6 +24,7 @@ import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/settings_group.dart';
 import '../../widgets/time_picker_sheet.dart';
 import 'faq_screen.dart';
+import '../produk/archived_products_screen.dart';
 import 'kelola_kategori_screen.dart';
 import 'tentang_aplikasi_screen.dart';
 
@@ -711,6 +712,17 @@ class _PengaturanScreenState extends State<PengaturanScreen> {
                 title: 'Kelola kategori',
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => KelolaKategoriScreen.show(context, isar: widget.isar),
+              ),
+              SettingsRow(
+                icon: Icons.inventory_2_outlined,
+                title: 'Produk diarsipkan',
+                description: 'Lihat dan pulihkan produk yang disembunyikan dari daftar',
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ArchivedProductsScreen(isar: widget.isar),
+                  ),
+                ),
               ),
             ],
           ),

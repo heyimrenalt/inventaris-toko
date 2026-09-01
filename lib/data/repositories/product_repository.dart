@@ -245,6 +245,60 @@ class ProductRepository {
     return product;
   }
 
+  /// Archives several products in one go, skipping ids that no longer
+  /// exist rather than failing the whole batch — a stale selection (the
+  /// product was deleted on another screen while the grid was open) must
+  /// not cost the user the rest of their selection.
+  ///
+  /// Returns the ids actually archived, which is what an "Urungkan"
+  /// action needs: undoing must restore exactly what this changed, not
+  /// everything that was selected.
+  Future<List<int>> archiveMany(Iterable<int> ids) async {
+    final archived = <int>[];
+    for (final id in ids) {
+      final product = await getById(id);
+      if (product == null || product.isArchived) continue;
+      await archive(id);
+      archived.add(id);
+    }
+    return archived;
+  }
+
+  /// Restores several archived products. Counterpart to [archiveMany],
+  /// used by its undo.
+  Future<void> unarchiveMany(Iterable<int> ids) async {
+    for (final id in ids) {
+      final product = await getById(id);
+      if (product == null || !product.isArchived) continue;
+      await unarchive(id);
+    }
+  }
+
+  /// Deletes several products, reporting per-product outcomes instead of
+  /// aborting on the first refusal.
+  ///
+  /// [delete]'s rule is unchanged and deliberately not relaxed for bulk:
+  /// a product with stock mutations is **not** deleted, because the
+  /// ledger is an audit trail and must survive the product it describes.
+  /// So a batch over a shop's real catalogue will commonly delete very
+  /// few and block many, and the caller is expected to say so rather than
+  /// report a flat "done".
+  Future<BulkDeleteResult> deleteMany(Iterable<int> ids) async {
+    final deleted = <Product>[];
+    final blocked = <Product>[];
+    for (final id in ids) {
+      final product = await getById(id);
+      if (product == null) continue;
+      try {
+        await delete(id);
+        deleted.add(product);
+      } on ProductHasHistoryException {
+        blocked.add(product);
+      }
+    }
+    return BulkDeleteResult(deleted: deleted, blocked: blocked);
+  }
+
   Future<Product> unarchive(int id) async {
     final product = await getById(id);
     if (product == null) {
@@ -367,4 +421,20 @@ class ProductRepository {
       throw DuplicateProductCodeException(code);
     }
   }
+}
+
+/// Outcome of [ProductRepository.deleteMany].
+///
+/// [deleted] carries whole products rather than ids so the caller can
+/// clean up their photo files, which the repository does not own.
+class BulkDeleteResult {
+  const BulkDeleteResult({required this.deleted, required this.blocked});
+
+  /// Products removed from the database.
+  final List<Product> deleted;
+
+  /// Products left untouched because they have stock mutation history.
+  final List<Product> blocked;
+
+  bool get isEmpty => deleted.isEmpty && blocked.isEmpty;
 }

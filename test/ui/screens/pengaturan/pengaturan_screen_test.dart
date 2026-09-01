@@ -252,6 +252,8 @@ void main() {
 
       expect(find.byKey(const Key('pengaturan_daily_summary_time')), findsOneWidget);
 
+      await tester.ensureVisible(find.byKey(const Key('pengaturan_daily_summary_toggle')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('pengaturan_daily_summary_toggle')));
       await settleAfterAsyncWork(tester);
 
@@ -266,10 +268,14 @@ void main() {
     await tester.runAsync(() async {
       await pumpScreen(tester);
 
+      await tester.ensureVisible(find.byKey(const Key('pengaturan_daily_summary_toggle')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('pengaturan_daily_summary_toggle')));
       await settleAfterAsyncWork(tester);
       expect(find.byKey(const Key('pengaturan_daily_summary_time')), findsNothing);
 
+      await tester.ensureVisible(find.byKey(const Key('pengaturan_daily_summary_toggle')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('pengaturan_daily_summary_toggle')));
       await settleAfterAsyncWork(tester);
       expect(find.byKey(const Key('pengaturan_daily_summary_time')), findsOneWidget);
@@ -424,6 +430,8 @@ void main() {
     await tester.runAsync(() async {
       await pumpScreen(tester);
 
+      await tester.ensureVisible(find.byKey(const Key('pengaturan_daily_summary_time')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('pengaturan_daily_summary_time')));
       await tester.pumpAndSettle();
 
@@ -437,7 +445,9 @@ void main() {
       await tester.runAsync(() async {
         await pumpScreen(tester);
 
-        await tester.tap(find.byKey(const Key('pengaturan_daily_summary_time')));
+        await tester.ensureVisible(find.byKey(const Key('pengaturan_daily_summary_time')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pengaturan_daily_summary_time')));
         await tester.pumpAndSettle();
 
         await tester.tap(find.byKey(const Key('time_picker_sheet_mode_toggle')));

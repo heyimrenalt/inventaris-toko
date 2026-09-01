@@ -9,6 +9,7 @@ import '../../../data/repositories/app_settings_repository.dart';
 import '../../../data/repositories/category_repository.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/stock_mutation_repository.dart';
+import '../../../services/photo_storage_service.dart';
 import '../../navigation/keyboard_safe_push.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_dimensions.dart';
@@ -16,9 +17,12 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_search_bar.dart';
+import '../../widgets/app_snack.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/glass_bottom_nav.dart';
 import '../../widgets/category_tree_picker.dart';
 import '../../widgets/product_grid_card.dart';
+import 'archived_products_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_form_screen.dart';
 import 'sort_mode.dart';
@@ -30,7 +34,8 @@ class ProdukScreen extends StatefulWidget {
     this.scrollController,
     this.productRepository,
     this.categoryRepository,
-  });
+    PhotoStorageService? photoStorageService,
+  }) : photoStorageService = photoStorageService ?? const ImagePickerPhotoStorageService();
 
   final Isar isar;
 
@@ -44,6 +49,11 @@ class ProdukScreen extends StatefulWidget {
   /// call-counting fake to verify pull-to-refresh actually re-queries.
   final ProductRepository? productRepository;
   final CategoryRepository? categoryRepository;
+
+  /// Owned here because a bulk delete has to remove the deleted
+  /// products' photo files, which the repository deliberately knows
+  /// nothing about. Same seam ProductDetailScreen exposes.
+  final PhotoStorageService photoStorageService;
 
   @override
   State<ProdukScreen> createState() => _ProdukScreenState();
@@ -67,6 +77,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
   String _searchQuery = '';
   bool _loading = true;
   SortMode _sortMode = SortMode.defaultOrder;
+
+  /// Ids picked in multi-select. Empty *and* [_selectionMode] false is
+  /// the normal browsing state; the two are tracked separately so
+  /// deselecting the last card keeps the mode open rather than snapping
+  /// the user out of it mid-decision.
+  final Set<int> _selectedIds = {};
+  bool _selectionMode = false;
 
   StreamSubscription<void>? _productsSubscription;
   StreamSubscription<void>? _categoriesSubscription;
@@ -163,6 +180,155 @@ class _ProdukScreenState extends State<ProdukScreen> {
     await _loadData();
   }
 
+  /// The Arsip screen had no way in at all before this: it was built and
+  /// tested, but never pushed from anywhere in the app, so archiving a
+  /// product removed it from view with no route back — [unarchive] was
+  /// unreachable too. Reloading on return is what makes a restored
+  /// product reappear here immediately.
+  void _enterSelection(Product product) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds
+        ..clear()
+        ..add(product.id);
+    });
+  }
+
+  void _toggleSelection(Product product) {
+    setState(() {
+      if (!_selectedIds.remove(product.id)) _selectedIds.add(product.id);
+    });
+  }
+
+  void _exitSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  /// The selection can outlive the products in it — a background reload
+  /// may drop one that was archived or deleted elsewhere — so every bulk
+  /// action resolves against what is currently on screen.
+  List<Product> get _selectedProducts =>
+      _products.where((product) => _selectedIds.contains(product.id)).toList();
+
+  Future<void> _archiveSelected() async {
+    final ids = _selectedProducts.map((product) => product.id).toList();
+    if (ids.isEmpty) return;
+
+    final archived = await _productRepository.archiveMany(ids);
+    if (!mounted) return;
+    _exitSelection();
+    await _loadData();
+    if (!mounted) return;
+
+    // Undo restores exactly what was archived, not what was selected —
+    // anything already archived is untouched by both halves.
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    AppSnack.action(
+      context,
+      message: archived.length == 1
+          ? '1 produk diarsipkan'
+          : '${archived.length} produk diarsipkan',
+      actionLabel: 'Urungkan',
+      duration: const Duration(seconds: 5),
+      onAction: () async {
+        await _productRepository.unarchiveMany(archived);
+        await _loadData();
+      },
+    );
+  }
+
+  Future<void> _deleteSelected() async {
+    final selected = _selectedProducts;
+    if (selected.isEmpty) return;
+
+    final confirmed = await showConfirmDialog(
+      context: context,
+      title: 'Hapus Produk',
+      message: selected.length == 1
+          ? "Hapus produk '${selected.first.name}'? Tindakan ini tidak bisa dibatalkan."
+          : 'Hapus ${selected.length} produk? Tindakan ini tidak bisa dibatalkan. '
+              'Produk yang punya riwayat mutasi tidak akan dihapus.',
+      confirmLabel: 'Hapus',
+      isDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await _productRepository.deleteMany(
+      selected.map((product) => product.id),
+    );
+
+    // Photo files belong to this layer, not the repository, so they are
+    // cleaned up here — and only for rows that actually went away.
+    for (final product in result.deleted) {
+      final photoPath = product.photoPath;
+      if (photoPath != null && photoPath.isNotEmpty) {
+        await widget.photoStorageService.deletePhoto(photoPath);
+      }
+    }
+
+    if (!mounted) return;
+    _exitSelection();
+    await _loadData();
+    if (!mounted) return;
+
+    if (result.blocked.isEmpty) {
+      AppSnack.success(context, '${result.deleted.length} produk dihapus');
+      return;
+    }
+    await _offerArchiveForBlocked(result);
+  }
+
+  /// A bulk delete over a real catalogue mostly *fails*: [delete] refuses
+  /// any product with stock mutations, because the ledger is an audit
+  /// trail that has to outlive the product. Rather than reporting a
+  /// half-success and leaving the user to work out why, the blocked
+  /// products are named and archiving — the operation that does work on
+  /// them — is offered in the same breath.
+  Future<void> _offerArchiveForBlocked(BulkDeleteResult result) async {
+    final blockedCount = result.blocked.length;
+    final deletedLine = result.deleted.isEmpty
+        ? ''
+        : '${result.deleted.length} produk dihapus. ';
+
+    final shouldArchive = await showConfirmDialog(
+      context: context,
+      title: 'Sebagian Tidak Bisa Dihapus',
+      message: '$deletedLine$blockedCount produk punya riwayat mutasi stok, '
+          'jadi tidak dihapus — riwayatnya harus tetap utuh. Arsipkan saja '
+          'agar tidak muncul di daftar utama?',
+      confirmLabel: 'Arsipkan',
+    );
+    if (shouldArchive != true || !mounted) return;
+
+    final archived = await _productRepository.archiveMany(
+      result.blocked.map((product) => product.id),
+    );
+    await _loadData();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    AppSnack.action(
+      context,
+      message: '${archived.length} produk diarsipkan',
+      actionLabel: 'Urungkan',
+      duration: const Duration(seconds: 5),
+      onAction: () async {
+        await _productRepository.unarchiveMany(archived);
+        await _loadData();
+      },
+    );
+  }
+
+  Future<void> _openArchived() async {
+    await keyboardSafePush<void>(
+      context,
+      MaterialPageRoute(builder: (_) => ArchivedProductsScreen(isar: widget.isar)),
+    );
+    await _loadData();
+  }
+
   Future<void> _openDetail(Product product) async {
     // keyboardSafePush keeps the search keyboard from popping back up when
     // we return to this list — see its doc for the ModalRoute focus bug.
@@ -176,10 +342,70 @@ class _ProdukScreenState extends State<ProdukScreen> {
   }
 
 
+  PreferredSizeWidget _buildBrowseHeader() {
+    return AppHeader(
+      title: 'Produk',
+      trailing: IconButton(
+        key: const Key('produk_archived_button'),
+        tooltip: 'Produk diarsipkan',
+        icon: const Icon(Icons.inventory_2_outlined),
+        onPressed: _openArchived,
+      ),
+    );
+  }
+
+  /// Replaces the normal header while selecting, rather than layering a
+  /// bar over it: the count has to be the most prominent thing on screen
+  /// when destructive actions are one tap away.
+  PreferredSizeWidget _buildSelectionHeader() {
+    final count = _selectedIds.length;
+    final hasSelection = count > 0;
+    return AppHeader(
+      title: hasSelection ? '$count dipilih' : 'Pilih produk',
+      leading: IconButton(
+        key: const Key('produk_selection_close'),
+        tooltip: 'Batal',
+        icon: const Icon(Icons.close),
+        onPressed: _exitSelection,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: const Key('produk_selection_archive'),
+            tooltip: 'Arsipkan',
+            icon: const Icon(Icons.archive_outlined),
+            onPressed: hasSelection ? _archiveSelected : null,
+          ),
+          IconButton(
+            key: const Key('produk_selection_delete'),
+            tooltip: 'Hapus',
+            icon: const Icon(Icons.delete_outline),
+            color: AppColors.redText,
+            onPressed: hasSelection ? _deleteSelected : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      // Back leaves multi-select instead of leaving the screen — the
+      // reflex for getting out of a selection is Back, and having it
+      // navigate away with cards still ticked would feel like a slip.
+      canPop: !_selectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectionMode) _exitSelection();
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      appBar: const AppHeader(title: 'Produk'),
+      appBar: _selectionMode ? _buildSelectionHeader() : _buildBrowseHeader(),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         child: CustomScrollView(
@@ -429,7 +655,13 @@ class _ProdukScreenState extends State<ProdukScreen> {
             product: product,
             categoryName:
                 categoryId == null ? 'Lainnya' : (categoryNameById[categoryId] ?? '-'),
-            onTap: () => _openDetail(product),
+            selectionMode: _selectionMode,
+            selected: _selectedIds.contains(product.id),
+            onLongPress: () => _enterSelection(product),
+            // While selecting, a tap picks rather than navigates —
+            // otherwise the two gestures would fight over the same card.
+            onTap: () =>
+                _selectionMode ? _toggleSelection(product) : _openDetail(product),
           );
         },
       ),

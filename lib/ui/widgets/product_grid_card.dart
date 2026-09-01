@@ -28,11 +28,25 @@ class ProductGridCard extends StatelessWidget {
     required this.product,
     required this.categoryName,
     required this.onTap,
+    this.onLongPress,
+    this.selectionMode = false,
+    this.selected = false,
   });
 
   final Product product;
   final String categoryName;
   final VoidCallback onTap;
+
+  /// Enters multi-select on the hosting screen. Null outside the Produk
+  /// grid, where a long press means nothing.
+  final VoidCallback? onLongPress;
+
+  /// True once the grid is in multi-select. The tick is shown on every
+  /// card then — empty or filled — so it is obvious which cards can be
+  /// picked, rather than only marking the ones already chosen.
+  final bool selectionMode;
+
+  final bool selected;
 
   /// The photo band's shape. Landscape rather than square: a square band
   /// on a half-width card pushes the text so far down that only two rows
@@ -79,18 +93,39 @@ class ProductGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+      // Shape rather than borderRadius — Material forbids both at once,
+      // and the selection ring needs the side that only shape carries.
+      // A ring rather than a tint or a scale-down: the photo is the whole
+      // point of this card, so selection must not sit on top of it.
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+        side: selected
+            ? const BorderSide(color: AppColors.primary, width: 2)
+            : BorderSide.none,
+      ),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
               aspectRatio: _photoAspectRatio,
-              child: _Photo(
-                photoPath: product.photoPath,
-                productName: product.name,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _Photo(
+                    photoPath: product.photoPath,
+                    productName: product.name,
+                  ),
+                  if (selectionMode)
+                    Positioned(
+                      top: AppSpacing.sm,
+                      right: AppSpacing.sm,
+                      child: _SelectionTick(selected: selected),
+                    ),
+                ],
               ),
             ),
             Expanded(
@@ -146,6 +181,34 @@ class ProductGridCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The checkbox drawn over the photo's top-right corner while the grid
+/// is in multi-select — the same place a phone's gallery puts it, which
+/// is where a non-technical user already looks for it.
+class _SelectionTick extends StatelessWidget {
+  const _SelectionTick({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? AppColors.primary : AppColors.white.withValues(alpha: 0.85),
+        border: Border.all(
+          color: selected ? AppColors.primary : AppColors.gray500,
+          width: 1.5,
+        ),
+      ),
+      child: selected
+          ? const Icon(Icons.check, size: 16, color: AppColors.white)
+          : null,
     );
   }
 }
